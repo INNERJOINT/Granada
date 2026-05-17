@@ -1,0 +1,14 @@
+{
+  "name": "@innerjoint/newtype",
+  "version": "1.0.0",
+  "description": "Development tools plugin for Claude Code - AOSP code search, JIRA analysis, git commit generation",
+  "main": "bridge/mcp-server.cjs",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "build": "echo 'no build step needed'"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  }
+}

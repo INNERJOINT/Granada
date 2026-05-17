@@ -1,0 +1,18 @@
+{
+  "name": "newtype",
+  "version": "1.0.0",
+  "description": "Development tools - AOSP code search, JIRA analysis, git commit generation",
+  "skills": [
+    "./skills/aosp-analyze/",
+    "./skills/aosp-plan/",
+    "./skills/aosp-autopilot/",
+    "./skills/aosp-feature-export/",
+    "./skills/aosp-feature-import/",
+    "./skills/aosp-project/",
+    "./skills/jira-analyze/",
+    "./skills/jira-aftersales/",
+    "./skills/git-commit/"
+  ],
+  "mcpServers": "./.mcp.json",
+  "agents": "./agents/"
+}
