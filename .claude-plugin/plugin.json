@@ -9,18 +9,6 @@
   "repository": "https://github.com/INNERJOINT/Granada",
   "homepage": "https://github.com/INNERJOINT/Granada",
   "keywords": ["aosp", "android", "jira", "git", "rca", "sourcepilot"],
-  "agents": "./agents/",
-  "skills": [
-    "./skills/aosp-analyze/",
-    "./skills/aosp-plan/",
-    "./skills/aosp-autopilot/",
-    "./skills/aosp-feature-export/",
-    "./skills/aosp-feature-import/",
-    "./skills/aosp-project/",
-    "./skills/jira-analyze/",
-    "./skills/jira-aftersales/",
-    "./skills/git-commit/"
-  ],
   "mcpServers": "./.mcp.json",
   "userConfig": {
     "AOSP_MCP_URL": {
