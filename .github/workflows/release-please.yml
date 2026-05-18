@@ -17,8 +17,8 @@ jobs:
           ref: release
           fetch-depth: 0
 
-      - name: Fast-forward master to release
-        run: git push origin release:master
+      - name: Force-sync master to release
+        run: git push --force origin release:master
 
   release-please:
     needs: sync-to-master
@@ -32,9 +32,32 @@ jobs:
           manifest-file: .github/.release-please-manifest.json
           target-branch: master
 
-      - name: Auto-merge Release PR
+      - name: Merge Release PR
         if: steps.release.outputs.pr
-        run: gh pr merge --auto --squash --delete-branch "${{ fromJson(steps.release.outputs.pr).number }}"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
+        run: |
+          PR_NUMBER="${{ fromJson(steps.release.outputs.pr).number }}"
+          PR_BODY=$(gh pr view "$PR_NUMBER" --json body --jq .body)
+          gh pr merge --squash --delete-branch --body "$PR_BODY" "$PR_NUMBER"
+
+      - name: Tag Release
+        if: steps.release.outputs.pr
+        uses: googleapis/release-please-action@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          config-file: .github/release-please-config.json
+          manifest-file: .github/.release-please-manifest.json
+          target-branch: master
+
+      - name: Sync master back to release
+        if: steps.release.outputs.pr
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0
+
+      - name: Push master to release
+        if: steps.release.outputs.pr
+        run: git push --force origin master:release
