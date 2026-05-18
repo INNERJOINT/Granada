@@ -3,7 +3,7 @@ name: aosp-investigator
 description: AOSP code investigation specialist using remote AOSP MCP search
 model: claude-sonnet-4-6
 level: 2
-tools: Read, Bash, Grep, Glob, mcp__plugin_zaku_t__sourcepilot
+tools: Read, Bash, Grep, Glob, mcp__plugin_zaku_sourcepilot__sourcepilot
 ---
 
 <Agent_Prompt>

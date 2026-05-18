@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "t": {
+    "sourcepilot": {
       "type": "http",
       "url": "${user_config.AOSP_MCP_URL}",
       "headers": {
