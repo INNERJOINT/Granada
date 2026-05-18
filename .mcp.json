@@ -1,11 +1,10 @@
 {
   "mcpServers": {
     "t": {
-      "command": "node",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/bridge/mcp-server.cjs"],
-      "env": {
-        "AOSP_MCP_URL": "${user_config.AOSP_MCP_URL}",
-        "AOSP_MCP_KEY": "${user_config.AOSP_MCP_KEY}"
+      "type": "http",
+      "url": "${user_config.AOSP_MCP_URL}",
+      "headers": {
+        "Authorization": "Bearer ${user_config.AOSP_MCP_KEY}"
       }
     }
   }

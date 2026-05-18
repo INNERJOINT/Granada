@@ -6,6 +6,7 @@
 
 const { Server } = require('@modelcontextprotocol/sdk/server/index.js');
 const { StdioServerTransport } = require('@modelcontextprotocol/sdk/server/stdio.js');
+const { ListToolsRequestSchema, CallToolRequestSchema } = require('@modelcontextprotocol/sdk/types.js');
 
 const AOSP_MCP_URL = (process.env.AOSP_MCP_URL || '').replace(/\/+$/, '');
 const AOSP_MCP_KEY = process.env.AOSP_MCP_KEY || '';
@@ -118,7 +119,7 @@ async function callAospMcp(method, params) {
 // MCP Server setup
 const server = new Server({ name: 'zaku', version: '1.0.0' }, { capabilities: { tools: {} } });
 
-server.setRequestHandler('tools/list', async () => ({
+server.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: [{
     name: 'sourcepilot',
     description: 'Search AOSP (Android Open Source Project)  via remote MCP server. Use "tool" to specify which remote tool to call (e.g. "list_projects", "search_code", "search_symbol", "search_file"), and "arguments" for tool-specific parameters.',
@@ -133,7 +134,7 @@ server.setRequestHandler('tools/list', async () => ({
   }],
 }));
 
-server.setRequestHandler('tools/call', async (request) => {
+server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
   if (name !== 'sourcepilot') {
     return { content: [{ type: 'text', text: `Unknown tool: ${name}` }], isError: true };
