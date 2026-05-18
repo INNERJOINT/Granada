@@ -16,8 +16,8 @@ jobs:
         id: release
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          config-file: release-please-config.json
-          manifest-file: .release-please-manifest.json
+          config-file: .github/release-please-config.json
+          manifest-file: .github/.release-please-manifest.json
 
       - name: Auto-merge Release PR
         if: steps.release.outputs.pr
