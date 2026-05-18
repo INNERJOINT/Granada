@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.2](https://github.com/INNERJOINT/Granada/compare/v1.2.1...v1.2.2) (2026-05-18)
+
+
+### Bug Fixes
+
+* **ci:** include PR body as squash merge commit message ([1dcc7fd](https://github.com/INNERJOINT/Granada/commit/1dcc7fdce2d0aa4783d03302de42ade63d64819a))
+* **ci:** simplify release workflow to standard release-please pattern ([e8f720d](https://github.com/INNERJOINT/Granada/commit/e8f720d15c897ffc69f296155b26214154b87de1))
+
 ## [1.2.1](https://github.com/INNERJOINT/Granada/compare/v1.2.0...v1.2.1) (2026-05-18)
 
 
