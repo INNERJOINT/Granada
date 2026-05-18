@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/INNERJOINT/Granada/compare/v1.2.2...v1.3.0) (2026-05-18)
+
+
+### Features
+
+* **ci:** auto squash-merge release PR with changelog body and label update ([1703f60](https://github.com/INNERJOINT/Granada/commit/1703f603eef03d6533fb719bdfe234995841dc95))
+
 ## [1.2.2](https://github.com/INNERJOINT/Granada/compare/v1.2.1...v1.2.2) (2026-05-18)
 
 
