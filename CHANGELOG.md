@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.2.0](https://github.com/INNERJOINT/Granada/compare/zaku-v1.1.0...zaku-v1.2.0) (2026-05-18)
+
+
+### Features
+
+* switch MCP transport from stdio bridge to streamable HTTP ([290de35](https://github.com/INNERJOINT/Granada/commit/290de353068a4f61dbe0a6a67bc5aeed4b6641d6))
+
+
+### Bug Fixes
+
+* **ci:** delete release-please branch after merge ([254cc58](https://github.com/INNERJOINT/Granada/commit/254cc58f9a3930878c5afedb67c932825285e42e))
+* **ci:** target dev branch for release-please and add auto-merge ([e9a07f7](https://github.com/INNERJOINT/Granada/commit/e9a07f79fad99a55e5364d57645fe7701408bb88))
+* **ci:** trigger release-please on release branch and use repo default target ([52fcc15](https://github.com/INNERJOINT/Granada/commit/52fcc15d94854dd9ce34fa9d5b3956a3f4e4f03e))
+
 ## [1.1.0](https://github.com/INNERJOINT/Granada/compare/zaku-v1.0.1...zaku-v1.1.0) (2026-05-18)
 
 
