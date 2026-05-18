@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.1](https://github.com/INNERJOINT/Granada/compare/v1.3.0...v1.3.1) (2026-05-18)
+
+
+### Bug Fixes
+
+* **ci:** find release PR by label instead of relying on empty output ([b7e7a6c](https://github.com/INNERJOINT/Granada/commit/b7e7a6c8ad91fdc1b04b9628ad3791838bb9007c))
+
 ## [1.3.0](https://github.com/INNERJOINT/Granada/compare/v1.2.2...v1.3.0) (2026-05-18)
 
 
