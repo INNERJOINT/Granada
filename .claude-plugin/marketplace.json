@@ -1,0 +1,24 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "zeonic",
+  "description": "Zeonic Corp plugin arsenal for Claude Code — mass-production dev weapons",
+  "owner": {
+    "name": "INNERJOINT",
+    "url": "https://github.com/INNERJOINT"
+  },
+  "version": "1.0.1",
+  "plugins": [
+    {
+      "name": "zaku",
+      "description": "Mass-production dev weapon — AOSP recon, JIRA elimination, Git ammo supply",
+      "version": "1.0.1",
+      "author": {
+        "name": "INNERJOINT"
+      },
+      "homepage": "https://github.com/INNERJOINT/Granada",
+      "source": "./",
+      "category": "development",
+      "tags": ["aosp", "android", "jira", "git", "rca", "sourcepilot"]
+    }
+  ]
+}

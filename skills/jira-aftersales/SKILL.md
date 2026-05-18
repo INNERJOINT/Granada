@@ -24,7 +24,7 @@ Converts technical jira-analyze RCA (Root Cause Analysis) reports into customer-
 </Use_When>
 
 <Do_Not_Use_When>
-- No jira-analyze report exists yet — run `/newtype:jira-analyze <KEY>` first
+- No jira-analyze report exists yet — run `/zaku:jira-analyze <KEY>` first
 - User wants the full technical RCA report — use `jira-analyze` directly
 - User wants interactive conversation about the bug — this produces a static script
 - Issue is not Android-related — jira-analyze only handles Android logs
@@ -79,7 +79,7 @@ mkdir -p /tmp/jira-aftersales-<KEY>
 ### Tier 3: User instruction (fallback — no report available)
 
 - If neither local file nor JIRA comment contains a report:
-- Display: "未找到 jira-analyze 分析报告。请先运行 `/newtype:jira-analyze <KEY>` 生成分析报告，然后重新运行本 skill。"
+- Display: "未找到 jira-analyze 分析报告。请先运行 `/zaku:jira-analyze <KEY>` 生成分析报告，然后重新运行本 skill。"
 - Abort gracefully with `Write {"active": false, current_phase="error"} to .plugin-state/jira-aftersales-state.json`
 
 <!-- Design note: We intentionally do NOT auto-invoke jira-analyze via Skill() mid-execution.
@@ -113,7 +113,7 @@ Spawn an executor subagent:
 
 ```
 Agent(
-  subagent_type="newtype:executor",
+  subagent_type="zaku:executor",
   model="sonnet",
   prompt="你是一个售后话术转换专家。将技术性的根因分析报告转换为客服人员可以直接复制粘贴给用户的售后话术。
 
@@ -191,7 +191,7 @@ grep -iE '\bANR\b|NullPointerException|tombstone|空指针|死锁|\bSIGSEGV\b|\b
 
 <Error_Handling>
 - **MCP unreachable** → abort with "mcp-atlassian 不可用。请检查 JIRA_URL, JIRA_USERNAME, JIRA_API_TOKEN 环境变量。"
-- **No jira-analyze report found (all 3 tiers)** → instruct user to run `/newtype:jira-analyze <KEY>` first, abort gracefully
+- **No jira-analyze report found (all 3 tiers)** → instruct user to run `/zaku:jira-analyze <KEY>` first, abort gracefully
 - **Report too incomplete for transformation** → abort with message explaining which sections are missing: "分析报告不完整，缺少{sections}，无法生成话术。"
 - **Transformation produces forbidden terms after 2 attempts** → append warning "⚠ 此话术可能包含技术术语，请人工审核后使用。", proceed with output
 - **Duplicate aftersales script detected** → warn user, proceed with regeneration
@@ -224,7 +224,7 @@ Update state at each phase boundary for resumability. On resume, read state via 
 - `jira_get_issue` — fetch issue details and comments (mcp-atlassian). Reads comments for report detection (Tier 2) and duplicate check (Phase 3).
 - `jira_add_comment` — post aftersales script as comment on JIRA issue (mcp-atlassian)
 - `Write` / `Read` / `Bash rm` — phase persistence via .plugin-state/jira-aftersales-state.json
-- `Agent(subagent_type="newtype:executor", model="sonnet")` — transformation subagent (Phase 4b)
+- `Agent(subagent_type="zaku:executor", model="sonnet")` — transformation subagent (Phase 4b)
 - `Bash` — grep post-processing for forbidden terminology (Phase 4c), temp directory management
 - `Write` tool — save aftersales script to local file (.plugin-state/specs/)
 </Tool_Usage>
@@ -271,7 +271,7 @@ User: /jira-aftersales SPFB-700
 [Phase 1] Parsed key: SPFB-700. MCP health check pass.
 [Phase 2] Tier 1: No local file.
          Tier 2: No jira-analyze report in JIRA comments.
-         Tier 3: "未找到 jira-analyze 分析报告。请先运行 /newtype:jira-analyze SPFB-700
+         Tier 3: "未找到 jira-analyze 分析报告。请先运行 /zaku:jira-analyze SPFB-700
                   生成分析报告，然后重新运行本 skill。"
 ```
 Why good: Cleanly instructs user to run jira-analyze first. Does not attempt mid-execution Skill() invocation.
@@ -286,7 +286,7 @@ Why bad: Contains developer terminology (SurfaceFlinger, binder, ANR). Should be
 
 <Bad>
 ```
-[Phase 3] No report found. Invoking Skill("newtype:jira-analyze", "SPFB-535")...
+[Phase 3] No report found. Invoking Skill("zaku:jira-analyze", "SPFB-535")...
 ```
 Why bad: Mid-execution Skill() invocation creates state mode conflict. Must instruct user to run jira-analyze first instead.
 </Bad>

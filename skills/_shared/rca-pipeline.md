@@ -28,7 +28,7 @@ Delegate all log parsing to a single `aosp-log-parser` agent. This agent handles
 
 ```
 Agent(
-  subagent_type="newtype:aosp-log-parser",
+  subagent_type="zaku:aosp-log-parser",
   prompt="Parse Android log files for <MODE_NAME> analysis <ANALYSIS_ID>.
 
 Temp directory: <TEMP_DIR>
@@ -67,7 +67,7 @@ Spawn an analyst subagent to extract structured search targets from the problem 
 
 ```
 Agent(
-  subagent_type="newtype:analyst",
+  subagent_type="zaku:analyst",
   prompt="从以下 Android 系统问题描述中提取 AOSP 源码搜索目标。
 
 问题描述: <issue_title>
@@ -92,7 +92,7 @@ Group search targets into 2-3 clusters by subsystem, then spawn one aosp-investi
 
 ```
 Agent(
-  subagent_type="newtype:aosp-investigator",
+  subagent_type="zaku:aosp-investigator",
   prompt="[If --project override is active, prepend: **AOSP Project Override:** Use project `<name>` for ALL sourcepilot search calls. Do NOT read `.plugin-state/aosp-config.json`.]
 
 Search AOSP source code for the following crash-related classch targets:
@@ -129,7 +129,7 @@ Update state: `current_phase: "aosp-searched"`.
 
 ```
 Agent(
-  subagent_type="newtype:analyst",
+  subagent_type="zaku:analyst",
   prompt="Analyze Android crash anomalies for <MODE_NAME> analysis <ANALYSIS_ID> and generate root-cause hypotheses.
 
 Read the anomalies file: <TEMP_DIR>anomalies.md
@@ -169,7 +169,7 @@ Save ouo <TEMP_DIR>hypotheses.md in this format:
 
 ```
 Agent(
-  subagent_type="newtype:analyst",
+  subagent_type="zaku:analyst",
   prompt="基于 AOSP 源码分析结果和问题描述，生成可能的根因假设。
 
 问题描述: <issue_title>
@@ -198,7 +198,7 @@ Spawn one agent per hypothesis (max 3). Each agent receives Phase 4 context to a
 
 ```
 Agent(
-  subagent_type="newtype:aosp-investigator",
+  subagent_type="zaku:aosp-investigator",
   prompt="[If --project override is active, prepend: **AOSP Project Override:** Use project `<name>` for ALL sourcepilot search calls.]
 
 Investigate this Android crash hypothesis for <MODE_NAME> analysis <ANALYSIS_ID>:

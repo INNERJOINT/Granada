@@ -69,7 +69,7 @@ Automates Android bug root-cause analysis by fetching JIRA issue details via mcp
    - If `--project` override was provided: display `**🔍 AOSP Project: <name> (命令行指定)**` and use this value for all subsequent phases. Skip reading `.plugin-state/aosp-config.json`.
    - Otherwise, read `.plugin-state/aosp-config.json`:
      - If configured: display `**🔍 AOSP Project: <project_name>**` prominently
-     - If not configured: display `**⚠ 未配置 AOSP 项目** — 搜索将不限定项目范围。运行 /newtype:aosp-project 设置项目。`
+     - If not configured: display `**⚠ 未配置 AOSP 项目** — 搜索将不限定项目范围。运行 /zaku:aosp-project 设置项目。`
    (When no `--project` override is provided, the `aosp-investigator` subagent reads this config and passes `project` to search calls automatically. When `--project` is provided, the override is passed explicitly in subagent prompts — see Phase 4 and Phase 5.)
 
 4. **Initialize state**:
@@ -138,7 +138,7 @@ Delegate all log parsing to a single `aosp-log-parser` agent. This agent handles
 
 ```
 Agent(
-  subagent_type="newtype:aosp-log-parser",
+  subagent_type="zaku:aosp-log-parser",
   model="sonnet",
   prompt="Parse Android log files for JIRA issue <KEY>.
 
@@ -178,7 +178,7 @@ Group search targets into 2-3 clusters by subsystem, then spawn one aosp-investi
 
 ```
 Agent(
-  subagent_type="newtype:aosp-investigator",
+  subagent_type="zaku:aosp-investigator",
   model="sonnet",
   prompt="[If --project override is active, prepend: **AOSP Project Override:** Use project `<name>` for ALL sourcepilot search calls. Do NOT read `.plugin-state/aosp-config.json` — the project has been specified explicitly via CLI flag.]
 
@@ -221,7 +221,7 @@ Spawn an analyst subagent to generate hypotheses from the anomalies:
 
 ```
 Agent(
-  subagent_type="newtype:analyst",
+  subagent_type="zaku:analyst",
   model="sonnet",
   prompt="Analyze Android crash anomalies for JIRA issue <KEY> and generate root-cause hypotheses.
 
@@ -265,7 +265,7 @@ Spawn one agent per hypothesis (max 3). Each agent receives Phase 4 context to a
 
 ```
 Agent(
-  subagent_type="newtype:aosp-investigator",
+  subagent_type="zaku:aosp-investigator",
   model="sonnet",
   prompt="[If --project override is active, prepend: **AOSP Project Override:** Use project `<name>` for ALL sourcepilot search calls. Do NOT read `.plugin-state/aosp-config.json` — the project has been specified explicitly via CLI flag.]
 
@@ -446,10 +446,10 @@ Update state at each phase boundary for resumability. On resume, read state via 
 - `jira_add_comment` — post RCA report as comment on JIRA issue (mcp-atlassian)
 - `sourcepilot` — search AOSP source for crash-related code (always, not conditional)
 - `Write` / `Read` / `Bash rm` — phase persistence via .plugin-state/jira-analyze-state.json
-- `Agent(subagent_type="newtype:aosp-log-parser", model="sonnet")` — log parsing, file classification, and timeline construction (Phase 3)
-- `Agent(subagent_type="newtype:aosp-log-parser", model="sonnet")` — log parsing and timeline construction (Phase 3)
-- `Agent(subagent_type="newtype:analyst", model="sonnet")` — hypothesis generation (Phase 5)
-- `Agent(subagent_type="newtype:aosp-investigator", model="sonnet")` — AOSP source search (Phase 4) and parallel hypothesis investigation (Phase 5)
+- `Agent(subagent_type="zaku:aosp-log-parser", model="sonnet")` — log parsing, file classification, and timeline construction (Phase 3)
+- `Agent(subagent_type="zaku:aosp-log-parser", model="sonnet")` — log parsing and timeline construction (Phase 3)
+- `Agent(subagent_type="zaku:analyst", model="sonnet")` — hypothesis generation (Phase 5)
+- `Agent(subagent_type="zaku:aosp-investigator", model="sonnet")` — AOSP source search (Phase 4) and parallel hypothesis investigation (Phase 5)
 - `Write` tool — save base64 files and final report
 - `Bash` — base64 decode (file-based), temp directory management, intermediate file cleanup
 </Tool_Usage>

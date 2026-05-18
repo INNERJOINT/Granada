@@ -14,10 +14,10 @@ Documents vendor/third-party features added on top of AOSP. Takes a feature desc
 ## Usage
 
 ```
-/newtype:aosp-feature-export "公共DNS" --links https://gitlab.gz.cvte.cn/mt8781_androidu/platform/packages/modules/Connectivity/-/merge_requests/3/diffs
-/newtype:aosp-feature-export "fingerprint unlock" --links https://gitlab.gz.cvte.cn/project/path/-/commit/d2794bf5a8132dc9
-/newtype:aosp-feature-export "USB audio routing" --links <mr-url1>,<commit-url2>
-/newtype:aosp-feature-export "USB audio routing"
+/zaku:aosp-feature-export "公共DNS" --links https://gitlab.gz.cvte.cn/mt8781_androidu/platform/packages/modules/Connectivity/-/merge_requests/3/diffs
+/zaku:aosp-feature-export "fingerprint unlock" --links https://gitlab.gz.cvte.cn/project/path/-/commit/d2794bf5a8132dc9
+/zaku:aosp-feature-export "USB audio routing" --links <mr-url1>,<commit-url2>
+/zaku:aosp-feature-export "USB audio routing"
 ```
 
 ## Flags
@@ -50,7 +50,7 @@ Call `sourcepilot` with `tool: "list_tools"` to verify MCP server reachability. 
 
 After health check passes, read `.plugin-state/aosp-config.json` to display the active AOSP project:
 - If configured: display `**🔍 AOSP Project: <project_name>**` prominently
-- If not configured: display `**⚠ 未配置 AOSP 项目** — 搜索将不限定项目范围。运行 /newtype:aosp-project 设置项目。`
+- If not configured: display `**⚠ 未配置 AOSP 项目** — 搜索将不限定项目范围。运行 /zaku:aosp-project 设置项目。`
 
 (The `aosp-investigator` subagent reads this config and passes `project` to search calls automatically — no need to inject it into spawn prompts.)
 
@@ -125,7 +125,7 @@ Spawn 3 `aosp-investigator` subagents in parallel. Each investigator is given th
 
 ```
 Agent(
-  subagent_type="newtype:aosp-investigator",
+  subagent_type="zaku:aosp-investigator",
   prompt="Investigate AOSP for the original code related to a VENDOR feature: '<description>'.
   
   This is a third-party/vendor customization, NOT an AOSP built-in feature. The vendor has modified or extended AOSP code to implement this feature.
@@ -164,7 +164,7 @@ Pass them the accumulated findings so far and let them independently decide how 
 
 ```
 Agent(
-  subagent_type="newtype:aosp-investigator",
+  subagent_type="zaku:aosp-investigator",
   prompt="Continue investigating AOSP for the original code related to a VENDOR feature: '<description>'.
   
   This is a third-party/vendor customization. The vendor has modified or extended AOSP code.

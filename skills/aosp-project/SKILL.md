@@ -17,9 +17,9 @@ List available AOSP projects from the remote MCP server and select one as the ac
 ## Usage
 
 ```
-/newtype:aosp-project
-/newtype:aosp-project list
-/newtype:aosp-project set <project-name>
+/zaku:aosp-project
+/zaku:aosp-project list
+/zaku:aosp-project set <project-name>
 ```
 
 - **No arguments / `list`**: Show available projects from the MCP server and the currently active project
@@ -115,7 +115,7 @@ Display the result prominently:
 ✅ AOSP 项目已设置为: <project_name>
 
 所有 sourcepilot 搜索将限定在此项目范围内。
-使用 /newtype:aosp-project 可随时更改。
+使用 /zaku:aosp-project 可随时更改。
 ```
 
 ## Tool Usage

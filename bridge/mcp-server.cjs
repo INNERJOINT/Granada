@@ -1,5 +1,5 @@
 /**
- * Standalone MCP Server for newtype plugin
+ * Standalone MCP Server for zaku plugin
  * Provides only the sourcepilot tool (AOSP code search proxy)
  */
 'use strict';
@@ -7,8 +7,8 @@
 const { Server } = require('@modelcontextprotocol/sdk/server/index.js');
 const { StdioServerTransport } = require('@modelcontextprotocol/sdk/server/stdio.js');
 
-const AOSP_MCP_URL = (process.env.AOSP_MCP_URL || 'http://10.23.12.96:8888/mcp').replace(/\/+$/, '');
-const AOSP_MCP_KEY = process.env.AOSP_MCP_KEY || 'sk-abc123';
+const AOSP_MCP_URL = (process.env.AOSP_MCP_URL || '').replace(/\/+$/, '');
+const AOSP_MCP_KEY = process.env.AOSP_MCP_KEY || '';
 
 let sessionId = null;
 let sessionInitPromise = null;
@@ -35,8 +35,10 @@ function parseSseResponse(body) {
     }
   }
   if (events.length > 0) return events[events.length - 1];
-  return JSON.parse(body);
+  try { return JSON.parse(body); } catch { return { error: { message: `Unparseable response: ${body.slice(0, 200)}` } }; }
 }
+
+const FETCH_TIMEOUT_MS = 30000;
 
 async function mcpPost(payload, sid) {
   const headers = {
@@ -46,19 +48,26 @@ async function mcpPost(payload, sid) {
   };
   if (sid) headers['Mcp-Session-Id'] = sid;
 
-  const res = await fetch(AOSP_MCP_URL, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(payload),
-  });
-  const body = await res.text();
-  return { body, headers: res.headers, status: res.status };
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(AOSP_MCP_URL, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+    const body = await res.text();
+    return { body, headers: res.headers, status: res.status };
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 async function initSession() {
   const initRes = await mcpPost({
     jsonrpc: '2.0', id: nextId(), method: 'initialize',
-    params: { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'newtype-aosp', version: '1.0' } },
+    params: { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'zaku-aosp', version: '1.0' } },
   });
   if (initRes.status !== 200) throw new Error(`AOSP MCP initialize failed: ${initRes.status} — ${initRes.body}`);
   const sid = initRes.headers.get('mcp-session-id');
@@ -107,7 +116,7 @@ async function callAospMcp(method, params) {
 }
 
 // MCP Server setup
-const server = new Server({ name: 'newtype', version: '1.0.0' }, { capabilities: { tools: {} } });
+const server = new Server({ name: 'zaku', version: '1.0.0' }, { capabilities: { tools: {} } });
 
 server.setRequestHandler('tools/list', async () => ({
   tools: [{
@@ -116,7 +125,7 @@ server.setRequestHandler('tools/list', async () => ({
     inputSchema: {
       type: 'object',
       properties: {
-        tool: { ton: 'Remote AOSP MCP tool name (e.g. "list_projects", "search_code", "search_symbol", "search_file", "search_regex", "list_repos", "get_file_content", "list_tools")' },
+        tool: { type: 'string', description: 'Remote AOSP MCP tool name (e.g. "list_projects", "search_code", "search_symbol", "search_file", "search_regex", "list_repos", "get_file_content", "list_tools")' },
         arguments: { type: 'object', description: 'Arguments to pass to the remote tool as key-value pairs', additionalProperties: true },
       },
       required: ['tool'],

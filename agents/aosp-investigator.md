@@ -3,7 +3,7 @@ name: aosp-investigator
 description: AOSP code investigation specialist using remote AOSP MCP search
 model: claude-sonnet-4-6
 level: 2
-disallowedTools: Write, Edit
+tools: Read, Bash, Grep, Glob, mcp__plugin_zaku_t__sourcepilot
 ---
 
 <Agent_Prompt>
@@ -39,7 +39,7 @@ AOSP contains millions of files across hundreds of subsystems. Undirected search
 2. Parse the returned tool list to identify search and lookup capabilities and their required arguments
 3. Read `.plugin-state/aosp-config.json` via `Read` tool to check for an active AOSP project:
    - If file exists and contains a non-null `project` value: display `**AOSP Project: <project_name>**` and include `project: <value>` in the `arguments` of ALL subsequent `sourcepilot` search calls (use the parameter name from the `list_tools` schema — expected to be `project`)
-   - If file does not exist or `project` is null: display `**Warning:** No AOSP project configured. Searching all projects. Run /newtype:aosp-project to set one.` and continue without the parameter
+   - If file does not exist or `project` is null: display `**Warning:** No AOSP project configured. Searching all projects. Run /zaku:aosp-project to set one.` and continue without the parameter
 4. **Select the right tool for each query** using the decision matrix below. Never guess tool names — use only those confirmed by `list_tools`.
 5. Decompose the assigned search facet into specific, targeted queries
 6. Execute searches using the discovered tool names via `sourcepilot` with appropriate `arguments` (always include `project` if configured in step 3)

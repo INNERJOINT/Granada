@@ -1,16 +1,16 @@
-# newtype
+# zaku
 
-Independent Claude Code plugin providing AOSP code search, JIRA analysis, and git commit utilities.
+量产型开发支援兵器 — AOSP 索敌、JIRA 歼灭、Git 弹药补给。
 
 ## Installation
 
 ```bash
-npx skills add @innerjoint/newtype
+npx skills add @zeonic/zaku
 ```
 
 Or clone and install locally:
 ```bash
-git clone <repo-url> && cd newtype
+git clone <repo-url> && cd zaku
 claude plugin install .
 ```
 
@@ -18,14 +18,14 @@ claude plugin install .
 
 ### sourcepilot (MCP tool)
 
-Proxies requests to a remote AOSP MCP server for code search. Configure via environment variables:
+Proxies requests to a remote AOSP MCP server for code search. Configure via plugin userConfig (prompted at enable time):
 
-- `AOSP_MCP_URL` — Remote AOSP MCP server endpoint (default: `http://10.23.12.96:8888/mcp`)
-- `AOSP_MCP_KEY` — Authentication key (default: `sk-abc123`)
+- `AOSP_MCP_URL` — Remote AOSP MCP server endpoint
+- `AOSP_MCP_KEY` — Authentication key (stored securely)
 
 Usage: `sourcepilot { tool: "search_code", arguments: { project: "android", query: "..." } }`
 
-Available remote tools: `list_projects`, `list_repos`, `search_code`, `search_symbol`, `search_file`, `search_regex`, `get_file_content`, `list_tools`
+Available remote tools: `list_projects`, `list_repos`, `search_code`, `search_symbol`, `search_file`, `search_regex`, `get_filcontent`, `list_tools`
 
 ## Skills
 

@@ -15,8 +15,8 @@ Investigation-first AOSP planning. Decomposes queries into facets, spawns parall
 ## Usage
 
 ```
-/newtype:aosp-plan "query about AOSP code"
-/newtype:aosp-plan --agents 5 "query"
+/zaku:aosp-plan "query about AOSP code"
+/zaku:aosp-plan --agents 5 "query"
 ```
 
 ## Flags
@@ -45,7 +45,7 @@ Do NOT proceed to spawn agents if this check fails.
 
 After health check passes, read `.plugin-state/aosp-config.json` to display the active AOSP project:
 - If configured: display `**🔍 AOSP Project: <project_name>**` prominently
-- If not configured: display `**⚠ 未配置 AOSP 项目** — 搜索将不限定项目范围。运行 /newtype:aosp-project 设置项目。`
+- If not configured: display `**⚠ 未配置 AOSP 项目** — 搜索将不限定项目范围。运行 /zaku:aosp-project 设置项目。`
 
 (The `aosp-investigator` subagent reads this config and passes `project` to search calls automatically.)
 
@@ -73,7 +73,7 @@ Fire N `aosp-investigator` subagents in parallel (one per facet). N comes from `
 
 ```
 Agent(
-  subagent_type="newtype:aosp-investigator",
+  subagent_type="zaku:aosp-investigator",
   model="sonnet",
   prompt="Investigate AOSP facet: <facet description>. Use sourcepilot tool. Report structured findings with file paths, code snippets, and architectural observations."
 )
@@ -192,7 +192,7 @@ Review the generated plan for AOSP-specific quality. This step runs automaticall
 
 **Sequential enforcement**: Architect MUST complete before Critic starts. Do NOT run both in parallel.
 
-**a. Architect review** via `Agent(subagent_type="newtype:architect", ...)`:
+**a. Architect review** via `Agent(subagent_type="zaku:architect", ...)`:
 
 Review focus:
 - Architectural soundness of proposed AOSP modifications
@@ -205,7 +205,7 @@ Review focus:
 
 Wait for Architect completion before proceeding to Critic.
 
-**b. Critic evaluation** via `Agent(subagent_type="newtype:critic", ...)`:
+**b. Critic evaluation** via `Agent(subagent_type="zaku:critic", ...)`:
 
 Quality criteria:
 - 80%+ plan steps cite AOSP source files from investigation results
@@ -259,9 +259,9 @@ Use `AskUserQuestion` to present the saved plan with these options:
 
 On approval: Call `Write {"active": false} to .plugin-state/aosp-plan-state.json` before invoking the execution skill. Do NOT use `rm -f .plugin-state/*-state.json` — its cancel signal disables stop-hook enforcement for the newly launched mode.
 
-- **Approve and implement via team**: Invoke `Skill("newtype:team")` with the plan path
-- **Approve and execute via ralph**: Invoke `Skill("newtype:ralph")` with the plan path
-- **Clear context and implement**: `Write JSON with active=false)` → `Skill("compact")` → `Skill("newtype:ralph")` with plan path
+- **Approve and implement via team**: Invoke `Skill("zaku:team")` with the plan path
+- **Approve and execute via ralph**: Invoke `Skill("zaku:ralph")` with the plan path
+- **Clear context and implement**: `Write JSON with active=false)` → `Skill("compact")` → `Skill("zaku:ralph")` with plan path
 
 ## Risk-Adaptive Mode
 
@@ -302,8 +302,8 @@ Critical: Never use `rm -f .plugin-state/*-state.json` before launching an execu
 
 ## Tool Usage
 
-- Use `Agent(subagent_type="newtype:architect", ...)` for Architect review in Step 5.5a
-- Use `Agent(subagent_type="newtype:critic", ...)` for Critic evaluation in Step 5.5b
+- Use `Agent(subagent_type="zaku:architect", ...)` for Architect review in Step 5.5a
+- Use `Agent(subagent_type="zaku:critic", ...)` for Critic evaluation in Step 5.5b
 - **CRITICAL**: Architect and Critic calls MUST be sequential, never parallel. Always await the Architect result before issuing the Critic call.
 - Quality gate runs automatically on all plans (not gated by `--interactive`)
 - Re-review loop capped at 3 iterations (narrower scope than general plans)

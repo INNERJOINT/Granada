@@ -1,7 +1,7 @@
 ---
 name: aosp-log-parser
 description: Android log parser specialist — parses logcat, tombstone, ANR traces, and kernel logs, then merges into a unified timeline with deduplicated anomalies
-disallowedTools: Bash, Edit, Glob, WebFetch, WebSearch, NotebookEdit, TaskCreate, TaskUpdate, TaskStop, TeamCreate, TeamDelete, SendMessage, Agent, Skill, ScheduleWakeup
+tools: Read, Write, Grep, Glob
 ---
 
 <Agent_Prompt>

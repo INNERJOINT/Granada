@@ -15,10 +15,10 @@ Takes an exported feature element report (功能元报告, produced by `aosp-fea
 ## Usage
 
 ```
-/newtype:aosp-feature-import .plugin-state/aosp-exports/public-dns.md
-/newtype:aosp-feature-import .plugin-state/aosp-exports/fingerprint-unlock.md --target rk3588_android14
-/newtype:aosp-feature-import .plugin-state/aosp-exports/usb-audio-routing.md --depth shallow
-/newtype:aosp-feature-import .plugin-state/aosp-exports/public-dns.md --execute
+/zaku:aosp-feature-import .plugin-state/aosp-exports/public-dns.md
+/zaku:aosp-feature-import .plugin-state/aosp-exports/fingerprint-unlock.md --target rk3588_android14
+/zaku:aosp-feature-import .plugin-state/aosp-exports/usb-audio-routing.md --depth shallow
+/zaku:aosp-feature-import .plugin-state/aosp-exports/public-dns.md --execute
 ```
 
 ## Flags
@@ -39,7 +39,7 @@ Takes an exported feature element report (功能元报告, produced by `aosp-fea
 
 ## When NOT to Use
 
-- No export report exists yet — run `/newtype:aosp-feature-export` first
+- No export report exists yet — run `/zaku:aosp-feature-export` first
 - Source and target are the same project — the export report already has all the information
 - The feature is an AOSP built-in (not a vendor customization) — use `aosp-plan` instead
 
@@ -68,7 +68,7 @@ Abort with: `AOSP MCP server unreachable. Check AOSP_MCP_URL and AOSP_MCP_KEY en
 Determine the target AOSP project:
 1. If `--target <project>` flag provided: use that value
 2. Otherwise: read `.plugin-state/aosp-config.json` for the active project
-3. If neither available: abort with `未指定目标 AOSP 项目。使用 --target <project> 或运行 /newtype:aosp-project 设置。`
+3. If neither available: abort with `未指定目标 AOSP 项目。使用 --target <project> 或运行 /zaku:aosp-project 设置。`
 
 **1c. Parse Export Report**
 
@@ -150,7 +150,7 @@ For each `critical` and `important` component (up to 6), spawn paired `aosp-inve
 
 ```
 Agent(
-  subagent_type="newtype:aosp-investigator",
+  subagent_type="zaku:aosp-investigator",
   prompt="Verify and enrich AOSP code context for a VENDOR feature import.
 
   **AOSP Project Override:** Use project '<source_project>' for ALL sourcepilot search calls. Do NOT read .plugin-state/aosp-config.json — the project has been specified explicitly by the orchestrator.
@@ -177,7 +177,7 @@ Agent(
 
 ```
 Agent(
-  subagent_type="newtype:aosp-investigator",
+  subagent_type="zaku:aosp-investigator",
   prompt="Find corresponding AOSP code in the TARGET project for a vendor feature port.
 
   **AOSP Project Override:** Use project '<target_project>' for ALL sourcepilot search calls. Do NOT read .plugin-state/aosp-config.json — the project has been specified explicitly by the orchestrator.
@@ -233,7 +233,7 @@ For DIVERGED and MISSING components, spawn additional target investigators (up t
 
 ```
 Agent(
-  subagent_type="newtype:aosp-investigator",
+  subagent_type="zaku:aosp-investigator",
   prompt="Deep investigation for a MISSING/DIVERGED component in target AOSP project.
 
   **AOSP Project Override:** Use project '<target_project>' for ALL sourcepilot search calls. Do NOT read .plugin-state/aosp-config.json — the project has been specified explicitly by the orchestrator.
@@ -321,7 +321,7 @@ Review the generated execution plan for AOSP-specific quality. This step runs au
 
 **Sequential enforcement**: Architect MUST complete before Critic starts. Do NOT run both in parallel.
 
-**Architect review** via `Agent(subagent_type="newtype:architect", ...)`:
+**Architect review** via `Agent(subagent_type="zaku:architect", ...)`:
 
 Review focus:
 - Cross-project mapping correctness (source→target path mappings are sound)
@@ -333,7 +333,7 @@ Review focus:
 
 Wait for Architect completion before proceeding to Critic.
 
-**Critic evaluation** via `Agent(subagent_type="newtype:critic", ...)`:
+**Critic evaluation** via `Agent(subagent_type="zaku:critic", ...)`:
 
 Quality criteria:
 - 80%+ plan steps cite investigation findings from Phase 1/2 (no unsupported claims)
@@ -370,11 +370,11 @@ On approval with suggestions: deduplicate, merge into plan, update the saved pla
 ### Step 8: Execution Handoff (if `--execute` and user approves)
 
 Use `AskUserQuestion` to present the execution plan with options:
-- **执行** — Hand off to `/newtype:aosp-autopilot .plugin-state/plans/aosp-import-<slug>.md`
+- **执行** — Hand off to `/zaku:aosp-autopilot .plugin-state/plans/aosp-import-<slug>.md`
 - **修改后执行** — Return to Step 6 with user feedback
 - **仅保留计划** — Stop here, user will execute manually later
 
-On approval: `Write {"active": false} to .plugin-state/aosp-feature-import-state.json` then invoke `Skill("newtype:aosp-autopilot")`.
+On approval: `Write {"active": false} to .plugin-state/aosp-feature-import-state.json` then invoke `Skill("zaku:aosp-autopilot")`.
 
 ## Output Template
 
@@ -526,21 +526,21 @@ Skill is idempotent — re-running with the same inputs overwrites the output fi
 | Execution handoff (--execute approved) | `Write {"active": false} to .plugin-state/aosp-feature-import-state.json` |
 | Export report not found (unrecoverable) | `Bash: rm -f .plugin-state/aosp-feature-import-state.json` |
 | MCP unreachable (unrecoverable) | `Bash: rm -f .plugin-state/aosp-feature-import-state.json` |
-| User cancels | `/newtype:cancel` calls `rm -f .plugin-state/*-state.json` |
+| User cancels | `/zaku:cancel` calls `rm -f .plugin-state/*-state.json` |
 
 Note: Do not use `rm -f .plugin-state/*-state.json` before launching `aosp-autopilot`. The 30-second cancel signal disables stop-hook enforcement for the newly launched mode. Use `Write JSON with active=false)` instead.
 
 ## Tool Usage
 
 - `sourcepilot`: MCP discovery (`list_tools`) and AOSP code search (via `aosp-investigator` subagents with explicit `project` parameter override)
-- `Agent(subagent_type="newtype:aosp-investigator")`: Parallel investigation of source and target projects
-- `Agent(subagent_type="newtype:architect")`: Architect review in Step 6c quality gate
-- `Agent(subagent_type="newtype:critic")`: Critic evaluation in Step 6c quality gate
+- `Agent(subagent_type="zaku:aosp-investigator")`: Parallel investigation of source and target projects
+- `Agent(subagent_type="zaku:architect")`: Architect review in Step 6c quality gate
+- `Agent(subagent_type="zaku:critic")`: Critic evaluation in Step 6c quality gate
 - `Read`: Parse export report, read `.plugin-state/aosp-config.json`
 - `Write`: Save import guide and execution plan
 - `Write` / `Bash rm`: Manage execution state via .plugin-state/ files
 - `AskUserQuestion`: Execution approval gate (Step 8), quality gate fallback (Step 6c)
-- `Skill("newtype:aosp-autopilot")`: Execution handoff
+- `Skill("zaku:aosp-autopilot")`: Execution handoff
 
 ## Keyword Triggers
 

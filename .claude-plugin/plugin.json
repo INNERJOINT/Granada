@@ -1,7 +1,15 @@
 {
-  "name": "newtype",
-  "version": "1.0.0",
-  "description": "Development tools - AOSP code search, JIRA analysis, git commit generation",
+  "name": "zaku",
+  "version": "1.0.1",
+  "description": "Mass-production dev weapon — AOSP recon, JIRA elimination, Git ammo supply",
+  "author": {
+    "name": "INNERJOINT"
+  },
+  "license": "MIT",
+  "repository": "https://github.com/INNERJOINT/Granada",
+  "homepage": "https://github.com/INNERJOINT/Granada",
+  "keywords": ["aosp", "android", "jira", "git", "rca", "sourcepilot"],
+  "agents": "./agents/",
   "skills": [
     "./skills/aosp-analyze/",
     "./skills/aosp-plan/",
@@ -14,5 +22,18 @@
     "./skills/git-commit/"
   ],
   "mcpServers": "./.mcp.json",
-  "agents": "./agents/"
+  "userConfig": {
+    "AOSP_MCP_URL": {
+      "type": "string",
+      "title": "AOSP MCP Server URL",
+      "description": "Remote AOSP MCP server endpoint",
+      "default": "http://10.23.12.96:8888/mcp"
+    },
+    "AOSP_MCP_KEY": {
+      "type": "string",
+      "title": "AOSP MCP Auth Key",
+      "description": "Authentication key for AOSP MCP server",
+      "sensitive": true
+    }
+  }
 }

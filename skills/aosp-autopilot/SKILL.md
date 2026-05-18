@@ -14,9 +14,9 @@ AOSP 多仓库自动执行引擎。解析 aosp-plan 产出的按仓库分组的�
 ## 使用方式
 
 ```
-/newtype:aosp-plan "查询" → 产出计划 → /newtype:aosp-autopilot .plugin-state/plans/aosp-<slug>.md
-/newtype:aosp-autopilot .plugin-state/plans/aosp-xxx.md
-/newtype:aosp-autopilot --max-retries 5 .plugin-state/plans/aosp-xxx.md
+/zaku:aosp-plan "查询" → 产出计划 → /zaku:aosp-autopilot .plugin-state/plans/aosp-<slug>.md
+/zaku:aosp-autopilot .plugin-state/plans/aosp-xxx.md
+/zaku:aosp-autopilot --max-retries 5 .plugin-state/plans/aosp-xxx.md
 ```
 
 ## 何时使用
@@ -29,7 +29,7 @@ AOSP 多仓库自动执行引擎。解析 aosp-plan 产出的按仓库分组的�
 ## 何时不用
 
 - 计划只涉及单个仓库 — 直接用 `ralph` 或 executor agent
-- 还没有 aosp-plan 产出的计划 — 先运行 `/newtype:aosp-plan`
+- 还没有 aosp-plan 产出的计划 — 先运行 `/zaku:aosp-plan`
 - 不在 AOSP 源码树中（无 `.repo/` 目录） — 用标准 `autopilot` 或 `ralph`
 - 用户只想查看计划不想执行 — 用 `aosp-plan` 即可
 
@@ -176,7 +176,7 @@ cd $AOSP_ROOT/<repo_path> && git branch --show-current
 
 ```
 Agent(
-  subagent_type="newtype:executor",
+  subagent_type="zaku:executor",
   prompt="在 AOSP 仓库中执行以下修改：
 
 工作目录: $AOSP_ROOT/<repo_path>
@@ -335,7 +335,7 @@ aosp-autopilot 管理自身状态以启用 stop-hook 持续执行。
 | `.repo/` 未找到（不可恢复） | `Bash: rm -f .plugin-state/aosp-autopilot-state.json` |
 | 计划文件无法解析（不可恢复） | `Bash: rm -f .plugin-state/aosp-autopilot-state.json` |
 | 执行中异常退出 | 状态保留 active=true，下次启动可恢复 |
-| 用户取消 | `/newtype:cancel` 内部调用 `rm -f .plugin-state/*-state.json` |
+| 用户取消 | `/zaku:cancel` 内部调用 `rm -f .plugin-state/*-state.json` |
 
 注意：不要在准备启动后续技能前调用 `rm -f .plugin-state/*-state.json`。`rm -f .plugin-state/*-state.json` 的 30 秒取消信号会禁用所有 mode 的 stop-hook。正常完成时使用 `Write JSON with active=false)`。
 
@@ -344,10 +344,10 @@ aosp-autopilot 管理自身状态以启用 stop-hook 持续执行。
 aosp-autopilot 是 aosp-plan 的下游执行技能。典型工作流：
 
 ```
-/newtype:aosp-plan "AOSP 查询"
+/zaku:aosp-plan "AOSP 查询"
   → 调查 → 计划生成 → 保存到 .plugin-state/plans/aosp-<slug>.md
   → 用户批准后
-/newtype:aosp-autopilot .plugin-state/plans/aosp-<slug>.md
+/zaku:aosp-autopilot .plugin-state/plans/aosp-<slug>.md
   → 解析 → 分支创建 → 并行执行 → 验证 → 提交 → 报告
 ```
 
@@ -378,7 +378,7 @@ aosp-autopilot 解析 aosp-plan 的 Evidence-Based Plan 部分。aosp-plan 的�
 
 ## 工具使用
 
-- 使用 `Agent(subagent_type="newtype:executor")` 并行派发各仓库的修改 agent（与 aosp-plan 的 aosp-investigator 派发保持一致的 API 风格）
+- 使用 `Agent(subagent_type="zaku:executor")` 并行派发各仓库的修改 agent（与 aosp-plan 的 aosp-investigator 派发保持一致的 API 风格）
 - 使用 `Skill("git-commit")` 为每个仓库生成符合历史风格的 commit
 - 使用 `Write` / `Read` 管理执行状态（.plugin-state/ 目录）
 - 使用 `Bash` 工具执行 `repo start`、`git diff`、`git add <files>` 等 git 操作
@@ -416,10 +416,10 @@ aosp-autopilot 解析 aosp-plan 的 Evidence-Based Plan 部分。aosp-plan 的�
 ### 基本用法
 
 ```
-/newtype:aosp-plan "为 NFC 添加新的 HAL 接口"
+/zaku:aosp-plan "为 NFC 添加新的 HAL 接口"
   → 产出: .plugin-state/plans/aosp-add-nfc-hal.md
 
-/newtype:aosp-autopilot .plugin-state/plans/aosp-add-nfc-hal.md
+/zaku:aosp-autopilot .plugin-state/plans/aosp-add-nfc-hal.md
   → 检测 AOSP 根: /home/user/aosp
   → 解析计划: 3 个仓库任务
     - hardware/interfaces (层级 0, 无依赖)
@@ -436,7 +436,7 @@ aosp-autopilot 解析 aosp-plan 的 Evidence-Based Plan 部分。aosp-plan 的�
 ### 重试场景
 
 ```
-/newtype:aosp-autopilot .plugin-state/plans/aosp-add-nfc-hal.md
+/zaku:aosp-autopilot .plugin-state/plans/aosp-add-nfc-hal.md
   → ...
   → frameworks/base: diff 验证 PARTIAL (缺少 1 个文件修改)
   → 重试 1: 附加差距信息，重新执行
@@ -448,7 +448,7 @@ aosp-autopilot 解析 aosp-plan 的 Evidence-Based Plan 部分。aosp-plan 的�
 ### Dry-run 模式
 
 ```
-/newtype:aosp-autopilot --dry-run .plugin-state/plans/aosp-add-nfc-hal.md
+/zaku:aosp-autopilot --dry-run .plugin-state/plans/aosp-add-nfc-hal.md
   → 检测 AOSP 根: /home/user/aosp
   → 解析计划: 3 个仓库任务
   → 分支创建:

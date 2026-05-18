@@ -93,7 +93,7 @@ Both modes save the report to `.plugin-state/specs/`.
    - If `--project` override was provided: display `**AOSP Project: <name> (命令行指定)**` and use this value for all subsequent phases. Skip reading `.plugin-state/aosp-config.json`.
    - Otherwise, read `.plugin-state/aosp-config.json`:
      - If configured: display `**AOSP Project: <project_name>**` prominently
-     - If not configured: display `**未配置 AOSP 项目** — 搜索将不限定项目范围。运行 /newtype:aosp-project 设置项目。`
+     - If not configured: display `**未配置 AOSP 项目** — 搜索将不限定项目范围。运行 /zaku:aosp-project 设置项目。`
 
 5. **Initialize state**:
 ```
@@ -137,7 +137,7 @@ Delegate all log parsing to a single `aosp-log-parser` agent. This agent handles
 
 ```
 Agent(
-  subagent_type="newtype:aosp-log-parser",
+  subagent_type="zaku:aosp-log-parser",
   model="sonnet",
   prompt="Parse Android log files for analysis <slug>.
 
@@ -177,7 +177,7 @@ Spawn an analyst subagent to extract structured search targets from the problem 
 
 ```
 Agent(
-  subagent_type="newtype:analyst",
+  subagent_type="zaku:analyst",
   model="sonnet",
   prompt="从以下 Android 系统问题描述中提取 AOSP 源码搜索目标。
 
@@ -204,7 +204,7 @@ Group search targets into 2-3 clusters by subsystem, then spawn one aosp-investi
 
 ```
 Agent(
-  subagent_type="newtype:aosp-investigator",
+  subagent_type="zaku:aosp-investigator",
   model="sonnet",
   prompt="[If --project override is active, prepend: **AOSP Project Override:** Use project `<name>` for ALL sourcepilot search calls. Do NOT read `.plugin-state/aosp-config.json` — the project has been specified explicitly via CLI flag.]
 
@@ -249,7 +249,7 @@ Spawn an analyst subagent to generate hypotheses:
 
 ```
 Agent(
-  subagent_type="newtype:analyst",
+  subagent_type="zaku:analyst",
   model="sonnet",
   prompt="Analyze Android crash anomalies for analysis <slug> and generate root-cause hypotheses.
 
@@ -289,7 +289,7 @@ Save output to /tmp/aosp-analyze-<slug>/hypotheses.md in this format:
 
 ```
 Agent(
-  subagent_type="newtype:analyst",
+  subagent_type="zaku:analyst",
   model="sonnet",
   prompt="基于 AOSP 源码分析结果和问题描述，生成可能的根因假设。
 
@@ -326,7 +326,7 @@ Spawn one agent per hypothesis (max 3). Each agent receives Phase 4 context to a
 
 ```
 Agent(
-  subagent_type="newtype:aosp-investigator",
+  subagent_type="zaku:aosp-investigator",
   model="sonnet",
   prompt="[If --project override is active, prepend: **AOSP Project Override:** Use project `<name>` for ALL sourcepilot search calls. Do NOT read `.plugin-state/aosp-config.json` — the project has been specified explicitly via CLI flag.]
 
@@ -516,10 +516,10 @@ Update state at each phase boundary for resumability. On resume, read state via 
 <Tool_Usage>
 - `sourcepilot` — search AOSP source for crash-related code (always, not conditional)
 - `Write` / `Read` / `Bash rm` — phase persistence via .plugin-state/aosp-analyze-state.json
-- `Agent(subagent_type="newtype:aosp-log-parser", model="sonnet")` — log parsing, file classification, and timeline construction (Phase 3)
-- `Agent(subagent_type="newtype:aosp-log-parser", model="sonnet")` — log parsing and timeline construction (Phase 3)
-- `Agent(subagent_type="newtype:analyst", model="sonnet")` — hypothesis generation (Phase 5)
-- `Agent(subagent_type="newtype:aosp-investigator", model="sonnet")` — AOSP context search (Phase 4) + parallel hypothesis investigation (Phase 5)
+- `Agent(subagent_type="zaku:aosp-log-parser", model="sonnet")` — log parsing, file classification, and timeline construction (Phase 3)
+- `Agent(subagent_type="zaku:aosp-log-parser", model="sonnet")` — log parsing and timeline construction (Phase 3)
+- `Agent(subagent_type="zaku:analyst", model="sonnet")` — hypothesis generation (Phase 5)
+- `Agent(subagent_type="zaku:aosp-investigator", model="sonnet")` — AOSP context search (Phase 4) + parallel hypothesis investigation (Phase 5)
 - `Write` — save final report
 - `Bash` — cp, temp directory management
 </Tool_Usage>
