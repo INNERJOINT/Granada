@@ -2,7 +2,7 @@ name: release-please
 on:
   push:
     branches:
-      - dev
+      - release
 
 permissions:
   contents: write
@@ -18,7 +18,6 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
-          target-branch: dev
 
       - name: Auto-merge Release PR
         if: steps.release.outputs.pr
