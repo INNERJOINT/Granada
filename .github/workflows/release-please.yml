@@ -9,7 +9,19 @@ permissions:
   pull-requests: write
 
 jobs:
+  sync-to-master:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: release
+          fetch-depth: 0
+
+      - name: Fast-forward master to release
+        run: git push origin release:master
+
   release-please:
+    needs: sync-to-master
     runs-on: ubuntu-latest
     steps:
       - uses: googleapis/release-please-action@v4
@@ -18,6 +30,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           config-file: .github/release-please-config.json
           manifest-file: .github/.release-please-manifest.json
+          target-branch: master
 
       - name: Auto-merge Release PR
         if: steps.release.outputs.pr
