@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.1](https://github.com/INNERJOINT/Granada/compare/v1.2.0...v1.2.1) (2026-05-18)
+
+
+### Bug Fixes
+
+* **ci:** two-stage release workflow with sync-to-master before release-please ([2197115](https://github.com/INNERJOINT/Granada/commit/219711580a29acf28abe9a6c9e669a7d1bd77f86))
+
 ## [1.2.0](https://github.com/INNERJOINT/Granada/compare/zaku-v1.1.0...zaku-v1.2.0) (2026-05-18)
 
 
