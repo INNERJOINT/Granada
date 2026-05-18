@@ -11,9 +11,54 @@ permissions:
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    outputs:
+      pr_number: ${{ steps.pr_number.outputs.number }}
+      release_created: ${{ steps.rp.outputs.release_created }}
+      prs_created: ${{ steps.rp.outputs.prs_created }}
     steps:
       - uses: googleapis/release-please-action@v4
+        id: rp
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           config-file: .github/release-please-config.json
           manifest-file: .github/.release-please-manifest.json
+
+      - name: Extract PR number
+        id: pr_number
+        if: steps.rp.outputs.pr
+        run: |
+          PR_RAW='${{ steps.rp.outputs.pr }}'
+          NUMBER=$(echo "$PR_RAW" | jq -r '.number // empty' 2>/dev/null || echo "$PR_RAW")
+          echo "number=$NUMBER" >> "$GITHUB_OUTPUT"
+
+  auto-merge:
+    needs: release-please
+    if: needs.release-please.outputs.prs_created == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Auto-merge release PR (squash with changelog body)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ needs.release-please.outputs.pr_number }}
+          REPO: ${{ github.repository }}
+        run: |
+          PR_BODY=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json body -q '.body')
+          gh pr merge "$PR_NUMBER" \
+            --repo "$REPO" \
+            --squash \
+            --auto \
+            --body "$PR_BODY"
+
+  label-tagged:
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Update autorelease label
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr edit ${{ needs.release-please.outputs.pr_number }} \
+            --repo "${{ github.repository }}" \
+            --remove-label "autorelease: pending" \
+            --add-label "autorelease: tagged"
