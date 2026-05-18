@@ -6,12 +6,12 @@
     "name": "INNERJOINT",
     "url": "https://github.com/INNERJOINT"
   },
-  "version": "1.2.1",
+  "version": "1.2.2",
   "plugins": [
     {
       "name": "zaku",
       "description": "Mass-production dev weapon — AOSP recon, JIRA elimination, Git ammo supply",
-      "version": "1.2.1",
+      "version": "1.2.2",
       "author": {
         "name": "INNERJOINT"
       },
