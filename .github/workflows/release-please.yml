@@ -57,8 +57,15 @@ jobs:
       - name: Update autorelease label
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
         run: |
-          gh pr edit ${{ needs.release-please.outputs.pr_number }} \
-            --repo "${{ github.repository }}" \
-            --remove-label "autorelease: pending" \
-            --add-label "autorelease: tagged"
+          PR_NUMBER=$(gh pr list --repo "$REPO" \
+            --label "autorelease: pending" \
+            --state merged \
+            --json number -q '.[0].number')
+          if [ -n "$PR_NUMBER" ]; then
+            gh pr edit "$PR_NUMBER" \
+              --repo "$REPO" \
+              --remove-label "autorelease: pending" \
+              --add-label "autorelease: tagged"
+          fi
