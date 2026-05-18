@@ -2,7 +2,7 @@ name: release-please
 on:
   push:
     branches:
-      - main
+      - dev
 
 permissions:
   contents: write
@@ -13,7 +13,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: googleapis/release-please-action@v4
+        id: release
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+          target-branch: dev
+
+      - name: Auto-merge Release PR
+        if: steps.release.outputs.pr
+        run: gh pr merge --auto --squash "${{ fromJson(steps.release.outputs.pr).number }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
