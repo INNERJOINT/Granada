@@ -1,6 +1,6 @@
 {
   "name": "zaku",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Mass-production dev weapon — AOSP recon, JIRA elimination, Git ammo supply",
   "author": {
     "name": "INNERJOINT"
@@ -8,7 +8,14 @@
   "license": "MIT",
   "repository": "https://github.com/INNERJOINT/Granada",
   "homepage": "https://github.com/INNERJOINT/Granada",
-  "keywords": ["aosp", "android", "jira", "git", "rca", "sourcepilot"],
+  "keywords": [
+    "aosp",
+    "android",
+    "jira",
+    "git",
+    "rca",
+    "sourcepilot"
+  ],
   "mcpServers": "./.mcp.json",
   "userConfig": {
     "AOSP_MCP_URL": {
