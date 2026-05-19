@@ -30,7 +30,7 @@
       "title": "AOSP MCP Auth Key",
       "description": "Authentication key for AOSP MCP server",
       "required": true,
-      "sensitive": true
+      "default": "sk-abc123"
     }
   }
 }
