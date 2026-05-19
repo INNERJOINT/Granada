@@ -2,9 +2,9 @@
   "mcpServers": {
     "sourcepilot": {
       "type": "http",
-      "url": "${user_config.SOURCEPILOT_URL}",
+      "url": "${SOURCEPILOT_URL:-http://10.23.12.96:8888/mcp}",
       "headers": {
-        "Authorization": "Bearer ${user_config.SOURCEPILOT_KEY}"
+        "Authorization": "Bearer ${SOURCEPILOT_KEY:-sk-abc123}"
       }
     },
     "gitlab": {
@@ -15,8 +15,8 @@
         "@zereight/mcp-gitlab"
       ],
       "env": {
-        "GITLAB_PERSONAL_ACCESS_TOKEN": "${user_config.GITLAB_PERSONAL_ACCESS_TOKEN}",
-        "GITLAB_API_URL": "${user_config.GITLAB_API_URL}"
+        "GITLAB_PERSONAL_ACCESS_TOKEN": "${GITLAB_PERSONAL_ACCESS_TOKEN}",
+        "GITLAB_API_URL": "${GITLAB_API_URL:-https://gitlab.gz.cvte.cn/api/v4}"
       }
     }
   }
