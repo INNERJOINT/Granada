@@ -2,6 +2,7 @@
 name: jira-aftersales
 description: Convert technical jira-analyze RCA reports into customer-friendly aftersales scripts in Chinese. Posted as JIRA comment for customer service agents.
 argument-hint: <JIRA URL or issue key>
+model: opus
 triggers:
   - "jira aftersales"
   - "jira_aftersales"

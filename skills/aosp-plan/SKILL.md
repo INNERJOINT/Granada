@@ -2,6 +2,7 @@
 name: aosp-plan
 description: AOSP investigation-driven planning with parallel code search
 argument-hint: <AOSP investigation query>
+model: opus
 pipeline: [aosp-plan, ralph]
 next-skill: ralph
 handoff: .plugin-state/plans/aosp-*.md

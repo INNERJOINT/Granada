@@ -2,6 +2,7 @@
 name: aosp-analyze
 description: Android system issue root-cause analysis via AOSP source search, with optional local log files for evidence-driven analysis. Report in Chinese, saved locally.
 argument-hint: [<log directory path>] [--project <name>] --title <description>
+model: opus
 triggers:
   - "aosp analyze"
   - "aosp_analyze"
