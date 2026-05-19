@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <!-- Zaku II Head -->
+  <defs>
+    <linearGradient id="armor" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#5a8a4a"/>
+      <stop offset="100%" style="stop-color:#2d5a1e"/>
+    </linearGradient>
+  </defs>
+  <!-- Background -->
+  <rect width="200" height="200" fill="#0d1117" rx="16"/>
+  <!-- Head shape -->
+  <path d="M70 130 L75 70 Q100 55 125 70 L130 130 Q100 140 70 130Z" fill="url(#armor)" stroke="#3d6b2e" stroke-width="2"/>
+  <!-- Mono-eye rail -->
+  <rect x="72" y="92" width="56" height="12" rx="6" fill="#1a1a1a" stroke="#333" stroke-width="1"/>
+  <!-- Mono-eye -->
+  <circle cx="105" cy="98" r="5" fill="#ff1744"/>
+  <circle cx="105" cy="98" r="3" fill="#ff5252" opacity="0.8"/>
+  <circle cx="105" cy="98" r="8" fill="none" stroke="#ff1744" stroke-width="0.5" opacity="0.4"/>
+  <!-- Helmet crest -->
+  <path d="M95 70 L100 45 L105 70" fill="#3d6b2e" stroke="#2d5a1e" stroke-width="1"/>
+  <!-- Helmet spike/blade -->
+  <path d="M100 50 L100 30 L103 45" fill="#5a8a4a" stroke="#3d6b2e" stroke-width="0.8"/>
+  <!-- Breathing tubes -->
+  <path d="M78 120 Q65 125 60 140" fill="none" stroke="#4a4a4a" stroke-width="4" stroke-linecap="round"/>
+  <path d="M122 120 Q135 125 140 140" fill="none" stroke="#4a4a4a" stroke-width="4" stroke-linecap="round"/>
+  <!-- Forehead detail -->
+  <rect x="88" y="72" width="24" height="4" rx="2" fill="#3d6b2e" stroke="#2d5a1e" stroke-width="0.5"/>
+  <!-- Text -->
+  <text x="100" y="175" text-anchor="middle" font-family="monospace" font-size="14" font-weight="bold" fill="#5a8a4a">MS-06 ZAKU II</text>
+</svg>
