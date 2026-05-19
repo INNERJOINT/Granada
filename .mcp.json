@@ -2,9 +2,22 @@
   "mcpServers": {
     "sourcepilot": {
       "type": "http",
-      "url": "${SOURCEPILOT_URL:-http://10.23.12.96:8888/mcp}",
+      "url": "${SOURCEPILOT_URL}",
       "headers": {
-        "Authorization": "Bearer ${SOURCEPILOT_KEY:-sk-abc123}"
+        "Authorization": "Bearer ${SOURCEPILOT_KEY}"
+      }
+    },
+    "atlassian": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": [
+        "mcp-atlassian"
+      ],
+      "env": {
+        "JIRA_URL": "${JIRA_URL}",
+        "JIRA_PERSONAL_TOKEN": "${JIRA_PERSONAL_TOKEN}",
+        "CONFLUENCE_URL": "${CONFLUENCE_URL}",
+        "CONFLUENCE_PERSONAL_TOKEN": "${CONFLUENCE_PERSONAL_TOKEN}"
       }
     },
     "gitlab": {
@@ -16,7 +29,7 @@
       ],
       "env": {
         "GITLAB_PERSONAL_ACCESS_TOKEN": "${GITLAB_PERSONAL_ACCESS_TOKEN}",
-        "GITLAB_API_URL": "${GITLAB_API_URL:-https://gitlab.gz.cvte.cn/api/v4}"
+        "GITLAB_API_URL": "${GITLAB_API_URL}"
       }
     }
   }
