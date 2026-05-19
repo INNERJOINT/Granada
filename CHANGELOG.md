@@ -1,3 +1,9 @@
+## [2.2.0](https://github.com/INNERJOINT/Granada/compare/v2.1.0...v2.2.0) (2026-05-19)
+
+### Features
+
+* **mcp:** add atlassian MCP server and remove default values ([1ef6fab](https://github.com/INNERJOINT/Granada/commit/1ef6fab47aa98ec45d35669545c035a17ab12d2e))
+
 ## [2.1.0](https://github.com/INNERJOINT/Granada/compare/v2.0.1...v2.1.0) (2026-05-19)
 
 ### Features
