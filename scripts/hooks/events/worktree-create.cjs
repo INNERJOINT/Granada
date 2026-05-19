@@ -7,7 +7,7 @@
 const fs = require('fs');
 const { execSync } = require('child_process');
 const path = require('path');
-const input = JSON.parse(fs.readFileSync('/dev/stdin', 'utf8'));
+const input = JSON.parse(fs.readFileSync(0, 'utf8'));
 
 // --- Input fields ---
 const {

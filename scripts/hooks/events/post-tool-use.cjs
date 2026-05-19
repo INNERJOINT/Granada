@@ -6,7 +6,7 @@
 //                   updatedMCPToolOutput can modify MCP tool results
 
 const fs = require('fs');
-const input = JSON.parse(fs.readFileSync('/dev/stdin', 'utf8'));
+const input = JSON.parse(fs.readFileSync(0, 'utf8'));
 
 // --- Input fields ---
 const {

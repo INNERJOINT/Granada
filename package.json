@@ -10,7 +10,9 @@
     "url": "git+https://github.com/INNERJOINT/Granada.git"
   },
   "scripts": {
-    "build": "echo 'no build step needed'"
+    "build": "echo 'no build step needed'",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.29.0"
@@ -20,6 +22,7 @@
     "@semantic-release/exec": "^7.0.3",
     "@semantic-release/git": "^10.0.1",
     "conventional-changelog-conventionalcommits": "^8.0.0",
-    "semantic-release": "^24.2.3"
+    "semantic-release": "^24.2.3",
+    "vitest": "^4.1.6"
   }
 }

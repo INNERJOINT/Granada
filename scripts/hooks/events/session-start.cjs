@@ -5,7 +5,7 @@
 // Special: only hook event that receives `model` field; supports env var persistence
 
 const fs = require('fs');
-const input = JSON.parse(fs.readFileSync('/dev/stdin', 'utf8'));
+const input = JSON.parse(fs.readFileSync(0, 'utf8'));
 
 // --- Input fields ---
 const {
