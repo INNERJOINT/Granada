@@ -1,3 +1,10 @@
+## [2.0.1](https://github.com/INNERJOINT/Granada/compare/v2.0.0...v2.0.1) (2026-05-19)
+
+### Bug Fixes
+
+* **ci:** use GITHUB_TOKEN instead of PAT for release workflow ([e102368](https://github.com/INNERJOINT/Granada/commit/e102368778a356ace7270a3746f2acdc6457cd1f))
+* **plugin:** remove sensitive flag from AOSP_MCP_KEY and add default value ([7af743c](https://github.com/INNERJOINT/Granada/commit/7af743c9a4cc84e31a2919a44fbcb8620d9643a1))
+
 # Changelog
 
 ## [1.3.1](https://github.com/INNERJOINT/Granada/compare/v1.3.0...v1.3.1) (2026-05-18)
