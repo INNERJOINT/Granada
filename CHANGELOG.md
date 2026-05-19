@@ -1,3 +1,11 @@
+## [2.3.0](https://github.com/INNERJOINT/Granada/compare/v2.2.0...v2.3.0) (2026-05-19)
+
+### Features
+
+* **hooks:** add per-event hook scripts covering all 29 hook events ([4754cb0](https://github.com/INNERJOINT/Granada/commit/4754cb060e2f28c25913a1149b18651c8c9fca50))
+* **hooks:** add vitest testing framework with contract tests for all 29 hook events ([cd49a71](https://github.com/INNERJOINT/Granada/commit/cd49a71485ef24f0f9de46787db8d0b1c1f3bee8))
+* **skills:** add model tier routing to all skill definitions ([3b495fa](https://github.com/INNERJOINT/Granada/commit/3b495fac5ee674b356f0b6564837824de173cad6))
+
 ## [2.2.0](https://github.com/INNERJOINT/Granada/compare/v2.1.0...v2.2.0) (2026-05-19)
 
 ### Features
