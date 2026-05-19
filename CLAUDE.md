@@ -52,10 +52,10 @@ Available remote tools: `list_projects`, `list_repos`, `search_code`, `search_sy
 
 This plugin uses native file operations for state persistence (no MCP state tools required):
 
-- **Write state**: `Write` tool → `.plugin-state/<skill>-state.json`
-- **Read state**: `Read` tool → `.plugin-state/<skill>-state.json`
-- **Clear state**: `Bash: rm -f .plugin-state/<skill>-state.json`
-- **AOSP project config**: `.plugin-state/aosp-config.json`
+- **Write state**: `Write` tool → `.granada/<skill>-state.json`
+- **Read state**: `Read` tool → `.granada/<skill>-state.json`
+- **Clear state**: `Bash: rm -f .granada/<skill>-state.json`
+- **AOSP project config**: `.granada/aosp-config.json`
 
 ## Dependencies
 

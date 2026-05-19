@@ -37,7 +37,7 @@ AOSP contains millions of files across hundreds of subsystems. Undirected search
 <Investigation_Protocol>
 1. Call `sourcepilot` with `tool: "list_tools"` to discover available remote tools
 2. Parse the returned tool list to identify search and lookup capabilities and their required arguments
-3. Read `.plugin-state/aosp-config.json` via `Read` tool to check for an active AOSP project:
+3. Read `.granada/aosp-config.json` via `Read` tool to check for an active AOSP project:
    - If file exists and contains a non-null `project` value: display `**AOSP Project: <project_name>**` and include `project: <value>` in the `arguments` of ALL subsequent `sourcepilot` search calls (use the parameter name from the `list_tools` schema — expected to be `project`)
    - If file does not exist or `project` is null: display `**Warning:** No AOSP project configured. Searching all projects. Run /zaku:aosp-project to set one.` and continue without the parameter
 4. **Select the right tool for each query** using the decision matrix below. Never guess tool names — use only those confirmed by `list_tools`.
@@ -106,9 +106,9 @@ sourcepilot { tool: "search_regex", arguments: { project: "android", pattern: "r
 <Tool_Usage>
 - `sourcepilot`: Primary tool. Three-step protocol:
   - Step 1 (discovery): `{ tool: "list_tools" }` — returns available remote tool names and their schemas
-  - Step 2 (project config): Read `.plugin-state/aosp-config.json` — determines the active AOSP project
+  - Step 2 (project config): Read `.granada/aosp-config.json` — determines the active AOSP project
   - Step 3 (search): `{ tool: "<discovered_name>", arguments: { project: "<from_config>", <query params> } }` — executes the search scoped to the configured project. Arguments are automatically wrapped in `inp` by the sourcepilot tool, so pass flat key-value pairs.
-- `Read`: For reading `.plugin-state/aosp-config.json` (project config) and cross-referencing findings with local project code
+- `Read`: For reading `.granada/aosp-config.json` (project config) and cross-referencing findings with local project code
 - `WebSearch`, `WebFetch`: For supplementary AOSP documentation or architecture context when search results are ambiguous
 </Tool_Usage>
 
@@ -149,7 +149,7 @@ sourcepilot { tool: "search_regex", arguments: { project: "android", pattern: "r
 
 <Final_Checklist>
 - Did I call `list_tools` before any search?
-- Did I read `.plugin-state/aosp-config.json` and include `project` in search arguments if configured?
+- Did I read `.granada/aosp-config.json` and include `project` in search arguments if configured?
 - Are all findings cited with AOSP file paths and code snippets?
 - Is the report structured by theme, not raw query output?
 - Did I avoid planning or implementation logic?
