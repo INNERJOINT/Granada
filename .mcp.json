@@ -2,9 +2,9 @@
   "mcpServers": {
     "sourcepilot": {
       "type": "http",
-      "url": "${user_config.AOSP_MCP_URL}",
+      "url": "${user_config.SOURCEPILOT_URL}",
       "headers": {
-        "Authorization": "Bearer ${user_config.AOSP_MCP_KEY}"
+        "Authorization": "Bearer ${user_config.SOURCEPILOT_KEY}"
       }
     },
     "gitlab": {

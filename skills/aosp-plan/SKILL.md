@@ -38,7 +38,7 @@ Call `sourcepilot` with `tool: "list_tools"` once at startup to verify the MCP s
 If the call fails, call `Bash: rm -f .plugin-state/aosp-plan-state.json` and abort immediately with:
 
 ```
-AOSP MCP server unreachable. Check AOSP_MCP_URL and AOSP_MCP_KEY environment variables.
+AOSP MCP server unreachable. Check SOURCEPILOT_URL and SOURCEPILOT_KEY environment variables.
 ```
 
 Do NOT proceed to spawn agents if this check fails.

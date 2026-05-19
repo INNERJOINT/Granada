@@ -20,8 +20,8 @@ claude plugin install .
 
 Proxies requests to a remote AOSP MCP server for code search. Configure via plugin userConfig (prompted at enable time):
 
-- `AOSP_MCP_URL` — Remote AOSP MCP server endpoint
-- `AOSP_MCP_KEY` — Authentication key (stored securely)
+- `SOURCEPILOT_URL` — Remote AOSP MCP server endpoint
+- `SOURCEPILOT_KEY` — Authentication key (stored securely)
 
 Usage: `sourcepilot { tool: "search_code", arguments: { project: "android", query: "..." } }`
 

@@ -18,14 +18,14 @@
   ],
   "mcpServers": "./.mcp.json",
   "userConfig": {
-    "AOSP_MCP_URL": {
+    "SOURCEPILOT_URL": {
       "type": "string",
       "title": "AOSP MCP Server URL",
       "description": "Remote AOSP MCP server endpoint",
       "required": true,
       "default": "http://10.23.12.96:8888/mcp"
     },
-    "AOSP_MCP_KEY": {
+    "SOURCEPILOT_KEY": {
       "type": "string",
       "title": "AOSP MCP Auth Key",
       "description": "Authentication key for AOSP MCP server",

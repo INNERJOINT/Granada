@@ -61,7 +61,7 @@ On failure:
 ```
 Bash: rm -f .plugin-state/aosp-feature-import-state.json
 ```
-Abort with: `AOSP MCP server unreachable. Check AOSP_MCP_URL and AOSP_MCP_KEY environment variables.`
+Abort with: `AOSP MCP server unreachable. Check SOURCEPILOT_URL and SOURCEPILOT_KEY environment variables.`
 
 **1b. Resolve Target Project**
 

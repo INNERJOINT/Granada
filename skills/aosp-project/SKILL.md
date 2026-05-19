@@ -46,7 +46,7 @@ Call `sourcepilot(tool: "list_tools")` to verify the MCP server is reachable and
 
 On failure, abort with:
 ```
-AOSP MCP server unreachable. Check AOSP_MCP_URL and AOSP_MCP_KEY environment variables.
+AOSP MCP server unreachable. Check SOURCEPILOT_URL and SOURCEPILOT_KEY environment variables.
 ```
 
 ### Step 3: Discover Project Listing Tool

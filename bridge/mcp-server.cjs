@@ -8,8 +8,8 @@ const { Server } = require('@modelcontextprotocol/sdk/server/index.js');
 const { StdioServerTransport } = require('@modelcontextprotocol/sdk/server/stdio.js');
 const { ListToolsRequestSchema, CallToolRequestSchema } = require('@modelcontextprotocol/sdk/types.js');
 
-const AOSP_MCP_URL = (process.env.AOSP_MCP_URL || '').replace(/\/+$/, '');
-const AOSP_MCP_KEY = process.env.AOSP_MCP_KEY || '';
+const SOURCEPILOT_URL = (process.env.SOURCEPILOT_URL || '').replace(/\/+$/, '');
+const SOURCEPILOT_KEY = process.env.SOURCEPILOT_KEY || '';
 
 let sessionId = null;
 let sessionInitPromise = null;
@@ -45,14 +45,14 @@ async function mcpPost(payload, sid) {
   const headers = {
     'Content-Type': 'application/json',
     'Accept': 'application/json, text/event-stream',
-    'Authorization': `Bearer ${AOSP_MCP_KEY}`,
+    'Authorization': `Bearer ${SOURCEPILOT_KEY}`,
   };
   if (sid) headers['Mcp-Session-Id'] = sid;
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
-    const res = await fetch(AOSP_MCP_URL, {
+    const res = await fetch(SOURCEPILOT_URL, {
       method: 'POST',
       headers,
       body: JSON.stringify(payload),

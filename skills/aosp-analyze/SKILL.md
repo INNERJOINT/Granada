@@ -87,7 +87,7 @@ Both modes save the report to `.plugin-state/specs/`.
    - Max 40 chars, truncate if needed.
 
 3. **MCP health check**:
-   - AOSP: call `sourcepilot(tool="list_tools")` — if fails, abort with "sourcepilot MCP unreachable. Check AOSP_MCP_URL and AOSP_MCP_KEY env vars."
+   - AOSP: call `sourcepilot(tool="list_tools")` — if fails, abort with "sourcepilot MCP unreachable. Check SOURCEPILOT_URL and SOURCEPILOT_KEY env vars."
 
 4. **Display active AOSP project**:
    - If `--project` override was provided: display `**AOSP Project: <name> (命令行指定)**` and use this value for all subsequent phases. Skip reading `.plugin-state/aosp-config.json`.
@@ -477,7 +477,7 @@ Report format:
 <Error_Handling>
 Embed these handlers throughout all phases:
 
-- **AOSP MCP unreachable** → abort with "sourcepilot MCP unreachable. Check AOSP_MCP_URL and AOSP_MCP_KEY env vars."
+- **AOSP MCP unreachable** → abort with "sourcepilot MCP unreachable. Check SOURCEPILOT_URL and SOURCEPILOT_KEY env vars."
 - **Input path does not exist** → abort with "Path not found: <path>"
 - **Input path is not a directory** → abort with "Path is not a directory: <path>. Provide a directory containing extracted Android logs."
 - **No Android log files found** → abort with "No Android log files found in the directory. Supported types: logcat, tombstone, ANR traces, kernel logs."
