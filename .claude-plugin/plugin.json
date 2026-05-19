@@ -31,6 +31,20 @@
       "description": "Authentication key for AOSP MCP server",
       "required": true,
       "default": "sk-abc123"
+    },
+    "GITLAB_PERSONAL_ACCESS_TOKEN": {
+      "type": "string",
+      "title": "GitLab Personal Access Token",
+      "description": "PAT for GitLab API authentication",
+      "required": true,
+      "sensitive": true
+    },
+    "GITLAB_API_URL": {
+      "type": "string",
+      "title": "GitLab API URL",
+      "description": "GitLab instance API endpoint",
+      "required": true,
+      "default": "https://gitlab.gz.cvte.cn/api/v4"
     }
   }
 }

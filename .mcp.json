@@ -6,6 +6,18 @@
       "headers": {
         "Authorization": "Bearer ${user_config.AOSP_MCP_KEY}"
       }
+    },
+    "gitlab": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@zereight/mcp-gitlab"
+      ],
+      "env": {
+        "GITLAB_PERSONAL_ACCESS_TOKEN": "${user_config.GITLAB_PERSONAL_ACCESS_TOKEN}",
+        "GITLAB_API_URL": "${user_config.GITLAB_API_URL}"
+      }
     }
   }
 }
