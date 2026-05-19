@@ -1,3 +1,9 @@
+## [2.1.0](https://github.com/INNERJOINT/Granada/compare/v2.0.1...v2.1.0) (2026-05-19)
+
+### Features
+
+* **plugin:** add GitLab MCP server with secure userConfig ([92d69ca](https://github.com/INNERJOINT/Granada/commit/92d69caee2d8d1c2135d7f9c3032d85924ffac59))
+
 ## [2.0.1](https://github.com/INNERJOINT/Granada/compare/v2.0.0...v2.0.1) (2026-05-19)
 
 ### Bug Fixes
