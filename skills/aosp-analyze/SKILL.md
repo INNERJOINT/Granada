@@ -11,7 +11,7 @@ triggers:
   - "crash analyze"
   - "aosp source analyze"
   - "aosp 分析"
-handoff: .plugin-state/specs/aosp-analyze-{slug}.md
+handoff: .granada/specs/aosp-analyze-{slug}.md
 level: 3
 ---
 
@@ -20,7 +20,7 @@ Automates Android system issue root-cause analysis. Supports two modes:
 - **Log-based mode** (full): Accepts a directory of extracted Android system logs (logcat, tombstone, ANR traces, kernel logs). Parses logs into a chronological timeline, searches AOSP source code for crash-related context, generates and investigates hypotheses in parallel, and produces a structured 7-section Chinese RCA report.
 - **No-log mode** (logless): Accepts a text description of the problem (via `--title`). Extracts search targets from the description, searches AOSP source code directly, generates hypotheses based on source analysis, and produces the same 7-section report structure (with sections 2/3 noting the absence of log evidence).
 
-Both modes save the report to `.plugin-state/specs/`.
+Both modes save the report to `.granada/specs/`.
 </Purpose>
 
 <Use_When>
@@ -62,8 +62,8 @@ Both modes save the report to `.plugin-state/specs/`.
       ```
 
 1b. **Resume check** (after input parsing, before slug generation):
-   - If `--fresh` flag is present: `Bash: rm -f .plugin-state/aosp-analyze-state.json` + `rm -rf /tmp/aosp-analyze-<slug>` (if slug determinable from prior state), then proceed as fresh run.
-   - Otherwise, read existing state: `Read .plugin-state/aosp-analyze-state.json`
+   - If `--fresh` flag is present: `Bash: rm -f .granada/aosp-analyze-state.json` + `rm -rf /tmp/aosp-analyze-<slug>` (if slug determinable from prior state), then proceed as fresh run.
+   - Otherwise, read existing state: `Read .granada/aosp-analyze-state.json`
    - If state exists AND `active == true` AND `state.input_path` matches current input (or `state.slug` matches derived slug):
      - Display: "检测到未完成的分析 (phase: <current_phase>)。从断点恢复..."
      - Validate temp directory exists: `ls /tmp/aosp-analyze-<slug>`
@@ -91,14 +91,14 @@ Both modes save the report to `.plugin-state/specs/`.
    - AOSP: call `sourcepilot(tool="list_tools")` — if fails, abort with "sourcepilot MCP unreachable. Check SOURCEPILOT_URL and SOURCEPILOT_KEY env vars."
 
 4. **Display active AOSP project**:
-   - If `--project` override was provided: display `**AOSP Project: <name> (命令行指定)**` and use this value for all subsequent phases. Skip reading `.plugin-state/aosp-config.json`.
-   - Otherwise, read `.plugin-state/aosp-config.json`:
+   - If `--project` override was provided: display `**AOSP Project: <name> (命令行指定)**` and use this value for all subsequent phases. Skip reading `.granada/aosp-config.json`.
+   - Otherwise, read `.granada/aosp-config.json`:
      - If configured: display `**AOSP Project: <project_name>**` prominently
      - If not configured: display `**未配置 AOSP 项目** — 搜索将不限定项目范围。运行 /zaku:aosp-project 设置项目。`
 
 5. **Initialize state**:
 ```
-Write JSON to .plugin-state/aosp-analyze-state.json with, active=true, current_phase="initialize", state={
+Write JSON to .granada/aosp-analyze-state.json with, active=true, current_phase="initialize", state={
   "slug": "<slug>",
   "temp_dir": "/tmp/aosp-analyze-<slug>",
   "analysis_mode": "log-based|no-log",
@@ -207,7 +207,7 @@ Group search targets into 2-3 clusters by subsystem, then spawn one aosp-investi
 Agent(
   subagent_type="zaku:aosp-investigator",
   model="sonnet",
-  prompt="[If --project override is active, prepend: **AOSP Project Override:** Use project `<name>` for ALL sourcepilot search calls. Do NOT read `.plugin-state/aosp-config.json` — the project has been specified explicitly via CLI flag.]
+  prompt="[If --project override is active, prepend: **AOSP Project Override:** Use project `<name>` for ALL sourcepilot search calls. Do NOT read `.granada/aosp-config.json` — the project has been specified explicitly via CLI flag.]
 
 Search AOSP source code for the following crash-related classes/functions from analysis <slug>.
 
@@ -329,7 +329,7 @@ Spawn one agent per hypothesis (max 3). Each agent receives Phase 4 context to a
 Agent(
   subagent_type="zaku:aosp-investigator",
   model="sonnet",
-  prompt="[If --project override is active, prepend: **AOSP Project Override:** Use project `<name>` for ALL sourcepilot search calls. Do NOT read `.plugin-state/aosp-config.json` — the project has been specified explicitly via CLI flag.]
+  prompt="[If --project override is active, prepend: **AOSP Project Override:** Use project `<name>` for ALL sourcepilot search calls. Do NOT read `.granada/aosp-config.json` — the project has been specified explicitly via CLI flag.]
 
 Investigate this Android crash hypothesis for analysis <slug>:
 
@@ -388,7 +388,7 @@ Report format:
    - Otherwise, derive from the most severe anomaly (e.g., "SIGSEGV in SurfaceFlinger")
    - Format: `{slug} — {derived_or_provided_description}`
 
-4. **Build the 7-section Chinese report** and save to `.plugin-state/specs/aosp-analyze-{slug}.md`:
+4. **Build the 7-section Chinese report** and save to `.granada/specs/aosp-analyze-{slug}.md`:
 
 ```markdown
 # 根因分析报告: {slug} — {issue_title}
@@ -469,8 +469,8 @@ Report format:
 <!-- /SYNC -->
 
 5. **Finalize state and cleanup**:
-   - On success: `Bash: rm -f .plugin-state/aosp-analyze-state.json` — terminal exit
-   - On error-abort: `Write {"active": false, current_phase="error"} to .plugin-state/aosp-analyze-state.json` — preserves state for debugging
+   - On success: `Bash: rm -f .granada/aosp-analyze-state.json` — terminal exit
+   - On error-abort: `Write {"active": false, current_phase="error"} to .granada/aosp-analyze-state.json` — preserves state for debugging
    - Announce report location to user
 
 </Steps>
@@ -511,12 +511,12 @@ Embed these handlers throughout all phases:
 
 State is lightweight (<10KB). Parsed data lives in temp files (`/tmp/aosp-analyze-<slug>/`), not in state.
 
-Update state at each phase boundary for resumability. On resume, read state via `Read .plugin-state/aosp-analyze-state.json` and continue from `current_phase`.
+Update state at each phase boundary for resumability. On resume, read state via `Read .granada/aosp-analyze-state.json` and continue from `current_phase`.
 </State_Schema>
 
 <Tool_Usage>
 - `sourcepilot` — search AOSP source for crash-related code (always, not conditional)
-- `Write` / `Read` / `Bash rm` — phase persistence via .plugin-state/aosp-analyze-state.json
+- `Write` / `Read` / `Bash rm` — phase persistence via .granada/aosp-analyze-state.json
 - `Agent(subagent_type="zaku:aosp-log-parser", model="sonnet")` — log parsing, file classification, and timeline construction (Phase 3)
 - `Agent(subagent_type="zaku:aosp-log-parser", model="sonnet")` — log parsing and timeline construction (Phase 3)
 - `Agent(subagent_type="zaku:analyst", model="sonnet")` — hypothesis generation (Phase 5)
@@ -531,7 +531,7 @@ Update state at each phase boundary for resumability. On resume, read state via 
 User: /aosp-analyze --dir /tmp/crash-logs --title "SystemUI crash after OTA"
 
 [Phase 1] Input: directory /tmp/crash-logs. Slug: crash-logs. AOSP MCP health check pass.
-          AOSP Project: android-14 (from .plugin-state/aosp-config.json)
+          AOSP Project: android-14 (from .granada/aosp-config.json)
 [Phase 2] Copied 8 files.
           Result: 2 logcat, 1 tombstone, 1 ANR, 0 kernel, 4 other.
 [Phase 3] Spawned aosp-log-parser agent.
@@ -547,7 +547,7 @@ User: /aosp-analyze --dir /tmp/crash-logs --title "SystemUI crash after OTA"
           Spawned 2 aosp-investigator agents in parallel.
           H1: HIGH confidence — found matching code path in SurfaceFlinger::onMessageReceived
           H2: MEDIUM — thread pool config matches but no direct evidence
-[Phase 6] Report saved to .plugin-state/specs/aosp-analyze-crash-logs.md (Chinese, 7 sections).
+[Phase 6] Report saved to .granada/specs/aosp-analyze-crash-logs.md (Chinese, 7 sections).
 ```
 Why good: All exploration delegated to subagents. Clear input (--dir). AOSP project configured. Full pipeline executed with aosp-log-parser agent handling parallel parsing.
 </Good>
@@ -557,7 +557,7 @@ Why good: All exploration delegated to subagents. Clear input (--dir). AOSP proj
 User: /aosp-analyze --title "SurfaceFlinger 在旋转屏幕时崩溃"
 
 [Phase 1] 无日志模式 (no-log). Slug: surfaceflinger-rotate-crash. MCP 健康检查通过。
-          AOSP Project: android-14 (from .plugin-state/aosp-config.json)
+          AOSP Project: android-14 (from .granada/aosp-config.json)
 [Phase 2] 跳过（无日志模式）
 [Phase 3] 跳过（无日志模式）
 [Phase 4] Spawned analyst → 从问题描述提取搜索目标: SurfaceFlinger, display rotation, WindowManagerService
@@ -569,7 +569,7 @@ User: /aosp-analyze --title "SurfaceFlinger 在旋转屏幕时崩溃"
           H1: SurfaceFlinger rotation transaction race condition (中)
           H2: DisplayRotation lock inversion during config change (中)
           Spawned 2 aosp-investigator agents in parallel.
-[Phase 6] Report saved to .plugin-state/specs/aosp-analyze-surfaceflinger-rotate-crash.md (Chinese, 7 sections).
+[Phase 6] Report saved to .granada/specs/aosp-analyze-surfaceflinger-rotate-crash.md (Chinese, 7 sections).
 ```
 Why good: No-log mode correctly skips Phase 2/3. Search targets extracted from --title by analyst. Confidence capped at "中". Full 7-section report generated with sections 2/3 noting absence of log evidence.
 </Good>
@@ -609,7 +609,7 @@ Why good: Correctly aborts early when path doesn't exist.
 - aosp-investigator subagent for both Phase 4 (AOSP context) and Phase 5 (hypothesis investigation)
 - Lightweight state (<10KB, file paths not data)
 - All 7 report sections (in Chinese)
-- Report saved to `.plugin-state/specs/aosp-analyze-{slug}.md`
+- Report saved to `.granada/specs/aosp-analyze-{slug}.md`
 - All exploration/analysis delegated to subagents (file classification, log parsing, timeline merge, hypothesis generation, AOSP investigation)
 - Lead only orchestrates: MCP calls, state management, subagent spawning, report assembly
 

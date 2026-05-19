@@ -4,7 +4,7 @@ description: AOSP 多仓库自动执行引擎，解析 aosp-plan 产出的跨仓
 argument-hint: <aosp-plan 计划文件路径或查询>
 model: opus
 pipeline: [aosp-plan, aosp-autopilot]
-handoff: .plugin-state/plans/aosp-*.md
+handoff: .granada/plans/aosp-*.md
 level: 4
 ---
 
@@ -15,16 +15,16 @@ AOSP 多仓库自动执行引擎。解析 aosp-plan 产出的按仓库分组的�
 ## 使用方式
 
 ```
-/zaku:aosp-plan "查询" → 产出计划 → /zaku:aosp-autopilot .plugin-state/plans/aosp-<slug>.md
-/zaku:aosp-autopilot .plugin-state/plans/aosp-xxx.md
-/zaku:aosp-autopilot --max-retries 5 .plugin-state/plans/aosp-xxx.md
+/zaku:aosp-plan "查询" → 产出计划 → /zaku:aosp-autopilot .granada/plans/aosp-<slug>.md
+/zaku:aosp-autopilot .granada/plans/aosp-xxx.md
+/zaku:aosp-autopilot --max-retries 5 .granada/plans/aosp-xxx.md
 ```
 
 ## 何时使用
 
 - aosp-plan 产出了跨多仓库的修改计划，需要自动执行
 - 用户说 "aosp autopilot"、"执行 aosp 计划"、"aosp execute"
-- 已有 `.plugin-state/plans/aosp-*.md` 计划文件，且计划涉及多个 AOSP 子仓库
+- 已有 `.granada/plans/aosp-*.md` 计划文件，且计划涉及多个 AOSP 子仓库
 - 需要在多个仓库中并行创建分支、执行修改并提交
 
 ## 何时不用
@@ -43,13 +43,13 @@ AOSP 多仓库自动执行引擎。解析 aosp-plan 产出的按仓库分组的�
 ## 前置条件
 
 - AOSP 源码树通过 `repo` 工具管理（存在 `.repo/` 目录）
-- aosp-plan 产出的计划文件（`.plugin-state/plans/aosp-*.md`）
+- aosp-plan 产出的计划文件（`.granada/plans/aosp-*.md`）
 
 ## 协议
 
 ### Step 0: 状态初始化
 
-调用 `Write {"active": true} to .plugin-state/aosp-autopilot-state.json` 启用 stop-hook 持续执行。
+调用 `Write {"active": true} to .granada/aosp-autopilot-state.json` 启用 stop-hook 持续执行。
 
 ### Step 1: 环境检测
 
@@ -68,7 +68,7 @@ while [ "$path" != "/" ]; do
 done
 ```
 
-如果找不到 `.repo/`，调用 `Bash: rm -f .plugin-state/aosp-autopilot-state.json` 后报错退出：
+如果找不到 `.repo/`，调用 `Bash: rm -f .granada/aosp-autopilot-state.json` 后报错退出：
 
 ```
 未检测到 AOSP 源码树（未找到 .repo/ 目录）。请确认当前目录在 repo 管理的 AOSP 源码树内。
@@ -88,7 +88,7 @@ ls -d $AOSP_ROOT/frameworks/base $AOSP_ROOT/hardware/interfaces ...
 
 ### Step 2: 解析计划
 
-读取 aosp-plan 产出的计划文件（`.plugin-state/plans/aosp-*.md`），提取以下结构：
+读取 aosp-plan 产出的计划文件（`.granada/plans/aosp-*.md`），提取以下结构：
 
 **2a. 提取仓库任务列表**
 
@@ -311,19 +311,19 @@ Skill("git-commit")
 <对每个失败仓库，列出具体失败原因和 git diff 输出>
 ```
 
-将报告保存到 `.plugin-state/aosp-autopilot-report/<timestamp>-<task-name>.md`。
+将报告保存到 `.granada/aosp-autopilot-report/<timestamp>-<task-name>.md`。
 
 **报告路径规则：**
 
-- 目录：`.plugin-state/aosp-autopilot-report/`（不存在时自动创建）
+- 目录：`.granada/aosp-autopilot-report/`（不存在时自动创建）
 - 文件名格式：`<YYYYMMDD-HHmmss>-<task-name>.md`
   - `timestamp`：执行开始时间，格式 `YYYYMMDD-HHmmss`（如 `20260515-143022`）
   - `task-name`：从计划标题提取的简要任务名（小写、空格转连字符、去特殊字符、截断至 50 字符）
-- 示例：`.plugin-state/aosp-autopilot-report/20260515-143022-add-nfc-hal.md`
+- 示例：`.granada/aosp-autopilot-report/20260515-143022-add-nfc-hal.md`
 
 ### Step 9: 清理
 
-调用 `Write {"active": false} to .plugin-state/aosp-autopilot-state.json` 标记完成。
+调用 `Write {"active": false} to .granada/aosp-autopilot-state.json` 标记完成。
 
 ## 状态生命周期
 
@@ -331,14 +331,14 @@ aosp-autopilot 管理自身状态以启用 stop-hook 持续执行。
 
 | 场景 | 状态操作 |
 |------|----------|
-| 进入时 | `Write {"active": true} to .plugin-state/aosp-autopilot-state.json` |
-| 正常完成 | `Write {"active": false} to .plugin-state/aosp-autopilot-state.json` |
-| `.repo/` 未找到（不可恢复） | `Bash: rm -f .plugin-state/aosp-autopilot-state.json` |
-| 计划文件无法解析（不可恢复） | `Bash: rm -f .plugin-state/aosp-autopilot-state.json` |
+| 进入时 | `Write {"active": true} to .granada/aosp-autopilot-state.json` |
+| 正常完成 | `Write {"active": false} to .granada/aosp-autopilot-state.json` |
+| `.repo/` 未找到（不可恢复） | `Bash: rm -f .granada/aosp-autopilot-state.json` |
+| 计划文件无法解析（不可恢复） | `Bash: rm -f .granada/aosp-autopilot-state.json` |
 | 执行中异常退出 | 状态保留 active=true，下次启动可恢复 |
-| 用户取消 | `/zaku:cancel` 内部调用 `rm -f .plugin-state/*-state.json` |
+| 用户取消 | `/zaku:cancel` 内部调用 `rm -f .granada/*-state.json` |
 
-注意：不要在准备启动后续技能前调用 `rm -f .plugin-state/*-state.json`。`rm -f .plugin-state/*-state.json` 的 30 秒取消信号会禁用所有 mode 的 stop-hook。正常完成时使用 `Write JSON with active=false)`。
+注意：不要在准备启动后续技能前调用 `rm -f .granada/*-state.json`。`rm -f .granada/*-state.json` 的 30 秒取消信号会禁用所有 mode 的 stop-hook。正常完成时使用 `Write JSON with active=false)`。
 
 ## 与 aosp-plan 的集成
 
@@ -346,9 +346,9 @@ aosp-autopilot 是 aosp-plan 的下游执行技能。典型工作流：
 
 ```
 /zaku:aosp-plan "AOSP 查询"
-  → 调查 → 计划生成 → 保存到 .plugin-state/plans/aosp-<slug>.md
+  → 调查 → 计划生成 → 保存到 .granada/plans/aosp-<slug>.md
   → 用户批准后
-/zaku:aosp-autopilot .plugin-state/plans/aosp-<slug>.md
+/zaku:aosp-autopilot .granada/plans/aosp-<slug>.md
   → 解析 → 分支创建 → 并行执行 → 验证 → 提交 → 报告
 ```
 
@@ -381,7 +381,7 @@ aosp-autopilot 解析 aosp-plan 的 Evidence-Based Plan 部分。aosp-plan 的�
 
 - 使用 `Agent(subagent_type="zaku:executor")` 并行派发各仓库的修改 agent（与 aosp-plan 的 aosp-investigator 派发保持一致的 API 风格）
 - 使用 `Skill("git-commit")` 为每个仓库生成符合历史风格的 commit
-- 使用 `Write` / `Read` 管理执行状态（.plugin-state/ 目录）
+- 使用 `Write` / `Read` 管理执行状态（.granada/ 目录）
 - 使用 `Bash` 工具执行 `repo start`、`git diff`、`git add <files>` 等 git 操作
 - 使用 `AskUserQuestion` 在需要用户决策时（如分支冲突）交互
 
@@ -402,15 +402,15 @@ aosp-autopilot 解析 aosp-plan 的 Evidence-Based Plan 部分。aosp-plan 的�
 
 | 场景 | 处理方式 |
 |------|----------|
-| `.repo/` 未找到 | `rm -f .plugin-state/*-state.json` + 报错退出 |
-| 计划文件无法解析 | `rm -f .plugin-state/*-state.json` + 报错退出 |
+| `.repo/` 未找到 | `rm -f .granada/*-state.json` + 报错退出 |
+| 计划文件无法解析 | `rm -f .granada/*-state.json` + 报错退出 |
 | 仓库目录不存在 | 在报告中标记为缺失，跳过该仓库 |
 | 分支已存在 | 询问用户是否切换或重新命名 |
 | agent 执行超时 | 标记为 FAIL，进入重试循环 |
 | diff 验证 PARTIAL | 进入重试循环，附加上一轮差距信息 |
 | 重试耗尽 | 标记为 FAIL，继续处理其他仓库 |
 | git commit 失败 | 标记为 FAIL，修改保留在工作区 |
-| 执行中不可恢复异常 | `rm -f .plugin-state/*-state.json` + 报告当前进度 |
+| 执行中不可恢复异常 | `rm -f .granada/*-state.json` + 报告当前进度 |
 
 ## 示例
 
@@ -418,9 +418,9 @@ aosp-autopilot 解析 aosp-plan 的 Evidence-Based Plan 部分。aosp-plan 的�
 
 ```
 /zaku:aosp-plan "为 NFC 添加新的 HAL 接口"
-  → 产出: .plugin-state/plans/aosp-add-nfc-hal.md
+  → 产出: .granada/plans/aosp-add-nfc-hal.md
 
-/zaku:aosp-autopilot .plugin-state/plans/aosp-add-nfc-hal.md
+/zaku:aosp-autopilot .granada/plans/aosp-add-nfc-hal.md
   → 检测 AOSP 根: /home/user/aosp
   → 解析计划: 3 个仓库任务
     - hardware/interfaces (层级 0, 无依赖)
@@ -437,7 +437,7 @@ aosp-autopilot 解析 aosp-plan 的 Evidence-Based Plan 部分。aosp-plan 的�
 ### 重试场景
 
 ```
-/zaku:aosp-autopilot .plugin-state/plans/aosp-add-nfc-hal.md
+/zaku:aosp-autopilot .granada/plans/aosp-add-nfc-hal.md
   → ...
   → frameworks/base: diff 验证 PARTIAL (缺少 1 个文件修改)
   → 重试 1: 附加差距信息，重新执行
@@ -449,7 +449,7 @@ aosp-autopilot 解析 aosp-plan 的 Evidence-Based Plan 部分。aosp-plan 的�
 ### Dry-run 模式
 
 ```
-/zaku:aosp-autopilot --dry-run .plugin-state/plans/aosp-add-nfc-hal.md
+/zaku:aosp-autopilot --dry-run .granada/plans/aosp-add-nfc-hal.md
   → 检测 AOSP 根: /home/user/aosp
   → 解析计划: 3 个仓库任务
   → 分支创建:

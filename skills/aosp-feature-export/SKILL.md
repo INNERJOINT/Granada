@@ -8,7 +8,7 @@ level: 3
 
 # AOSP Feature Export Skill
 
-Documents vendor/third-party features added on top of AOSP. Takes a feature description and GitLab MR/commit URLs (vendor changes) as input, fetches diffs via GitLab MCP tools to identify modification points, then uses `sourcepilot` to search the AOSP codebase for the original code being modified or extended. Outputs a comprehensive Chinese-language markdown document that maps the vendor feature across AOSP layers, archived to `.plugin-state/aosp-exports/`.
+Documents vendor/third-party features added on top of AOSP. Takes a feature description and GitLab MR/commit URLs (vendor changes) as input, fetches diffs via GitLab MCP tools to identify modification points, then uses `sourcepilot` to search the AOSP codebase for the original code being modified or extended. Outputs a comprehensive Chinese-language markdown document that maps the vendor feature across AOSP layers, archived to `.granada/aosp-exports/`.
 
 **Key distinction:** The feature being documented is NOT an AOSP built-in feature. It is a vendor customization — code added or modified by the third-party vendor on top of AOSP. The AOSP search phase finds the original context that the vendor code interacts with.
 
@@ -42,14 +42,14 @@ Future: URL routing is provider-dispatched. Currently supports GitLab only. GitH
 ### Step 0: State Initialization
 
 ```
-Write JSON to .plugin-state/aosp-feature-export-state.json with, active=true, task_description="<description>")
+Write JSON to .granada/aosp-feature-export-state.json with, active=true, task_description="<description>")
 ```
 
 ### Step 1: Health Check
 
 Call `sourcepilot` with `tool: "list_tools"` to verify MCP server reachability. Then issue one lightweight search query to confirm upstream is responding.
 
-After health check passes, read `.plugin-state/aosp-config.json` to display the active AOSP project:
+After health check passes, read `.granada/aosp-config.json` to display the active AOSP project:
 - If configured: display `**🔍 AOSP Project: <project_name>**` prominently
 - If not configured: display `**⚠ 未配置 AOSP 项目** — 搜索将不限定项目范围。运行 /zaku:aosp-project 设置项目。`
 
@@ -57,7 +57,7 @@ After health check passes, read `.plugin-state/aosp-config.json` to display the 
 
 On failure:
 ```
-Bash: rm -f .plugin-state/aosp-feature-export-state.json
+Bash: rm -f .granada/aosp-feature-export-state.json
 ```
 Abort with: `AOSP MCP server unreachable. Check SOURCEPILOT_URL and SOURCEPILOT_KEY environment variables.`
 
@@ -228,7 +228,7 @@ The orchestrator's only heavy-lifting phase — merge and structure all investig
 If `--append` is NOT set, skip this step entirely.
 
 1. Compute slug from description (same logic as Step 6)
-2. Check if `.plugin-state/aosp-exports/<slug>.md` exists
+2. Check if `.granada/aosp-exports/<slug>.md` exists
    - If not: emit `"⚠ 未找到已有导出文件，回退到完整模式。"` and proceed normally (append degrades to full mode gracefully — Phase 1 executes as usual)
    - If exists: load the file and extract:
      a. `discovered_prefixes` from the "相关AOSP项目" table
@@ -256,16 +256,16 @@ If `--append` is NOT set, skip this step entirely.
 ### Step 6: Save
 
 1. Generate slug from description: lowercase, replace spaces/special chars with hyphens, max 50 chars
-2. Create `.plugin-state/aosp-exports/` directory if it doesn't exist
-3. Write output to `.plugin-state/aosp-exports/<slug>.md`
-4. Call `Bash: rm -f .plugin-state/aosp-feature-export-state.json`
-5. Confirm to user: `Feature export saved to .plugin-state/aosp-exports/<slug>.md`
+2. Create `.granada/aosp-exports/` directory if it doesn't exist
+3. Write output to `.granada/aosp-exports/<slug>.md`
+4. Call `Bash: rm -f .granada/aosp-feature-export-state.json`
+5. Confirm to user: `Feature export saved to .granada/aosp-exports/<slug>.md`
 
 ### Error Recovery
 
 On any unrecoverable error after Step 0:
-- If agent data has been collected, write partial results to `.plugin-state/aosp-exports/<slug>-partial.md`
-- Call `Bash: rm -f .plugin-state/aosp-feature-export-state.json`
+- If agent data has been collected, write partial results to `.granada/aosp-exports/<slug>-partial.md`
+- Call `Bash: rm -f .granada/aosp-feature-export-state.json`
 - Report the error to the user
 
 Skill is idempotent — re-running with the same inputs overwrites the output file.
@@ -278,7 +278,7 @@ Skill is idempotent — re-running with the same inputs overwrites the output fi
 ## 概览
 - **功能:** {description}
 - **类型:** Vendor/第三方定制功能
-- **AOSP项目:** {project_name from .plugin-state/aosp-config.json, or "未配置"}
+- **AOSP项目:** {project_name from .granada/aosp-config.json, or "未配置"}
 - **导出日期:** {date}
 - **输入链接:** {url_list or "无"}
 - **输入提交:** {commit_list or "无"}
@@ -370,7 +370,7 @@ Skill is idempotent — re-running with the same inputs overwrites the output fi
 
 ## Configuration
 
-- Output directory: `.plugin-state/aosp-exports/` (fixed)
+- Output directory: `.granada/aosp-exports/` (fixed)
 - Max iteration rounds: 5
 - Max total agent spawns: 15
 - Convergence threshold: < 3 new second-level prefixes per round

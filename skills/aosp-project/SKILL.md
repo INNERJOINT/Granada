@@ -13,7 +13,7 @@ level: 1
 
 # AOSP Project Selection Skill
 
-List available AOSP projects from the remote MCP server and select one as the active project. The selection is saved to `.plugin-state/aosp-config.json` and used by all sourcepilot-based skills (`aosp-feature-export`, `aosp-plan`, `jira-analyze`) and the `aosp-investigator` agent.
+List available AOSP projects from the remote MCP server and select one as the active project. The selection is saved to `.granada/aosp-config.json` and used by all sourcepilot-based skills (`aosp-feature-export`, `aosp-plan`, `jira-analyze`) and the `aosp-investigator` agent.
 
 ## Usage
 
@@ -30,7 +30,7 @@ List available AOSP projects from the remote MCP server and select one as the ac
 
 ### Step 1: Show Current Config
 
-Read `.plugin-state/aosp-config.json` via `Read` tool.
+Read `.granada/aosp-config.json` via `Read` tool.
 
 - If file exists and contains a `project` value, display:
   ```
@@ -57,7 +57,7 @@ From the `list_tools` result, find the tool that lists available projects (expec
 If no project-listing tool is found, abort with:
 ```
 AOSP MCP server does not support project listing. You can set the project manually:
-Write {"project": "<project-name>"} to .plugin-state/aosp-config.json
+Write {"project": "<project-name>"} to .granada/aosp-config.json
 ```
 
 ### Step 4: Fetch and Display Projects
@@ -90,7 +90,7 @@ Otherwise, use `AskUserQuestion` to let the user pick from the project list. Inc
 
 ### Step 6: Save Config
 
-Use the `Write` tool to save the selection to `.plugin-state/aosp-config.json`:
+Use the `Write` tool to save the selection to `.granada/aosp-config.json`:
 
 ```json
 {
@@ -106,7 +106,7 @@ If the user chose "Clear (search all)", write:
 }
 ```
 
-Create the `.plugin-state/` directory if it does not exist (it should already exist in any OMC-enabled project).
+Create the `.granada/` directory if it does not exist (it should already exist in any OMC-enabled project).
 
 ### Step 7: Confirm
 
@@ -122,8 +122,8 @@ Display the result prominently:
 ## Tool Usage
 
 - `sourcepilot`: MCP discovery (`list_tools`) and project listing (`list_projects`). Arguments are automatically wrapped in `inp` by the sourcepilot tool.
-- `Read`: Read current config from `.plugin-state/aosp-config.json`
-- `Write`: Save config to `.plugin-state/aosp-config.json`
+- `Read`: Read current config from `.granada/aosp-config.json`
+- `Write`: Save config to `.granada/aosp-config.json`
 - `AskUserQuestion`: Interactive project selection
 
 ## Error Handling

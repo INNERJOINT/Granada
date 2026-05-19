@@ -9,7 +9,7 @@ triggers:
   - "aftersales jira"
   - "售后话术"
   - "jira 售后"
-handoff: .plugin-state/specs/jira-aftersales-{issue_key}.md
+handoff: .granada/specs/jira-aftersales-{issue_key}.md
 level: 3
 ---
 
@@ -45,7 +45,7 @@ Converts technical jira-analyze RCA (Root Cause Analysis) reports into customer-
 
 3. **Initialize state**:
 ```
-Write JSON to .plugin-state/jira-aftersales-state.json with, active=true, current_phase="initialize", state={
+Write JSON to .granada/jira-aftersales-state.json with, active=true, current_phase="initialize", state={
   "issue_key": "<KEY>",
   "report_source": "null",
   "report_completeness": "null",
@@ -63,7 +63,7 @@ mkdir -p /tmp/jira-aftersales-<KEY>
 
 ### Tier 1: Local file (primary — most reliable, no API dependency)
 
-- Read `.plugin-state/specs/jira-analyze-{KEY}.md` using Read tool
+- Read `.granada/specs/jira-analyze-{KEY}.md` using Read tool
 - If file exists and contains `# 根因分析报告:` — use this as the report text
 - Update state: `report_source: "local_file"`
 - Proceed to Phase 3
@@ -81,7 +81,7 @@ mkdir -p /tmp/jira-aftersales-<KEY>
 
 - If neither local file nor JIRA comment contains a report:
 - Display: "未找到 jira-analyze 分析报告。请先运行 `/zaku:jira-analyze <KEY>` 生成分析报告，然后重新运行本 skill。"
-- Abort gracefully with `Write {"active": false, current_phase="error"} to .plugin-state/jira-aftersales-state.json`
+- Abort gracefully with `Write {"active": false, current_phase="error"} to .granada/jira-aftersales-state.json`
 
 <!-- Design note: We intentionally do NOT auto-invoke jira-analyze via Skill() mid-execution.
      Mid-execution Skill() invocation creates a state mode conflict (two modes active simultaneously).
@@ -181,12 +181,12 @@ grep -iE '\bANR\b|NullPointerException|tombstone|空指针|死锁|\bSIGSEGV\b|\b
 
 2. **Post as JIRA comment**: `jira_add_comment(issue_key=<KEY>, body=<script_content>)` — if this fails, warn but do not abort (the local copy is still available).
 
-3. **Save local copy** to `.plugin-state/specs/jira-aftersales-{issue_key}.md`
+3. **Save local copy** to `.granada/specs/jira-aftersales-{issue_key}.md`
 
 4. **Finalize state and cleanup**:
-   - On success: `Bash: rm -f .plugin-state/jira-aftersales-state.json` — terminal exit
-   - On error-abort: `Write {"active": false, current_phase="error"} to .plugin-state/jira-aftersales-state.json` — preserves state for debugging
-   - Announce completion: "售后话术已生成并发布到 JIRA 评论。本地副本保存在 .plugin-state/specs/jira-aftersales-{KEY}.md"
+   - On success: `Bash: rm -f .granada/jira-aftersales-state.json` — terminal exit
+   - On error-abort: `Write {"active": false, current_phase="error"} to .granada/jira-aftersales-state.json` — preserves state for debugging
+   - Announce completion: "售后话术已生成并发布到 JIRA 评论。本地副本保存在 .granada/specs/jira-aftersales-{KEY}.md"
 
 </Steps>
 
@@ -196,7 +196,7 @@ grep -iE '\bANR\b|NullPointerException|tombstone|空指针|死锁|\bSIGSEGV\b|\b
 - **Report too incomplete for transformation** → abort with message explaining which sections are missing: "分析报告不完整，缺少{sections}，无法生成话术。"
 - **Transformation produces forbidden terms after 2 attempts** → append warning "⚠ 此话术可能包含技术术语，请人工审核后使用。", proceed with output
 - **Duplicate aftersales script detected** → warn user, proceed with regeneration
-- **JIRA comment post fails** → warn user, provide local file path as fallback: "JIRA 评论发布失败，本地副本已保存在 .plugin-state/specs/jira-aftersales-{KEY}.md"
+- **JIRA comment post fails** → warn user, provide local file path as fallback: "JIRA 评论发布失败，本地副本已保存在 .granada/specs/jira-aftersales-{KEY}.md"
 </Error_Handling>
 
 <State_Schema>
@@ -217,17 +217,17 @@ grep -iE '\bANR\b|NullPointerException|tombstone|空指针|死锁|\bSIGSEGV\b|\b
 
 State is lightweight (<5KB). Report text lives in temp files (`/tmp/jira-aftersales-<KEY>/`), not in state.
 
-Update state at each phase boundary for resumability. On resume, read state via `Read .plugin-state/jira-aftersales-state.json` and continue from `current_phase`.
+Update state at each phase boundary for resumability. On resume, read state via `Read .granada/jira-aftersales-state.json` and continue from `current_phase`.
 </State_Schema>
 
 <Tool_Usage>
-- `Read` tool — check local file `.plugin-state/specs/jira-analyze-{KEY}.md` (primary detection, Tier 1)
+- `Read` tool — check local file `.granada/specs/jira-analyze-{KEY}.md` (primary detection, Tier 1)
 - `jira_get_issue` — fetch issue details and comments (mcp-atlassian). Reads comments for report detection (Tier 2) and duplicate check (Phase 3).
 - `jira_add_comment` — post aftersales script as comment on JIRA issue (mcp-atlassian)
-- `Write` / `Read` / `Bash rm` — phase persistence via .plugin-state/jira-aftersales-state.json
+- `Write` / `Read` / `Bash rm` — phase persistence via .granada/jira-aftersales-state.json
 - `Agent(subagent_type="zaku:executor", model="sonnet")` — transformation subagent (Phase 4b)
 - `Bash` — grep post-processing for forbidden terminology (Phase 4c), temp directory management
-- `Write` tool — save aftersales script to local file (.plugin-state/specs/)
+- `Write` tool — save aftersales script to local file (.granada/specs/)
 </Tool_Usage>
 
 <Examples>
@@ -236,13 +236,13 @@ Update state at each phase boundary for resumability. On resume, read state via 
 User: /jira-aftersales SPFB-535
 
 [Phase 1] Parsed key: SPFB-535. MCP health check pass.
-[Phase 2] Tier 1: Found local file .plugin-state/specs/jira-analyze-SPFB-535.md. Using local report.
+[Phase 2] Tier 1: Found local file .granada/specs/jira-analyze-SPFB-535.md. Using local report.
 [Phase 3] No existing aftersales script in JIRA comments.
 [Phase 4] Report completeness: full (all 7 sections present).
          Spawned executor subagent for transformation.
          Grep post-processing: 0 forbidden terms found. Clean output.
 [Phase 5] Posted aftersales script as JIRA comment on SPFB-535.
-         Local copy saved to .plugin-state/specs/jira-aftersales-SPFB-535.md.
+         Local copy saved to .granada/specs/jira-aftersales-SPFB-535.md.
 ```
 Why good: Local file found (fastest path), clean transformation, no terminology leakage.
 </Good>
@@ -304,7 +304,7 @@ Why bad: Mid-execution Skill() invocation creates state mode conflict. Must inst
 - Duplicate aftersales script detection via `# 售后话术:` signature
 - Partial report handling with adapted transformation prompt
 - Report posted as JIRA comment via jira_add_comment
-- Local copy saved to `.plugin-state/specs/jira-aftersales-{KEY}.md`
+- Local copy saved to `.granada/specs/jira-aftersales-{KEY}.md`
 - Lightweight state (<5KB, file paths not data)
 
 **Must NOT have:**

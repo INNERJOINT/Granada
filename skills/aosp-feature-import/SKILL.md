@@ -9,22 +9,22 @@ level: 3
 
 # AOSP Feature Import Skill
 
-Takes an exported feature element report (功能元报告, produced by `aosp-feature-export`) and ports it to a different AOSP codebase. Parses the export report to extract vendor modification points, searches BOTH the source AOSP project (from the report) and the target AOSP project (current config or `--target`) in parallel, maps code locations across projects, identifies API/module gaps, and produces a structured import guide saved to `.plugin-state/aosp-imports/`.
+Takes an exported feature element report (功能元报告, produced by `aosp-feature-export`) and ports it to a different AOSP codebase. Parses the export report to extract vendor modification points, searches BOTH the source AOSP project (from the report) and the target AOSP project (current config or `--target`) in parallel, maps code locations across projects, identifies API/module gaps, and produces a structured import guide saved to `.granada/aosp-imports/`.
 
 **Key distinction from aosp-feature-export:** The export skill discovers what vendor code touches in ONE AOSP tree. The import skill maps those touch points to a DIFFERENT AOSP tree, identifying where the same vendor modifications should be applied and what adaptations are needed.
 
 ## Usage
 
 ```
-/zaku:aosp-feature-import .plugin-state/aosp-exports/public-dns.md
-/zaku:aosp-feature-import .plugin-state/aosp-exports/fingerprint-unlock.md --target rk3588_android14
-/zaku:aosp-feature-import .plugin-state/aosp-exports/usb-audio-routing.md --depth shallow
-/zaku:aosp-feature-import .plugin-state/aosp-exports/public-dns.md --execute
+/zaku:aosp-feature-import .granada/aosp-exports/public-dns.md
+/zaku:aosp-feature-import .granada/aosp-exports/fingerprint-unlock.md --target rk3588_android14
+/zaku:aosp-feature-import .granada/aosp-exports/usb-audio-routing.md --depth shallow
+/zaku:aosp-feature-import .granada/aosp-exports/public-dns.md --execute
 ```
 
 ## Flags
 
-- `--target <project>`: Override the target AOSP project (default: reads from `.plugin-state/aosp-config.json`)
+- `--target <project>`: Override the target AOSP project (default: reads from `.granada/aosp-config.json`)
 - `--depth shallow|deep`: Controls investigation depth (default: `deep`)
   - `shallow`: Phase 2 runs 1 round only, no convergence check. Useful for quick feasibility assessment.
   - `deep`: Phase 2 runs up to 4 rounds with convergence-based termination.
@@ -49,7 +49,7 @@ Takes an exported feature element report (功能元报告, produced by `aosp-fea
 ### Step 0: State Initialization
 
 ```
-Write JSON to .plugin-state/aosp-feature-import-state.json with, active=true, task_description="Import: <report_filename>")
+Write JSON to .granada/aosp-feature-import-state.json with, active=true, task_description="Import: <report_filename>")
 ```
 
 ### Step 1: Health Check and Project Resolution
@@ -60,7 +60,7 @@ Call `sourcepilot` with `tool: "list_tools"` to verify MCP server reachability.
 
 On failure:
 ```
-Bash: rm -f .plugin-state/aosp-feature-import-state.json
+Bash: rm -f .granada/aosp-feature-import-state.json
 ```
 Abort with: `AOSP MCP server unreachable. Check SOURCEPILOT_URL and SOURCEPILOT_KEY environment variables.`
 
@@ -68,7 +68,7 @@ Abort with: `AOSP MCP server unreachable. Check SOURCEPILOT_URL and SOURCEPILOT_
 
 Determine the target AOSP project:
 1. If `--target <project>` flag provided: use that value
-2. Otherwise: read `.plugin-state/aosp-config.json` for the active project
+2. Otherwise: read `.granada/aosp-config.json` for the active project
 3. If neither available: abort with `未指定目标 AOSP 项目。使用 --target <project> 或运行 /zaku:aosp-project 设置。`
 
 **1c. Parse Export Report**
@@ -154,7 +154,7 @@ Agent(
   subagent_type="zaku:aosp-investigator",
   prompt="Verify and enrich AOSP code context for a VENDOR feature import.
 
-  **AOSP Project Override:** Use project '<source_project>' for ALL sourcepilot search calls. Do NOT read .plugin-state/aosp-config.json — the project has been specified explicitly by the orchestrator.
+  **AOSP Project Override:** Use project '<source_project>' for ALL sourcepilot search calls. Do NOT read .granada/aosp-config.json — the project has been specified explicitly by the orchestrator.
 
   Component: <component.name>
   Expected file paths from export report:
@@ -181,7 +181,7 @@ Agent(
   subagent_type="zaku:aosp-investigator",
   prompt="Find corresponding AOSP code in the TARGET project for a vendor feature port.
 
-  **AOSP Project Override:** Use project '<target_project>' for ALL sourcepilot search calls. Do NOT read .plugin-state/aosp-config.json — the project has been specified explicitly by the orchestrator.
+  **AOSP Project Override:** Use project '<target_project>' for ALL sourcepilot search calls. Do NOT read .granada/aosp-config.json — the project has been specified explicitly by the orchestrator.
 
   Component: <component.name>
   Source project paths (from a different AOSP tree):
@@ -237,7 +237,7 @@ Agent(
   subagent_type="zaku:aosp-investigator",
   prompt="Deep investigation for a MISSING/DIVERGED component in target AOSP project.
 
-  **AOSP Project Override:** Use project '<target_project>' for ALL sourcepilot search calls. Do NOT read .plugin-state/aosp-config.json — the project has been specified explicitly by the orchestrator.
+  **AOSP Project Override:** Use project '<target_project>' for ALL sourcepilot search calls. Do NOT read .granada/aosp-config.json — the project has been specified explicitly by the orchestrator.
 
   Component: <component.name>
   Status: <DIVERGED|MISSING>
@@ -314,7 +314,7 @@ If `.repo/` is not found, warn the user and skip plan generation:
    - **Acceptance criteria:** [Verifiable outcome]
    ```
 
-2. Save the execution plan to `.plugin-state/plans/aosp-import-<slug>.md`
+2. Save the execution plan to `.granada/plans/aosp-import-<slug>.md`
 
 **6c. Quality Gate — Architect + Critic Review**
 
@@ -358,24 +358,24 @@ On approval with suggestions: deduplicate, merge into plan, update the saved pla
 ### Step 7: Save
 
 1. Generate slug from feature name: lowercase, replace spaces/special chars with hyphens, max 50 chars
-2. Create `.plugin-state/aosp-imports/` directory if it doesn't exist
-3. Write import guide to `.plugin-state/aosp-imports/<slug>.md`
-4. If `--execute` plan was generated, save to `.plugin-state/plans/aosp-import-<slug>.md`
-5. Call `Bash: rm -f .plugin-state/aosp-feature-import-state.json`
+2. Create `.granada/aosp-imports/` directory if it doesn't exist
+3. Write import guide to `.granada/aosp-imports/<slug>.md`
+4. If `--execute` plan was generated, save to `.granada/plans/aosp-import-<slug>.md`
+5. Call `Bash: rm -f .granada/aosp-feature-import-state.json`
 6. Confirm to user:
    ```
-   功能导入指南已保存: .plugin-state/aosp-imports/<slug>.md
-   [如有执行计划] 执行计划已保存: .plugin-state/plans/aosp-import-<slug>.md
+   功能导入指南已保存: .granada/aosp-imports/<slug>.md
+   [如有执行计划] 执行计划已保存: .granada/plans/aosp-import-<slug>.md
    ```
 
 ### Step 8: Execution Handoff (if `--execute` and user approves)
 
 Use `AskUserQuestion` to present the execution plan with options:
-- **执行** — Hand off to `/zaku:aosp-autopilot .plugin-state/plans/aosp-import-<slug>.md`
+- **执行** — Hand off to `/zaku:aosp-autopilot .granada/plans/aosp-import-<slug>.md`
 - **修改后执行** — Return to Step 6 with user feedback
 - **仅保留计划** — Stop here, user will execute manually later
 
-On approval: `Write {"active": false} to .plugin-state/aosp-feature-import-state.json` then invoke `Skill("zaku:aosp-autopilot")`.
+On approval: `Write {"active": false} to .granada/aosp-feature-import-state.json` then invoke `Skill("zaku:aosp-autopilot")`.
 
 ## Output Template
 
@@ -486,12 +486,12 @@ On approval: `Write {"active": false} to .plugin-state/aosp-feature-import-state
 
 | Scenario | Handling |
 |----------|----------|
-| Export report file not found | `rm -f .plugin-state/*-state.json` + abort with path suggestion |
-| Export report unparseable (missing required sections) | `rm -f .plugin-state/*-state.json` + abort listing missing sections |
+| Export report file not found | `rm -f .granada/*-state.json` + abort with path suggestion |
+| Export report unparseable (missing required sections) | `rm -f .granada/*-state.json` + abort listing missing sections |
 | Source project unreachable via sourcepilot | Warn, continue with `--skip-source-verify` behavior |
-| Target project unreachable via sourcepilot | `rm -f .plugin-state/*-state.json` + abort (target is required) |
-| Source == Target project | `rm -f .plugin-state/*-state.json` + abort with explanation |
-| No target project configured or specified | `rm -f .plugin-state/*-state.json` + abort with setup instructions |
+| Target project unreachable via sourcepilot | `rm -f .granada/*-state.json` + abort (target is required) |
+| Source == Target project | `rm -f .granada/*-state.json` + abort with explanation |
+| No target project configured or specified | `rm -f .granada/*-state.json` + abort with setup instructions |
 | >50% of Phase 1 agents fail | Emit partial results with warning, continue with available data |
 | All target investigators return MISSING for all components | Complete with "high difficulty" assessment, recommend manual review |
 | Partial agent failure in Phase 2 | Continue with successful results, note gaps |
@@ -499,16 +499,16 @@ On approval: `Write {"active": false} to .plugin-state/aosp-feature-import-state
 ## Error Recovery
 
 On any unrecoverable error after Step 0:
-- If investigator data has been collected, write partial results to `.plugin-state/aosp-imports/<slug>-partial.md`
-- Call `Bash: rm -f .plugin-state/aosp-feature-import-state.json`
+- If investigator data has been collected, write partial results to `.granada/aosp-imports/<slug>-partial.md`
+- Call `Bash: rm -f .granada/aosp-feature-import-state.json`
 - Report the error to the user
 
 Skill is idempotent — re-running with the same inputs overwrites the output file.
 
 ## Configuration
 
-- Output directory: `.plugin-state/aosp-imports/` (fixed)
-- Execution plan directory: `.plugin-state/plans/` (fixed, prefix `aosp-import-`)
+- Output directory: `.granada/aosp-imports/` (fixed)
+- Execution plan directory: `.granada/plans/` (fixed, prefix `aosp-import-`)
 - Max Phase 1 agent pairs: 6 (12 agents total: 6 source + 6 target)
 - Max Phase 2 agents: 8 (target-only, gap investigation)
 - Max total agents across all phases: 20 (investigation) + 2 per quality gate iteration (max 4 for architect+critic)
@@ -522,14 +522,14 @@ Skill is idempotent — re-running with the same inputs overwrites the output fi
 
 | Scenario | State Operation |
 |----------|-----------------|
-| On entry | `Write {"active": true} to .plugin-state/aosp-feature-import-state.json` |
-| Normal completion (no --execute) | `Bash: rm -f .plugin-state/aosp-feature-import-state.json` |
-| Execution handoff (--execute approved) | `Write {"active": false} to .plugin-state/aosp-feature-import-state.json` |
-| Export report not found (unrecoverable) | `Bash: rm -f .plugin-state/aosp-feature-import-state.json` |
-| MCP unreachable (unrecoverable) | `Bash: rm -f .plugin-state/aosp-feature-import-state.json` |
-| User cancels | `/zaku:cancel` calls `rm -f .plugin-state/*-state.json` |
+| On entry | `Write {"active": true} to .granada/aosp-feature-import-state.json` |
+| Normal completion (no --execute) | `Bash: rm -f .granada/aosp-feature-import-state.json` |
+| Execution handoff (--execute approved) | `Write {"active": false} to .granada/aosp-feature-import-state.json` |
+| Export report not found (unrecoverable) | `Bash: rm -f .granada/aosp-feature-import-state.json` |
+| MCP unreachable (unrecoverable) | `Bash: rm -f .granada/aosp-feature-import-state.json` |
+| User cancels | `/zaku:cancel` calls `rm -f .granada/*-state.json` |
 
-Note: Do not use `rm -f .plugin-state/*-state.json` before launching `aosp-autopilot`. The 30-second cancel signal disables stop-hook enforcement for the newly launched mode. Use `Write JSON with active=false)` instead.
+Note: Do not use `rm -f .granada/*-state.json` before launching `aosp-autopilot`. The 30-second cancel signal disables stop-hook enforcement for the newly launched mode. Use `Write JSON with active=false)` instead.
 
 ## Tool Usage
 
@@ -537,9 +537,9 @@ Note: Do not use `rm -f .plugin-state/*-state.json` before launching `aosp-autop
 - `Agent(subagent_type="zaku:aosp-investigator")`: Parallel investigation of source and target projects
 - `Agent(subagent_type="zaku:architect")`: Architect review in Step 6c quality gate
 - `Agent(subagent_type="zaku:critic")`: Critic evaluation in Step 6c quality gate
-- `Read`: Parse export report, read `.plugin-state/aosp-config.json`
+- `Read`: Parse export report, read `.granada/aosp-config.json`
 - `Write`: Save import guide and execution plan
-- `Write` / `Bash rm`: Manage execution state via .plugin-state/ files
+- `Write` / `Bash rm`: Manage execution state via .granada/ files
 - `AskUserQuestion`: Execution approval gate (Step 8), quality gate fallback (Step 6c)
 - `Skill("zaku:aosp-autopilot")`: Execution handoff
 

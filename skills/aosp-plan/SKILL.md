@@ -5,13 +5,13 @@ argument-hint: <AOSP investigation query>
 model: opus
 pipeline: [aosp-plan, ralph]
 next-skill: ralph
-handoff: .plugin-state/plans/aosp-*.md
+handoff: .granada/plans/aosp-*.md
 level: 4
 ---
 
 # AOSP Plan Skill
 
-Investigation-first AOSP planning. Decomposes queries into facets, spawns parallel `aosp-investigator` subagents, synthesizes all findings, and produces an evidence-backed plan saved to `.plugin-state/plans/`.
+Investigation-first AOSP planning. Decomposes queries into facets, spawns parallel `aosp-investigator` subagents, synthesizes all findings, and produces an evidence-backed plan saved to `.granada/plans/`.
 
 ## Usage
 
@@ -30,13 +30,13 @@ Investigation-first AOSP planning. Decomposes queries into facets, spawns parall
 
 ### Step 0: State Initialization
 
-Call `Write {"active": true} to .plugin-state/aosp-plan-state.json` before any other action. This enables stop-hook enforcement during parallel investigation.
+Call `Write {"active": true} to .granada/aosp-plan-state.json` before any other action. This enables stop-hook enforcement during parallel investigation.
 
 ### Step 1: MCP Health Check
 
 Call `sourcepilot` with `tool: "list_tools"` once at startup to verify the MCP server is reachable and discover available remote tool names.
 
-If the call fails, call `Bash: rm -f .plugin-state/aosp-plan-state.json` and abort immediately with:
+If the call fails, call `Bash: rm -f .granada/aosp-plan-state.json` and abort immediately with:
 
 ```
 AOSP MCP server unreachable. Check SOURCEPILOT_URL and SOURCEPILOT_KEY environment variables.
@@ -44,7 +44,7 @@ AOSP MCP server unreachable. Check SOURCEPILOT_URL and SOURCEPILOT_KEY environme
 
 Do NOT proceed to spawn agents if this check fails.
 
-After health check passes, read `.plugin-state/aosp-config.json` to display the active AOSP project:
+After health check passes, read `.granada/aosp-config.json` to display the active AOSP project:
 - If configured: display `**🔍 AOSP Project: <project_name>**` prominently
 - If not configured: display `**⚠ 未配置 AOSP 项目** — 搜索将不限定项目范围。运行 /zaku:aosp-project 设置项目。`
 
@@ -242,12 +242,12 @@ Final plan output MUST include an **Architecture Decision Record** section appen
 Derive a slug from the query (lowercase, spaces→hyphens, strip special chars). Save to:
 
 ```
-.plugin-state/plans/aosp-<slug>.md
+.granada/plans/aosp-<slug>.md
 ```
 
 Confirm the save path to the user after writing.
 
-If NOT running with `--interactive`, call `Bash: rm -f .plugin-state/aosp-plan-state.json` after confirming the save path. The skill stops here in non-interactive mode.
+If NOT running with `--interactive`, call `Bash: rm -f .granada/aosp-plan-state.json` after confirming the save path. The skill stops here in non-interactive mode.
 
 ### Step 7: Execution Approval (--interactive only)
 
@@ -256,9 +256,9 @@ Use `AskUserQuestion` to present the saved plan with these options:
 - **Approve and execute via ralph** — proceed to implementation via ralph sequential execution
 - **Clear context and implement** — compact context first, then ralph (recommended when context is large after investigation)
 - **Request changes** — return to Step 5 with user feedback
-- **Reject** — discard plan, call `Bash: rm -f .plugin-state/aosp-plan-state.json`, stop
+- **Reject** — discard plan, call `Bash: rm -f .granada/aosp-plan-state.json`, stop
 
-On approval: Call `Write {"active": false} to .plugin-state/aosp-plan-state.json` before invoking the execution skill. Do NOT use `rm -f .plugin-state/*-state.json` — its cancel signal disables stop-hook enforcement for the newly launched mode.
+On approval: Call `Write {"active": false} to .granada/aosp-plan-state.json` before invoking the execution skill. Do NOT use `rm -f .granada/*-state.json` — its cancel signal disables stop-hook enforcement for the newly launched mode.
 
 - **Approve and implement via team**: Invoke `Skill("zaku:team")` with the plan path
 - **Approve and execute via ralph**: Invoke `Skill("zaku:ralph")` with the plan path
@@ -285,19 +285,19 @@ Deliberate mode adds:
 
 The stop hook uses `aosp-plan` state to enforce continuation during parallel investigation. The skill MUST manage this state:
 
-- **On entry**: `Write {"active": true} to .plugin-state/aosp-plan-state.json` before Step 1
-- **On MCP failure**: `Bash: rm -f .plugin-state/aosp-plan-state.json` — terminal exit
-- **On non-interactive completion** (Step 6): `Bash: rm -f .plugin-state/aosp-plan-state.json` — plan output only, no execution follows
-- **On execution handoff** (Step 7 approval): `Write {"active": false} to .plugin-state/aosp-plan-state.json` — preserves stop-hook enforcement for the execution mode
-- **On rejection** (Step 7 reject): `Bash: rm -f .plugin-state/aosp-plan-state.json` — terminal exit
+- **On entry**: `Write {"active": true} to .granada/aosp-plan-state.json` before Step 1
+- **On MCP failure**: `Bash: rm -f .granada/aosp-plan-state.json` — terminal exit
+- **On non-interactive completion** (Step 6): `Bash: rm -f .granada/aosp-plan-state.json` — plan output only, no execution follows
+- **On execution handoff** (Step 7 approval): `Write {"active": false} to .granada/aosp-plan-state.json` — preserves stop-hook enforcement for the execution mode
+- **On rejection** (Step 7 reject): `Bash: rm -f .granada/aosp-plan-state.json` — terminal exit
 
-Critical: Never use `rm -f .plugin-state/*-state.json` before launching an execution mode. The 30-second cancel signal disables stop-hook enforcement for ALL modes.
+Critical: Never use `rm -f .granada/*-state.json` before launching an execution mode. The 30-second cancel signal disables stop-hook enforcement for ALL modes.
 
 ## Configuration
 
 - Maximum 5 parallel `aosp-investigator` agents (matches `external-context` precedent)
 - Keyword trigger: `"aosp plan"` or `"aosp_plan"`
-- State file: `.plugin-state/aosp-plan-state.json` (Write/Read/rm)
+- State file: `.granada/aosp-plan-state.json` (Write/Read/rm)
 - Non-interactive mode (default): outputs plan and stops after Step 6
 - Interactive mode (`--interactive`): adds synthesis review (Step 4.5) and execution approval (Step 7) gates
 

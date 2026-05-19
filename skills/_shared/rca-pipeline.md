@@ -14,7 +14,7 @@
 | `<TEMP_DIR>` | `/tmp/jira-analyze-<KEY>/` | `/tmp/aosp-analyze-<slug>/` |
 | `<MODE_NAME>` | `jira-analyze` | `aosp-analyze` |
 | `<ANALYSIS_MODE>` | always `log-based` | `log-based` or `no-log` |
-| `<REPORT_OUTPUT_PATH>` | `.plugin-state/specs/jira-analyze-{issue_key}.md` | `.plugin-state/specs/aosp-analyze-{slug}.md` |
+| `<REPORT_OUTPUT_PATH>` | `.granada/specs/jira-analyze-{issue_key}.md` | `.granada/specs/aosp-analyze-{slug}.md` |
 
 ---
 
@@ -93,7 +93,7 @@ Group search targets into 2-3 clusters by subsystem, then spawn one aosp-investi
 ```
 Agent(
   subagent_type="zaku:aosp-investigator",
-  prompt="[If --project override is active, prepend: **AOSP Project Override:** Use project `<name>` for ALL sourcepilot search calls. Do NOT read `.plugin-state/aosp-config.json`.]
+  prompt="[If --project override is active, prepend: **AOSP Project Override:** Use project `<name>` for ALL sourcepilot search calls. Do NOT read `.granada/aosp-config.json`.]
 
 Search AOSP source code for the following crash-related classch targets:
 <list of class names, function names, native libraries from anomalies>
@@ -338,7 +338,7 @@ Report format:
 
 4. **Finalize state and cleanup**:
    - On success: `rm state file(mode="<MODE_NAME>")` — terminal exit
-   - On error-abort: `Write {"active": false, "current_phase": "error"} to .plugin-state/<MODE_NAME>-state.json` — preserves state for debugging
+   - On error-abort: `Write {"active": false, "current_phase": "error"} to .granada/<MODE_NAME>-state.json` — preserves state for debugging
    - Announce report location to user
 
 <!-- MODE-GATE: jira-analyze only — post report as JIRA comment -->

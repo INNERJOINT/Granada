@@ -8,7 +8,7 @@ triggers:
   - "jira_analyze"
   - "jira rca"
   - "analyze jira"
-handoff: .plugin-state/specs/jira-analyze-{issue_key}.md
+handoff: .granada/specs/jira-analyze-{issue_key}.md
 level: 3
 ---
 
@@ -42,8 +42,8 @@ Automates Android bug root-cause analysis by fetching JIRA issue details via mcp
    - If neither matches, abort with: "Could not parse JIRA issue key from input. Provide a URL (https://jira.example.com/browse/PROJ-123) or key (PROJ-123)."
 
 1b. **Resume check** (before MCP health checks):
-   - If `--fresh` flag is present: `Bash: rm -f .plugin-state/jira-analyze-state.json` + `rm -rf /tmp/jira-analyze-<KEY>`, then proceed as fresh run.
-   - Otherwise, read existing state: `Read .plugin-state/jira-analyze-state.json`
+   - If `--fresh` flag is present: `Bash: rm -f .granada/jira-analyze-state.json` + `rm -rf /tmp/jira-analyze-<KEY>`, then proceed as fresh run.
+   - Otherwise, read existing state: `Read .granada/jira-analyze-state.json`
    - If state exists AND `active == true` AND `state.issue_key` matches current `<KEY>`:
      - Display: "检测到未完成的分析 (phase: <current_phase>)。从断点恢复..."
      - Validate temp directory exists: `ls /tmp/jira-analyze-<KEY>`
@@ -67,15 +67,15 @@ Automates Android bug root-cause analysis by fetching JIRA issue details via mcp
    - AOSP: call `sourcepilot(tool="list_tools")` — if fails, abort with "sourcepilot MCP unreachable. Check SOURCEPILOT_URL and SOURCEPILOT_KEY env vars."
 
 3. **Display active AOSP project**:
-   - If `--project` override was provided: display `**🔍 AOSP Project: <name> (命令行指定)**` and use this value for all subsequent phases. Skip reading `.plugin-state/aosp-config.json`.
-   - Otherwise, read `.plugin-state/aosp-config.json`:
+   - If `--project` override was provided: display `**🔍 AOSP Project: <name> (命令行指定)**` and use this value for all subsequent phases. Skip reading `.granada/aosp-config.json`.
+   - Otherwise, read `.granada/aosp-config.json`:
      - If configured: display `**🔍 AOSP Project: <project_name>**` prominently
      - If not configured: display `**⚠ 未配置 AOSP 项目** — 搜索将不限定项目范围。运行 /zaku:aosp-project 设置项目。`
    (When no `--project` override is provided, the `aosp-investigator` subagent reads this config and passes `project` to search calls automatically. When `--project` is provided, the override is passed explicitly in subagent prompts — see Phase 4 and Phase 5.)
 
 4. **Initialize state**:
 ```
-Write JSON to .plugin-state/jira-analyze-state.json with, active=true, current_phase="initialize", state={
+Write JSON to .granada/jira-analyze-state.json with, active=true, current_phase="initialize", state={
   "issue_key": "<KEY>",
   "temp_dir": "/tmp/jira-analyze-<KEY>",
   "issue_summary": null,
@@ -181,7 +181,7 @@ Group search targets into 2-3 clusters by subsystem, then spawn one aosp-investi
 Agent(
   subagent_type="zaku:aosp-investigator",
   model="sonnet",
-  prompt="[If --project override is active, prepend: **AOSP Project Override:** Use project `<name>` for ALL sourcepilot search calls. Do NOT read `.plugin-state/aosp-config.json` — the project has been specified explicitly via CLI flag.]
+  prompt="[If --project override is active, prepend: **AOSP Project Override:** Use project `<name>` for ALL sourcepilot search calls. Do NOT read `.granada/aosp-config.json` — the project has been specified explicitly via CLI flag.]
 
 Search AOSP source code for the following crash-related classes/functions from JIRA issue <KEY>.
 
@@ -268,7 +268,7 @@ Spawn one agent per hypothesis (max 3). Each agent receives Phase 4 context to a
 Agent(
   subagent_type="zaku:aosp-investigator",
   model="sonnet",
-  prompt="[If --project override is active, prepend: **AOSP Project Override:** Use project `<name>` for ALL sourcepilot search calls. Do NOT read `.plugin-state/aosp-config.json` — the project has been specified explicitly via CLI flag.]
+  prompt="[If --project override is active, prepend: **AOSP Project Override:** Use project `<name>` for ALL sourcepilot search calls. Do NOT read `.granada/aosp-config.json` — the project has been specified explicitly via CLI flag.]
 
 Investigate this Android crash hypothesis for JIRA issue <KEY>:
 
@@ -322,7 +322,7 @@ Report format:
 
 2. **Rank hypotheses** by confidence (from investigation results)
 
-3. **Build the 7-section Chinese report** and save to `.plugin-state/specs/jira-analyze-{issue_key}.md`:
+3. **Build the 7-section Chinese report** and save to `.granada/specs/jira-analyze-{issue_key}.md`:
 
 ```markdown
 <!-- Downstream dependency: jira-aftersales skill detects reports by this title format. Do not change without updating jira-aftersales. -->
@@ -394,8 +394,8 @@ Report format:
 5. **Post report as JIRA comment**: `jira_add_comment(issue_key=<KEY>, body=<report_content>)` — post the full report content as a comment on the JIRA issue. If this fails, warn but do not abort (the local report file is still available).
 
 6. **Finalize state and cleanup**:
-   - On success: `Bash: rm -f .plugin-state/jira-analyze-state.json` — terminal exit
-   - On error-abort: `Write {"active": false, current_phase="error"} to .plugin-state/jira-analyze-state.json` — preserves state for debugging
+   - On success: `Bash: rm -f .granada/jira-analyze-state.json` — terminal exit
+   - On error-abort: `Write {"active": false, current_phase="error"} to .granada/jira-analyze-state.json` — preserves state for debugging
    - Announce report location to user
 
 </Steps>
@@ -436,7 +436,7 @@ Embed these handlers throughout all phases:
 
 State is lightweight (<10KB). Parsed data lives in temp files (`/tmp/jira-analyze-<KEY>/`), not in state.
 
-Update state at each phase boundary for resumability. On resume, read state via `Read .plugin-state/jira-analyze-state.json` and continue from `current_phase`.
+Update state at each phase boundary for resumability. On resume, read state via `Read .granada/jira-analyze-state.json` and continue from `current_phase`.
 </State_Schema>
 
 <Tool_Usage>
@@ -446,7 +446,7 @@ Update state at each phase boundary for resumability. On resume, read state via 
 - `log-unboxer download --sn` — fallback: download device logs by serial number from log server (last 90 days). Do NOT use `--url`.
 - `jira_add_comment` — post RCA report as comment on JIRA issue (mcp-atlassian)
 - `sourcepilot` — search AOSP source for crash-related code (always, not conditional)
-- `Write` / `Read` / `Bash rm` — phase persistence via .plugin-state/jira-analyze-state.json
+- `Write` / `Read` / `Bash rm` — phase persistence via .granada/jira-analyze-state.json
 - `Agent(subagent_type="zaku:aosp-log-parser", model="sonnet")` — log parsing, file classification, and timeline construction (Phase 3)
 - `Agent(subagent_type="zaku:aosp-log-parser", model="sonnet")` — log parsing and timeline construction (Phase 3)
 - `Agent(subagent_type="zaku:analyst", model="sonnet")` — hypothesis generation (Phase 5)
@@ -480,7 +480,7 @@ User: /jira-analyze https://jira.cvte.com/browse/SPFB-535
          H1: HIGH confidence — found matching code path in SurfaceFlinger::onMessageReceived
          H2: MEDIUM — binder thread pool config matches but no direct evidence
          H3: LOW — kernel log timing doesn't correlate with userspace crashes
-[Phase 5] Report saved to .plugin-state/specs/jira-analyze-SPFB-535.md (Chinese, 7 sections).
+[Phase 5] Report saved to .granada/specs/jira-analyze-SPFB-535.md (Chinese, 7 sections).
          Posted report as JIRA comment on SPFB-535.
 ```
 Why good: All exploration delegated to subagents. Log parsing and file classification (aosp-log-parser/sonnet), hypothesis generation (analyst/sonnet), AOSP investigation (3 aosp-investigator/sonnet in parallel). Lead only orchestrates. Report in Chinese, posted to JIRA.

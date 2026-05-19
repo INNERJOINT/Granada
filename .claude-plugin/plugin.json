@@ -13,38 +13,7 @@
     "android",
     "jira",
     "git",
-    "rca",
     "sourcepilot"
   ],
-  "mcpServers": "./.mcp.json",
-  "userConfig": {
-    "SOURCEPILOT_URL": {
-      "type": "string",
-      "title": "AOSP MCP Server URL",
-      "description": "Remote AOSP MCP server endpoint",
-      "required": true,
-      "default": "http://10.23.12.96:8888/mcp"
-    },
-    "SOURCEPILOT_KEY": {
-      "type": "string",
-      "title": "AOSP MCP Auth Key",
-      "description": "Authentication key for AOSP MCP server",
-      "required": true,
-      "default": "sk-abc123"
-    },
-    "GITLAB_PERSONAL_ACCESS_TOKEN": {
-      "type": "string",
-      "title": "GitLab Personal Access Token",
-      "description": "PAT for GitLab API authentication",
-      "required": true,
-      "sensitive": true
-    },
-    "GITLAB_API_URL": {
-      "type": "string",
-      "title": "GitLab API URL",
-      "description": "GitLab instance API endpoint",
-      "required": true,
-      "default": "https://gitlab.gz.cvte.cn/api/v4"
-    }
-  }
+  "mcpServers": "./.mcp.json"
 }
