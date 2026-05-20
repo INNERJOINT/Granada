@@ -1,3 +1,9 @@
+## [2.6.0](https://github.com/INNERJOINT/Granada/compare/v2.5.0...v2.6.0) (2026-05-20)
+
+### Features
+
+* **output-styles:** use box-drawing diagrams ([10e1bb2](https://github.com/INNERJOINT/Granada/commit/10e1bb2d7db906068d3f5a34c10bcdbe049421ff))
+
 ## [2.5.0](https://github.com/INNERJOINT/Granada/compare/v2.4.0...v2.5.0) (2026-05-20)
 
 ### Features
