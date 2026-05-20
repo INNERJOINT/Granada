@@ -1,3 +1,9 @@
+## [2.6.1](https://github.com/INNERJOINT/Granada/compare/v2.6.0...v2.6.1) (2026-05-20)
+
+### Bug Fixes
+
+* **skills:** quote argument hints ([aee8767](https://github.com/INNERJOINT/Granada/commit/aee87678f151f3b07df0cf3db1ef6d66f1a4f578))
+
 ## [2.6.0](https://github.com/INNERJOINT/Granada/compare/v2.5.0...v2.6.0) (2026-05-20)
 
 ### Features
