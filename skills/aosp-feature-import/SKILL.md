@@ -1,7 +1,7 @@
 ---
 name: aosp-feature-import
 description: Import an exported AOSP feature element report into a different AOSP project, mapping source code locations to target and producing an executable import plan
-argument-hint: "<path-to-export-report>" [--target <project>] [--depth shallow|deep] [--execute]
+argument-hint: '"<path-to-export-report>" [--target <project>] [--depth shallow|deep] [--execute]'
 model: opus
 pipeline: [aosp-feature-import, aosp-autopilot]
 level: 3

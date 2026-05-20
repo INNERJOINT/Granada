@@ -1,7 +1,7 @@
 ---
 name: aosp-project
 description: List and select the active AOSP project for sourcepilot-based skills
-argument-hint: [list | set <project-name>]
+argument-hint: '[list | set <project-name>]'
 model: haiku
 triggers:
   - "aosp project"

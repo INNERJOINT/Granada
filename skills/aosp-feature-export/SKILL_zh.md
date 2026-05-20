@@ -1,7 +1,7 @@
 ---
 name: aosp-feature-export
 description: 通过在所有 AOSP 项目中迭代搜索相关代码，导出 AOSP 功能要素文档
-argument-hint: "<功能描述>" --links <url1,url2,...>
+argument-hint: '"<功能描述>" --links <url1,url2,...>'
 model: opus
 level: 3
 ---
