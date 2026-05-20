@@ -1,3 +1,9 @@
+## [2.5.0](https://github.com/INNERJOINT/Granada/compare/v2.4.0...v2.5.0) (2026-05-20)
+
+### Features
+
+* **output-styles:** add diagrams-first style ([9e4564b](https://github.com/INNERJOINT/Granada/commit/9e4564b3e7d3e6509741381129f93ada14ce468e))
+
 ## [2.4.0](https://github.com/INNERJOINT/Granada/compare/v2.3.0...v2.4.0) (2026-05-20)
 
 ### Features
