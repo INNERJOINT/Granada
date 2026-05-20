@@ -22,7 +22,7 @@
 
 <!-- MODE-GATE: log-based only. aosp-analyze skips Phase 3 entirely when analysis_mode=="no-log" -->
 
-Delegate all log parsing to a single `aosp-log-parser` agent. This agent handles file classification (if needed), all 4 log type parsers, and the merge/synthesis step internally.
+Delegate all log parsing to a single `aosp-log-parser` agent. This agent reads the collector-generated file classification, runs all 4 log type parsers, and performs the merge/synthesis step internally.
 
 ### Spawn aosp-log-parser Agent
 
@@ -33,8 +33,9 @@ Agent(
 
 Temp directory: <TEMP_DIR>
 Source files directory: <TEMP_DIR>extracted/
+Classification manifest: <TEMP_DIR>file-classification.json
 
-Classify files if needed (generate file-classification.json if missing), then follow your Parsing Protocol: read the classification, parse each log type using parallel tool calls where possible, then merge into unified timeline.md and anomalies.md.
+Read the collector-generated classification manifest first, parse each listed log type using parallel tool calls where possible, then merge into unified timeline.md and anomalies.md. Abort if the manifest is missing or inconsistent with the extracted directory.
 
 Report the total anomaly count at the end of your response."
 )
@@ -342,5 +343,5 @@ Report format:
    - Announce report location to user
 
 <!-- MODE-GATE: jira-analyze only — post report as JIRA comment -->
-5. **Post report as JIRA comment**: `jira_add_comment(issue_key=<KEY>, body=<report_content>)` — post the full report content as a comment on the JIRA issue. If this fails, warn but do not abort (the local report file is still available).
+5. **Post report as JIRA comment**: `jira_add_comment(issue_key=<KEY>, body=<redacted_report_content>)` — post the redacted report content as a comment on the JIRA issue. If this fails, warn but do not abort (the local report file is still available).
 <!-- /MODE-GATE -->

@@ -16,7 +16,7 @@ Android bug reports contain heterogeneous log formats. Logcat has timestamps and
 </Why_This_Matters>
 
 <Success_Criteria>
-- Every log file in the input directory is classified and parsed
+- Every parseable log file listed in the required classification manifest is parsed
 - All parsed output files are saved to the temp directory
 - Timeline events are sorted chronologically with source labels
 - Anomalies are deduplicated (same stack trace within 1-second window)
@@ -30,24 +30,21 @@ Android bug reports contain heterogeneous log formats. Logcat has timestamps and
 - For large files (>10MB), use Read with offset/limit to process in chunks
 - Never modify source files — only write to the output directory
 - All output paths use `<temp_dir>/` prefix (the caller provides this)
+- Redact common secrets before writing parsed output: authorization headers, bearer tokens, API keys, passwords, access/refresh/id tokens, cookies, session IDs, private keys, and signed URL token/key/signature query values
 </Constraints>
 
 <Parsing_Protocol>
 
-## Step 0: File Classification (if needed)
+## Step 0: Require Collector Classification
 
-If `<temp_dir>/file-classification.json` does NOT exist, generate it:
+`<temp_dir>/file-classification.json` is a required input produced by `aosp-log-collector`. Do not generate, repair, or infer classification in this parser.
 
-1. List all files in `<temp_dir>/extracted/` directory
-2. For each file, determine its type by scanning the filename AND the first 20 lines of content:
-   - `logcat*`, `*logcat*`, files starting with `--------- beginning of` → **logcat**
-   - `tombstone_*`, files starting with `*** *** ***` → **tombstone**
-   - `*traces.txt`, `*anr*`, files containing `"main" prio=` → **ANR trace**
-   - `*dmesg*`, `*kmsg*`, `*kernel*` → **kernel log**
-   - Everything else → **other**
-3. Save the classification to `<temp_dir>/file-classification.json` as JSON: `{"filename": "logcat|tombstone|anr|kernel|other", ...}`
+Before parsing:
 
-If `<temp_dir>/file-classification.json` already exists, read it directly and proceed to Step 1 (supports resume).
+1. Read `<temp_dir>/file-classification.json`.
+2. If the file is missing, invalid JSON, empty, or contains no parseable log types, report the specific error and abort.
+3. If any listed file is missing from `<temp_dir>/extracted/`, report the inconsistency and abort.
+4. If extracted files exist that are not listed in the manifest, report the inconsistency and abort so collection can be rerun.
 
 ## Step 1: Read File Classification
 
@@ -61,11 +58,13 @@ Group files by type. Only process these four types: logcat, tombstone, anr, kern
 
 Before parsing, validate the classification (agent executes these checks via Read tool calls — no calling code required):
 
-1. **File exists**: If `<temp_dir>/file-classification.json` is missing (and Step 0 did not create it), report error: `file-classification.json not found at <path>` and abort.
+1. **File exists**: If `<temp_dir>/file-classification.json` is missing, report error: `file-classification.json not found at <path>; run aosp-log-collector first` and abort.
 2. **Valid JSON**: If JSON parsing fails, report error with the raw first 200 characters and abort.
-3. **Valid type values**: All values MUST be one of: `logcat`, `tombstone`, `anr`, `kernel`, `other`. If an unrecognized type is found, report warning but continue (treat it as "other").
-4. **At least one parseable type**: If ALL files are classified as "other", report: `No Android log files found. All files classified as "other".` and abort.
-5. **File existence check** (agent executes): For each file listed in the classification, verify it exists on disk via Read with limit=1. Emit a warning for any file that does not exist: `WARNING: <filename> listed in classification but not found on disk` and exclude it from parsing.
+3. **Non-empty manifest**: If the manifest contains zero entries, report `file-classification.json is empty` and abort.
+4. **Valid type values**: All values MUST be one of: `logcat`, `tombstone`, `anr`, `kernel`, `other`. If an unrecognized type is found, report error and abort.
+5. **At least one parseable type**: If ALL files are classified as "other", report: `No Android log files found. All files classified as "other".` and abort.
+6. **Manifest-to-disk consistency**: For each file listed in the classification, verify it exists on disk via Read with limit=1. If any listed file is missing, report `Classification manifest references missing file: <filename>` and abort.
+7. **Disk-to-manifest consistency**: If `<temp_dir>/extracted/` contains files not listed in the manifest, report `Extracted directory contains unclassified file: <filename>` and abort.
 
 ## Step 2: Parse Each Log Type (in parallel)
 

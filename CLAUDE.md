@@ -46,6 +46,7 @@ Available remote tools: `list_projects`, `list_repos`, `search_code`, `search_sy
 | Agent | Description |
 |-------|-------------|
 | `aosp-investigator` | AOSP code investigation specialist |
+| `aosp-log-collector` | Android log collector (JIRA/local logs, extraction, classification) |
 | `aosp-log-parser` | Android log parser (logcat, tombstone, ANR, kernel) |
 
 ## State Management

@@ -42,7 +42,7 @@ Automates Android bug root-cause analysis by fetching JIRA issue details via mcp
    - If neither matches, abort with: "Could not parse JIRA issue key from input. Provide a URL (https://jira.example.com/browse/PROJ-123) or key (PROJ-123)."
 
 1b. **Resume check** (before MCP health checks):
-   - If `--fresh` flag is present: `Bash: rm -f .granada/jira-analyze-state.json` + `rm -rf /tmp/jira-analyze-<KEY>`, then proceed as fresh run.
+   - If `--fresh` flag is present: remove `.granada/jira-analyze-state.json`; remove `/tmp/jira-analyze-<KEY>` only after the issue key has passed `^[A-Z][A-Z0-9_]+-\d+$`, quote the target, and use `rm -rf -- "$target"`, then proceed as fresh run.
    - Otherwise, read existing state: `Read .granada/jira-analyze-state.json`
    - If state exists AND `active == true` AND `state.issue_key` matches current `<KEY>`:
      - Display: "检测到未完成的分析 (phase: <current_phase>)。从断点恢复..."
@@ -93,47 +93,36 @@ Write JSON to .granada/jira-analyze-state.json with, active=true, current_phase=
 mkdir -p /tmp/jira-analyze-<KEY>/extracted
 ```
 
-## Phase 2: JIRA Data Collection
+## Phase 2: JIRA Data Collection (via aosp-log-collector Agent)
 
-1. **Fetch issue details**: `jira_get_issue(issue_key=<KEY>, comment_limit=0)` — store title, status, assignee, priority, description. **Do NOT fetch or analyze comments/备注** — comments may contain noise or outdated information that interferes with log-based RCA.
+Delegate all JIRA issue metadata, attachment collection, archive unpacking, fallback log download, file organization, and file classification to `aosp-log-collector`.
 
-2. **Pre-check attachments**: `jira_get_issue(issue_key=<KEY>, fields="attachment")` — inspect attachment metadata (filename, size, mimeType). Filter to zip files only. Skip files > 50MB (MCP transfer limit). If no zip attachments, warn and attempt to parse any `.txt`/`.log` files directly.
+1. **Spawn the aosp-log-collector agent**:
 
-3. **Download attachments** — try methods in priority order:
+```
+Agent(
+  subagent_type="zaku:aosp-log-collector",
+  model="sonnet",
+  prompt="Collect Android logs for JIRA issue <KEY>.
 
-   **Method A (preferred): MCP `jira_download_attachments`** — download zip attachments via mcp-atlassian:
-   `jira_download_attachments(issue_key=<KEY>)` → returns base64-encoded EmbeddedResource objects.
-   Save via file-based decode (NOT echo pipe — avoids ARG_MAX limit):
-   ```bash
-   # Step 1: Write base64 content to file using Write tool (mcp__filesystem__write_file)
-   # Step 2: Decode via file redirection
-   base64 -d < /tmp/jira-analyze-<KEY>/<filename>.b64 > /tmp/jira-analyze-<KEY>/<filename>.zip
-   ```
-   Then decompress using `log-unboxer unpack`:
-   ```bash
-   log-unboxer unpack /tmp/jira-analyze-<KEY>/<filename>.zip --output-dir /tmp/jira-analyze-<KEY>/extracted/
-   ```
-   If `log-unboxer unpack` fails, abort with: "log-unboxer unpack failed. Check that log-unboxer is installed and accessible." Do NOT fall back to `unzip` or any other decompression tool.
+Mode: JIRA
+Issue key: <KEY>
+Temp directory: /tmp/jira-analyze-<KEY>/
+Extracted directory: /tmp/jira-analyze-<KEY>/extracted/
+Classification manifest: /tmp/jira-analyze-<KEY>/file-classification.json
 
-   **Cleanup intermediate files** (per-attachment, only after successful extraction):
-   ```bash
-   rm -f /tmp/jira-analyze-<KEY>/<filename>.b64
-   rm -f /tmp/jira-analyze-<KEY>/<filename>.zip
-   ```
-   Guard: only delete if `log-unboxer unpack` exit code was 0 for that specific attachment. If unpack fails, preserve that attachment's intermediates for debugging.
+Fetch issue details with comments excluded, collect log attachments or fallback logs, populate the extracted directory, and generate the classification manifest. Report issue summary, attachment metadata, collection summary, per-type counts, and Collection status."
+)
+```
 
-   **Method B (fallback): `log-unboxer download --sn`** — if no zip attachments are found, check the issue description for a device serial number (SN). If found:
-   ```bash
-   log-unboxer download --sn <SERIAL_NUMBER> --output-dir /tmp/jira-analyze-<KEY>/extracted/ --days 90
-   ```
-   This downloads the last 90 days of device logs directly from the log server.
+2. **Verify collection output**: After the agent completes, check that `/tmp/jira-analyze-<KEY>/extracted/` contains files and `/tmp/jira-analyze-<KEY>/file-classification.json` exists. If the collector reports FAILED or either artifact is missing, abort with "Log collection failed — extracted logs or classification manifest missing."
 
-4. **Update state**: `current_phase: "data-collected"`, persist `attachment_meta`.
+3. **Update state**: `current_phase: "data-collected"`, persist `attachment_meta` and `log_file_types` from the collector summary.
 
 <!-- SYNC: skills/_shared/rca-pipeline.md#phase-3 -->
 ## Phase 3: Log Parsing and Timeline Construction (via aosp-log-parser Agent)
 
-Delegate all log parsing to a single `aosp-log-parser` agent. This agent handles file classification reading, all 4 log type parsers, and the merge/synthesis step internally.
+Delegate all log parsing to a single `aosp-log-parser` agent. This agent reads the collector-generated file classification, runs all 4 log type parsers, and performs the merge/synthesis step internally.
 
 ### Spawn aosp-log-parser Agent
 
@@ -145,8 +134,9 @@ Agent(
 
 Temp directory: /tmp/jira-analyze-<KEY>/
 Source files directory: /tmp/jira-analyze-<KEY>/extracted/
+Classification manifest: /tmp/jira-analyze-<KEY>/file-classification.json
 
-Classify files if needed (generate file-classification.json if missing), then follow your Parsing Protocol: read the classification, parse each log type using parallel tool calls where possible, then merge into unified timeline.md and anomalies.md.
+Read the collector-generated classification manifest first, parse each listed log type using parallel tool calls where possible, then merge into unified timeline.md and anomalies.md. Abort if the manifest is missing or inconsistent with the extracted directory.
 
 Report the total anomaly count at the end of your response."
 )
@@ -322,7 +312,7 @@ Report format:
 
 2. **Rank hypotheses** by confidence (from investigation results)
 
-3. **Build the 7-section Chinese report** and save to `.granada/specs/jira-analyze-{issue_key}.md`:
+3. **Build the 7-section Chinese report** and save to `.granada/specs/jira-analyze-{issue_key}.md` after redacting common secrets from all included log excerpts and issue text (authorization headers, bearer tokens, API keys, passwords, access/refresh/id tokens, cookies, session IDs, private keys, and signed URL token/key/signature query values):
 
 ```markdown
 <!-- Downstream dependency: jira-aftersales skill detects reports by this title format. Do not change without updating jira-aftersales. -->
@@ -391,7 +381,7 @@ Report format:
 
 <!-- /SYNC -->
 
-5. **Post report as JIRA comment**: `jira_add_comment(issue_key=<KEY>, body=<report_content>)` — post the full report content as a comment on the JIRA issue. If this fails, warn but do not abort (the local report file is still available).
+5. **Post report as JIRA comment**: `jira_add_comment(issue_key=<KEY>, body=<redacted_report_content>)` — post the redacted report content as a comment on the JIRA issue. If this fails, warn but do not abort (the local report file is still available).
 
 6. **Finalize state and cleanup**:
    - On success: `Bash: rm -f .granada/jira-analyze-state.json` — terminal exit
@@ -404,10 +394,9 @@ Report format:
 Embed these handlers throughout all phases:
 
 - **MCP unreachable** → abort with specific message naming which MCP failed and env vars to check
-- **No zip attachments found** → warn, attempt to parse any .txt/.log attachments directly
-- **Attachment > 50MB** → skip with warning (MCP transfer limit)
-- **Zip decompression fails** → log error, continue with other attachments
-- **No parseable logs found** → abort with "No Android log files found in attachments"
+- **Collector reports FAILED** → abort with the collector's failure reason
+- **Collector reports PARTIAL** → continue only if `extracted/` and `file-classification.json` exist and include parseable logs
+- **No parseable logs found** → abort with "No Android log files found in collected artifacts"
 - **AOSP search returns no results** → note "no AOSP source found" in report, do not fail
 - **Agent timeout/failure** → mark hypothesis as "investigation incomplete", continue with others
 - **All hypotheses fail investigation** → report with "insufficient evidence" conclusion
@@ -440,19 +429,14 @@ Update state at each phase boundary for resumability. On resume, read state via 
 </State_Schema>
 
 <Tool_Usage>
-- `jira_get_issue` — fetch issue details and attachment metadata (mcp-atlassian)
-- `jira_download_attachments` — primary attachment download method (mcp-atlassian)
-- `log-unboxer unpack` — decompress downloaded zip/archive files (only allowed decompression tool)
-- `log-unboxer download --sn` — fallback: download device logs by serial number from log server (last 90 days). Do NOT use `--url`.
-- `jira_add_comment` — post RCA report as comment on JIRA issue (mcp-atlassian)
-- `sourcepilot` — search AOSP source for crash-related code (always, not conditional)
-- `Write` / `Read` / `Bash rm` — phase persistence via .granada/jira-analyze-state.json
-- `Agent(subagent_type="zaku:aosp-log-parser", model="sonnet")` — log parsing, file classification, and timeline construction (Phase 3)
-- `Agent(subagent_type="zaku:aosp-log-parser", model="sonnet")` — log parsing and timeline construction (Phase 3)
+- `jira_get_issue` — Phase 1 JIRA health check (mcp-atlassian)
+- `Agent(subagent_type="zaku:aosp-log-collector", model="sonnet")` — JIRA issue metadata, log attachment collection, archive handling, extracted directory preparation, and classification manifest generation (Phase 2)
+- `Agent(subagent_type="zaku:aosp-log-parser", model="sonnet")` — log parsing and timeline construction from the collector-generated classification manifest (Phase 3)
 - `Agent(subagent_type="zaku:analyst", model="sonnet")` — hypothesis generation (Phase 5)
 - `Agent(subagent_type="zaku:aosp-investigator", model="sonnet")` — AOSP source search (Phase 4) and parallel hypothesis investigation (Phase 5)
-- `Write` tool — save base64 files and final report
-- `Bash` — base64 decode (file-based), temp directory management, intermediate file cleanup
+- `jira_add_comment` — post RCA report as comment on JIRA issue (mcp-atlassian)
+- `sourcepilot` — search AOSP source for crash-related code (always, not conditional)
+- `Write` / `Read` / `Bash rm` — phase persistence via .granada/jira-analyze-state.json and final report output
 </Tool_Usage>
 
 <Examples>
@@ -461,9 +445,9 @@ Update state at each phase boundary for resumability. On resume, read state via 
 User: /jira-analyze https://jira.cvte.com/browse/SPFB-535
 
 [Phase 1] Parsed key: SPFB-535. MCP health checks pass (jira + aosp).
-[Phase 2] Fetched issue. Found 2 zip attachments (logs_2026.zip, bugreport.zip).
-         Decompressed → 12 files.
-         Result: 3 logcat, 2 tombstone, 1 ANR, 1 kernel, 5 other.
+[Phase 2] Spawned aosp-log-collector agent.
+         Collection complete → 12 files classified: 3 logcat, 2 tombstone, 1 ANR, 1 kernel, 5 other.
+         Issue summary and attachment metadata captured from collector output.
 [Phase 3] Spawned aosp-log-parser agent.
          Completed → 847 timeline events, 23 anomalies.
          Top anomalies: SIGSEGV in libsurfaceflinger.so, ANR in SystemUI, kernel BUG at mm/slub.c.
@@ -483,16 +467,15 @@ User: /jira-analyze https://jira.cvte.com/browse/SPFB-535
 [Phase 5] Report saved to .granada/specs/jira-analyze-SPFB-535.md (Chinese, 7 sections).
          Posted report as JIRA comment on SPFB-535.
 ```
-Why good: All exploration delegated to subagents. Log parsing and file classification (aosp-log-parser/sonnet), hypothesis generation (analyst/sonnet), AOSP investigation (3 aosp-investigator/sonnet in parallel). Lead only orchestrates. Report in Chinese, posted to JIRA.
+Why good: All exploration delegated to subagents. Log collection and classification are handled by aosp-log-collector; aosp-log-parser consumes the manifest and builds timeline/anomalies; hypothesis generation and AOSP investigation run in separate subagents. Lead only orchestrates. Report in Chinese, posted to JIRA.
 </Good>
 
 <Bad>
 ```
 User: /jira-analyze SPFB-535
-[Phase 2] Downloaded attachments.
-[Phase 2] echo "$BASE64_CONTENT" | base64 -d > file.zip   # ARG_MAX exceeded!
+[Phase 2] Main skill performs attachment download, decode, unpack, and cleanup itself.
 ```
-Why bad: Used echo pipe for base64 decode instead of file-based approach. Large attachments will fail with argument list too long.
+Why bad: Collection implementation details belong in `aosp-log-collector`; the main skill should only orchestrate and verify collector outputs.
 </Bad>
 
 <Bad>
@@ -505,21 +488,19 @@ Why bad: AOSP search must run for ALL hypotheses, not just the highest-ranked on
 
 <Guardrails>
 **Must have:**
-- **log-unboxer 唯一**: 下载和解压日志必须且只能使用 `log-unboxer`（`unpack` 或 `download --sn`），禁止使用 `unzip`、`tar`、`7z` 或任何其他解压工具
+- `aosp-log-collector` subagent for JIRA issue metadata, log collection, archive handling, extracted directory preparation, and classification manifest generation
+- `aosp-log-parser` subagent for parsing the collector-generated classification manifest, timeline merge, and anomaly merge
 - mcp-atlassian for JIRA access (not jira-cli)
 - sourcepilot for AOSP source (always, not conditional) — **Phase 4 AOSP 源码分析是必选阶段**，除非十分确认问题与 AOSP 源码完全无关才可跳过
 - aosp-investigator subagent for both Phase 4 (AOSP context) and Phase 5 (hypothesis investigation)
-- File-based base64 decode (not echo pipe)
 - Lightweight state (<10KB, file paths not data)
 - All 7 report sections (in Chinese)
 - Report posted as JIRA comment via jira_add_comment
-- All exploration/analysis delegated to subagents (file classification, log parsing, timeline merge, hypothesis generation, AOSP investigation)
 - Lead only orchestrates: MCP calls, state management, subagent spawning, report assembly
 
 **Must NOT have:**
 - Interactive/conversational mode (produces static report)
 - iOS or non-Android log parsing
 - Binary attachment processing (images, videos)
-- Base64 content piped through echo/shell arguments
-- 自行解压日志（禁止 `unzip`、`tar`、`7z` 等，必须通过 `log-unboxer`）
+- Inline download, decompression, base64, or cleanup command details in this skill; those belong in `aosp-log-collector`
 </Guardrails>

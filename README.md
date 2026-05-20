@@ -62,6 +62,7 @@ Available operations: `list_projects`, `search_code`, `search_symbol`, `search_f
 | Agent | Description |
 |-------|-------------|
 | `aosp-investigator` | AOSP code investigation specialist |
+| `aosp-log-collector` | Android log collector (JIRA/local logs, extraction, classification) |
 | `aosp-log-parser` | Android log parser (logcat, tombstone, ANR, kernel) |
 
 ## License

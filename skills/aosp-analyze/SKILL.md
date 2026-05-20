@@ -62,7 +62,7 @@ Both modes save the report to `.granada/specs/`.
       ```
 
 1b. **Resume check** (after input parsing, before slug generation):
-   - If `--fresh` flag is present: `Bash: rm -f .granada/aosp-analyze-state.json` + `rm -rf /tmp/aosp-analyze-<slug>` (if slug determinable from prior state), then proceed as fresh run.
+   - If `--fresh` flag is present: remove `.granada/aosp-analyze-state.json`; remove `/tmp/aosp-analyze-<slug>` only after validating `slug` matches `^[A-Za-z0-9._-]{1,40}$`, contains no `..` or path separators, and the resolved target starts with `/tmp/aosp-analyze-`. Quote the target and use `rm -rf -- "$target"`, then proceed as fresh run.
    - Otherwise, read existing state: `Read .granada/aosp-analyze-state.json`
    - If state exists AND `active == true` AND `state.input_path` matches current input (or `state.slug` matches derived slug):
      - Display: "检测到未完成的分析 (phase: <current_phase>)。从断点恢复..."
@@ -117,22 +117,38 @@ Write JSON to .granada/aosp-analyze-state.json with, active=true, current_phase=
 mkdir -p /tmp/aosp-analyze-<slug>/extracted
 ```
 
-## Phase 2: Log Collection
+## Phase 2: Log Collection (via aosp-log-collector Agent)
 
 > **Mode gate:** If `analysis_mode == "no-log"`, skip Phase 2 and Phase 3 entirely. Update state: `current_phase: "parsed"`, then proceed directly to Phase 4.
 
-1. **Copy or symlink** files from the input directory into the working extracted directory:
-   ```bash
-   cp -r <input_path>/* /tmp/aosp-analyze-<slug>/extracted/
-   ```
-   (Use `ln -s` if the source directory is large and on the same filesystem.)
+Delegate all local log directory copying/linking, file organization, and file classification to `aosp-log-collector`.
 
-2. **Update state**: `current_phase: "data-collected"`.
+1. **Spawn the aosp-log-collector agent**:
+
+```
+Agent(
+  subagent_type="zaku:aosp-log-collector",
+  model="sonnet",
+  prompt="Collect Android logs for analysis <slug>.
+
+Mode: Local directory
+Input path: <input_path>
+Temp directory: /tmp/aosp-analyze-<slug>/
+Extracted directory: /tmp/aosp-analyze-<slug>/extracted/
+Classification manifest: /tmp/aosp-analyze-<slug>/file-classification.json
+
+Populate the extracted directory from the input path and generate the classification manifest. Report collection summary, per-type counts, and Collection status."
+)
+```
+
+2. **Verify collection output**: After the agent completes, check that `/tmp/aosp-analyze-<slug>/extracted/` contains files and `/tmp/aosp-analyze-<slug>/file-classification.json` exists. If the collector reports FAILED or either artifact is missing, abort with "Log collection failed — extracted logs or classification manifest missing."
+
+3. **Update state**: `current_phase: "data-collected"`, persist `log_file_types` from the collector summary.
 
 <!-- SYNC: skills/_shared/rca-pipeline.md#phase-3 -->
 ## Phase 3: Log Parsing and Timeline Construction (via aosp-log-parser Agent)
 
-Delegate all log parsing to a single `aosp-log-parser` agent. This agent handles file classification reading, all 4 log type parsers, and the merge/synthesis step internally.
+Delegate all log parsing to a single `aosp-log-parser` agent. This agent reads the collector-generated file classification, runs all 4 log type parsers, and performs the merge/synthesis step internally.
 
 1. **Spawn the aosp-log-parser agent**:
 
@@ -144,8 +160,9 @@ Agent(
 
 Temp directory: /tmp/aosp-analyze-<slug>/
 Source files directory: /tmp/aosp-analyze-<slug>/extracted/
+Classification manifest: /tmp/aosp-analyze-<slug>/file-classification.json
 
-Classify files if needed (generate file-classification.json if missing), then follow your Parsing Protocol: read the classification, parse each log type, then merge into unified timeline.md and anomalies.md.
+Read the collector-generated classification manifest first, parse each listed log type, then merge into unified timeline.md and anomalies.md. Abort if the manifest is missing or inconsistent with the extracted directory.
 
 Report the total anomaly count at the end of your response."
 )
@@ -388,7 +405,7 @@ Report format:
    - Otherwise, derive from the most severe anomaly (e.g., "SIGSEGV in SurfaceFlinger")
    - Format: `{slug} — {derived_or_provided_description}`
 
-4. **Build the 7-section Chinese report** and save to `.granada/specs/aosp-analyze-{slug}.md`:
+4. **Build the 7-section Chinese report** and save to `.granada/specs/aosp-analyze-{slug}.md` after redacting common secrets from all included log excerpts and issue text (authorization headers, bearer tokens, API keys, passwords, access/refresh/id tokens, cookies, session IDs, private keys, and signed URL token/key/signature query values):
 
 ```markdown
 # 根因分析报告: {slug} — {issue_title}
@@ -517,12 +534,11 @@ Update state at each phase boundary for resumability. On resume, read state via 
 <Tool_Usage>
 - `sourcepilot` — search AOSP source for crash-related code (always, not conditional)
 - `Write` / `Read` / `Bash rm` — phase persistence via .granada/aosp-analyze-state.json
-- `Agent(subagent_type="zaku:aosp-log-parser", model="sonnet")` — log parsing, file classification, and timeline construction (Phase 3)
-- `Agent(subagent_type="zaku:aosp-log-parser", model="sonnet")` — log parsing and timeline construction (Phase 3)
+- `Agent(subagent_type="zaku:aosp-log-collector", model="sonnet")` — local log directory preparation and classification manifest generation (Phase 2)
+- `Agent(subagent_type="zaku:aosp-log-parser", model="sonnet")` — log parsing and timeline construction from the collector-generated classification manifest (Phase 3)
 - `Agent(subagent_type="zaku:analyst", model="sonnet")` — hypothesis generation (Phase 5)
 - `Agent(subagent_type="zaku:aosp-investigator", model="sonnet")` — AOSP context search (Phase 4) + parallel hypothesis investigation (Phase 5)
 - `Write` — save final report
-- `Bash` — cp, temp directory management
 </Tool_Usage>
 
 <Examples>
@@ -532,8 +548,8 @@ User: /aosp-analyze --dir /tmp/crash-logs --title "SystemUI crash after OTA"
 
 [Phase 1] Input: directory /tmp/crash-logs. Slug: crash-logs. AOSP MCP health check pass.
           AOSP Project: android-14 (from .granada/aosp-config.json)
-[Phase 2] Copied 8 files.
-          Result: 2 logcat, 1 tombstone, 1 ANR, 0 kernel, 4 other.
+[Phase 2] Spawned aosp-log-collector agent.
+          Collection complete → 8 files classified: 2 logcat, 1 tombstone, 1 ANR, 0 kernel, 4 other.
 [Phase 3] Spawned aosp-log-parser agent.
           Completed → 312 timeline events, 7 anomalies.
           Top anomalies: SIGSEGV in libsurfaceflinger.so, ANR in SystemUI.
@@ -580,7 +596,7 @@ User: /aosp-analyze /home/user/bugreport-logs
 
 [Phase 1] Input: directory /home/user/bugreport-logs. Slug: bugreport-logs. AOSP MCP health check pass.
           No AOSP project configured — searching all projects.
-[Phase 2] Copied 15 files. Classification → 4 logcat, 3 tombstone, 2 ANR, 1 kernel, 5 other.
+[Phase 2] aosp-log-collector classified 15 files → 4 logcat, 3 tombstone, 2 ANR, 1 kernel, 5 other.
 [... rest of pipeline ...]
 ```
 Why good: Positional path shorthand works. No project configured — searches all projects with clear warning.
