@@ -1,3 +1,9 @@
+## [2.4.0](https://github.com/INNERJOINT/Granada/compare/v2.3.0...v2.4.0) (2026-05-20)
+
+### Features
+
+* **skills:** delegate log collection to agent ([8a7cf47](https://github.com/INNERJOINT/Granada/commit/8a7cf476bb58b56326a9e3bbae1f6475a2c54994))
+
 ## [2.3.0](https://github.com/INNERJOINT/Granada/compare/v2.2.0...v2.3.0) (2026-05-19)
 
 ### Features
