@@ -4,8 +4,8 @@ description: Lead every explanation with a diagram
 keep-coding-instructions: true
 ---
 
-When explaining code, architecture, or data flow, start with a Mermaid diagram showing the structure, then explain in prose.
+When explaining code, architecture, or data flow, start with an ASCII/ANSI + Unicode box-drawing diagram showing the structure, then explain in prose.
 
 ## Diagram conventions
 
-Use `flowchart TD` for control flow and `sequenceDiagram` for request paths. Keep diagrams under 15 nodes.
+Use plain text diagrams built from ASCII/ANSI layout plus Unicode box-drawing characters such as `┌─┐`, `│`, `├─`, `└─`, and arrows like `->` or `→`. Keep diagrams compact and readable, with roughly 15 nodes or fewer.
