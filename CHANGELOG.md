@@ -1,3 +1,14 @@
+## [2.7.0](https://github.com/INNERJOINT/Granada/compare/v2.6.1...v2.7.0) (2026-05-20)
+
+### Features
+
+* **skills:** split aosp-analyze into aosp-rca and general technical report ([05ef40e](https://github.com/INNERJOINT/Granada/commit/05ef40e1701b31c9b52ad88f7ab66e8ad0c1a9b4))
+
+### Bug Fixes
+
+* **skills:** preserve namespaced command hints ([37c0372](https://github.com/INNERJOINT/Granada/commit/37c03726370e35803adc8c890e46164008c37c1c))
+* **skills:** prune redundant frontmatter and ignore firecrawl cache ([626b03f](https://github.com/INNERJOINT/Granada/commit/626b03faa396d37e57a290e17e22dee7cb843ff8))
+
 ## [2.6.1](https://github.com/INNERJOINT/Granada/compare/v2.6.0...v2.6.1) (2026-05-20)
 
 ### Bug Fixes

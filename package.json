@@ -1,6 +1,6 @@
 {
   "name": "@zeonic/zaku",
-  "version": "2.6.1",
+  "version": "2.7.0",
   "description": "Mass-production dev weapon — AOSP recon, JIRA elimination, Git ammo supply",
   "main": "bridge/mcp-server.cjs",
   "type": "module",
