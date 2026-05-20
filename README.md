@@ -40,7 +40,8 @@ cd Granada && claude plugin install .
 
 | Skill | Description |
 |-------|-------------|
-| `aosp-analyze` | Android crash/issue root-cause analysis via AOSP source search |
+| `aosp-analyze` | General AOSP module/function/feature technical report |
+| `aosp-rca` | Android crash/issue root-cause analysis via AOSP source search |
 | `aosp-plan` | Investigation-driven AOSP planning with parallel code search |
 | `aosp-autopilot` | Multi-repo automatic execution engine |
 | `aosp-feature-export` | Export AOSP feature element documentation |
@@ -62,6 +63,7 @@ Available operations: `list_projects`, `search_code`, `search_symbol`, `search_f
 | Agent | Description |
 |-------|-------------|
 | `aosp-investigator` | AOSP code investigation specialist |
+| `aosp-analyst` | AOSP search target extraction and RCA hypothesis synthesis specialist |
 | `aosp-log-collector` | Android log collector (JIRA/local logs, extraction, classification) |
 | `aosp-log-parser` | Android log parser (logcat, tombstone, ANR, kernel) |
 

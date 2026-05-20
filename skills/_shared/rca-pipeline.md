@@ -1,26 +1,26 @@
 # RCA Pipeline — Canonical Reference (NOT EXECUTED)
 
 > **This file is the maintenance reference for shared Phase 3-6 logic between
-> `skills/jira-analyze/SKILL.md` and `skills/aosp-analyze/SKILL.md`.**
+> `skills/jira-analyze/SKILL.md` and `skills/aosp-rca/SKILL.md`.**
 >
 > It is NEVER executed by the skill runtime. Changes here must be manually
 > synced to both SKILL.md files. Run `scripts/lint-rca-sync.sh` to detect drift.
 
 ## Identifiers
 
-| Placeholder | jira-analyze | aosp-analyze |
+| Placeholder | jira-analyze | aosp-rca |
 |-------------|-------------|--------------|
 | `<ANALYSIS_ID>` | `<KEY>` (JIRA issue key) | `<slug>` (directory basename) |
-| `<TEMP_DIR>` | `/tmp/jira-analyze-<KEY>/` | `/tmp/aosp-analyze-<slug>/` |
-| `<MODE_NAME>` | `jira-analyze` | `aosp-analyze` |
+| `<TEMP_DIR>` | `/tmp/jira-analyze-<KEY>/` | `/tmp/aosp-rca-<slug>/` |
+| `<MODE_NAME>` | `jira-analyze` | `aosp-rca` |
 | `<ANALYSIS_MODE>` | always `log-based` | `log-based` or `no-log` |
-| `<REPORT_OUTPUT_PATH>` | `.granada/specs/jira-analyze-{issue_key}.md` | `.granada/specs/aosp-analyze-{slug}.md` |
+| `<REPORT_OUTPUT_PATH>` | `.granada/specs/jira-analyze-{issue_key}.md` | `.granada/specs/aosp-rca-{slug}.md` |
 
 ---
 
 ## Phase 3: Log Parsing and Timeline Construction (via aosp-log-parser Agent)
 
-<!-- MODE-GATE: log-based only. aosp-analyze skips Phase 3 entirely when analysis_mode=="no-log" -->
+<!-- MODE-GATE: log-based only. aosp-rca skips Phase 3 entirely when analysis_mode=="no-log" -->
 
 Delegate all log parsing to a single `aosp-log-parser` agent. This agent reads the collector-generated file classification, runs all 4 log type parsers, and performs the merge/synthesis step internally.
 
@@ -53,39 +53,33 @@ Update state: `current_phase: "parsed"`, `anomaly_count: <N>` (from the agent's 
 
 Before hypothesis investigation, perform a dedicated AOSP source search based on crash signatures extracted from anomalies. This phase is **mandatory** — skip only if absolutely certain the issue has zero relevance to AOSP code.
 
-### Extract Search Targets (log-based mode)
+### Extract Search Targets
 
-Read `<TEMP_DIR>anomalies.md` and extract:
-- Java/native class names from stack traces (e.g., `SurfaceFlinger`, `ActivityManagerService`, `InputDispatcher`)
-- Native library names (e.g., `libsurfaceflinger.so`, `libbinder.so`)
-- Kernel subsystem identifiers (e.g., `mm/slub.c`, `drivers/gpu/`)
-- Signal/error patterns (e.g., `SIGSEGV`, `SIGABRT`, specific error messages)
-
-<!-- MODE-GATE: aosp-analyze no-log only — this section replaces the above in no-log mode -->
-### Extract Search Targets (no-log mode — aosp-analyze only)
-
-Spawn an analyst subagent to extract structured search targets from the problem description:
+Spawn an `aosp-analyst` subagent to extract structured search targets from parsed logs or, for aosp-rca no-log mode, from the problem description:
 
 ```
 Agent(
-  subagent_type="zaku:analyst",
-  prompt="从以下 Android 系统问题描述中提取 AOSP 源码搜索目标。
+  subagent_type="zaku:aosp-analyst",
+  prompt="Extract structured AOSP source search targets for <MODE_NAME> analysis <ANALYSIS_ID>.
 
-问题描述: <issue_title>
+Analysis mode: <ANALYSIS_MODE>
+Issue description: <issue_title or 'none'>
 
-提取以下信息:
-1. Android 组件/服务名 (如 SurfaceFlinger, WindowManagerService, ActivityManagerService)
-2. 可能涉及的 native 库 (如 libsurfaceflinger.so, libbinder.so)
-3. 可能相关的子系统 (如 display, input, power, audio)
-4. 建议的搜索关键词 (基于问题描述中的技术术语)
+If analysis_mode == log-based:
+- Read <TEMP_DIR>anomalies.md
+- Read <TEMP_DIR>timeline.md
+- Extract Java/native class names, function names, native libraries, kernel subsystem identifiers, signals, and specific error patterns.
 
-输出 JSON 格式:
-{\"components\": [...], \"libraries\": [...], \"subsystems\": [...], \"keywords\": [...]}
+If analysis_mode == no-log:
+- Use the issue description to infer Android components/services, native libraries, subsystems, and technical keywords.
 
-保存到 <TEMP_DIR>search-targets.json"
+Group targets into 2-3 subsystem clusters.
+
+Save valid JSON to <TEMP_DIR>search-targets.json with clusters and gaps."
 )
 ```
-<!-- /MODE-GATE -->
+
+Read `<TEMP_DIR>search-targets.json` and use its clusters as search targets for the AOSP investigator agents below.
 
 ### Parallel AOSP Search (via Subagents)
 
@@ -96,8 +90,8 @@ Agent(
   subagent_type="zaku:aosp-investigator",
   prompt="[If --project override is active, prepend: **AOSP Project Override:** Use project `<name>` for ALL sourcepilot search calls. Do NOT read `.granada/aosp-config.json`.]
 
-Search AOSP source code for the following crash-related classch targets:
-<list of class names, function names, native libraries from anomalies>
+Search AOSP source code for this RCA target cluster from search-targets.json:
+<cluster with subsystem, components, libraries, functions, keywords, and error_patterns>
 
 For each target:
 1. Use sourcepilot — first call {tool: 'list_tools'} to discover available tools
@@ -130,7 +124,7 @@ Update state: `current_phase: "aosp-searched"`.
 
 ```
 Agent(
-  subagent_type="zaku:analyst",
+  subagent_type="zaku:aosp-analyst",
   prompt="Analyze Android crash anomalies for <MODE_NAME> analysis <ANALYSIS_ID> and generate root-cause hypotheses.
 
 Read the anomalies file: <TEMP_DIR>anomalies.md
@@ -150,7 +144,7 @@ Prioritize hypotheses by:
 2. Earliest anomaly in timeline over later ones
 3. System-level crashes over app-level
 
-Save ouo <TEMP_DIR>hypotheses.md in this format:
+Save output to <TEMP_DIR>hypotheses.md in this format:
 
 ## Hypothesis 1: <title>
 **Supporting anomalies:** <list of anomaly references>
@@ -165,12 +159,12 @@ Save ouo <TEMP_DIR>hypotheses.md in this format:
 )
 ```
 
-<!-- MODE-GATE: aosp-analyze no-log only — replaces the above analyst prompt in no-log mode -->
-### Hypothesis Generation (no-log mode — aosp-analyze only)
+<!-- MODE-GATE: aosp-rca no-log only — replaces the above analyst prompt in no-log mode -->
+### Hypothesis Generation (no-log mode — aosp-rca only)
 
 ```
 Agent(
-  subagent_type="zaku:analyst",
+  subagent_type="zaku:aosp-analyst",
   prompt="基于 AOSP 源码分析结果和问题描述，生成可能的根因假设。
 
 问题描述: <issue_title>
@@ -264,7 +258,7 @@ Report format:
 **问题链接:** {jira_url}
 **状态:** {status} | **经办人:** {assignee} | **优先级:** {priority}
 <!-- /MODE-GATE -->
-<!-- MODE-GATE: aosp-analyze only — adds analysis mode ->
+<!-- MODE-GATE: aosp-rca only — adds analysis mode -->
 **分析模式:** {log-based: "日志驱动分析" | no-log: "无日志源码分析（基于问题描述推断）"}
 **输入目录:** {input_path or "无（无日志模式）"}
 **分析项目:** {project_name or "未限定"}
@@ -278,7 +272,7 @@ Report format:
 |------|------|----------|------|
 | {timestamp} | {logcat/tombstone/ANR/kernel} | {INFO/WARN/ERROR/FATAL} | {description} |
 
-<!-- MODE-GATE: aosp-analyze no-log only -->
+<!-- MODE-GATE: aosp-rca no-log only -->
 > 本次分析未提供日志文件，无事件时间线。以下分析基于问题描述和 AOSP 源码结构推断。
 <!-- /MODE-GATE -->
 
@@ -289,7 +283,7 @@ Report format:
 - **堆栈信息:**
   {stack_trace}
 
-<!-- MODE-GATE: aosp-analyze no-log only -->
+<!-- MODE-GATE: aosp-rca no-log only -->
 > 本次分析未提供日志文件，无异常提取。以下根因假设基于 AOSP 源码分析推断，而非日志证据。
 <!-- /MODE-GATE -->
 
@@ -319,7 +313,7 @@ Report format:
 
 ### 假设 1: {title} (置信度: {level})
 
-<!-- MODE-GATE: aosp-analyze no-log only -->
+<!-- MODE-GATE: aosp-rca no-log only -->
 > **无日志模式约束:** 所有假设的置信度上限为"中"，不允许标注"高"。本分析基于源码推断，未经日志证据验证。
 <!-- /MODE-GATE -->
 

@@ -211,7 +211,7 @@ Spawn an analyst subagent to generate hypotheses from the anomalies:
 
 ```
 Agent(
-  subagent_type="zaku:analyst",
+  subagent_type="zaku:aosp-analyst",
   model="sonnet",
   prompt="Analyze Android crash anomalies for JIRA issue <KEY> and generate root-cause hypotheses.
 
@@ -431,7 +431,7 @@ Update state at each phase boundary for resumability. On resume, read state via 
 - `jira_get_issue` — Phase 1 JIRA health check (mcp-atlassian)
 - `Agent(subagent_type="zaku:aosp-log-collector", model="sonnet")` — JIRA issue metadata, log attachment collection, archive handling, extracted directory preparation, and classification manifest generation (Phase 2)
 - `Agent(subagent_type="zaku:aosp-log-parser", model="sonnet")` — log parsing and timeline construction from the collector-generated classification manifest (Phase 3)
-- `Agent(subagent_type="zaku:analyst", model="sonnet")` — hypothesis generation (Phase 5)
+- `Agent(subagent_type="zaku:aosp-analyst", model="sonnet")` — hypothesis generation (Phase 5)
 - `Agent(subagent_type="zaku:aosp-investigator", model="sonnet")` — AOSP source search (Phase 4) and parallel hypothesis investigation (Phase 5)
 - `jira_add_comment` — post RCA report as comment on JIRA issue (mcp-atlassian)
 - `sourcepilot` — search AOSP source for crash-related code (always, not conditional)

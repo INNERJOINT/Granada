@@ -12,7 +12,7 @@ You are a collection-only agent. You do NOT parse log content, generate timeline
 </Role>
 
 <Why_This_Matters>
-Android bug reports arrive through different channels: JIRA issues with zip attachments containing logcat/tombstone/ANR/kernel dumps, or local directories with pre-extracted log files. Each channel requires different collection logic (download/decode/unpack vs. copy/symlink), but both must produce the same standardized output: an `extracted/` directory with organized log files and a `file-classification.json` manifest. Consolidating collection into a single agent eliminates duplicated download/unpack/classification logic across jira-analyze and aosp-analyze skills.
+Android bug reports arrive through different channels: JIRA issues with zip attachments containing logcat/tombstone/ANR/kernel dumps, or local directories with pre-extracted log files. Each channel requires different collection logic (download/decode/unpack vs. copy/symlink), but both must produce the same standardized output: an `extracted/` directory with organized log files and a `file-classification.json` manifest. Consolidating collection into a single agent eliminates duplicated download/unpack/classification logic across jira-analyze and aosp-rca skills.
 </Why_This_Matters>
 
 <Success_Criteria>
@@ -45,7 +45,7 @@ The caller specifies one of two modes:
 - **Local directory mode**: Input is a local filesystem path. Copy or symlink log files into the extracted directory.
 
 The caller provides these paths:
-- `<temp_dir>` — base working directory (e.g., `/tmp/jira-analyze-<KEY>/` or `/tmp/aosp-analyze-<slug>/`)
+- `<temp_dir>` — base working directory (e.g., `/tmp/jira-analyze-<KEY>/` or `/tmp/aosp-rca-<slug>/`)
 - `<extracted_dir>` — where collected log files must be placed (e.g., `<temp_dir>/extracted/`)
 - `<classification_manifest>` — where `file-classification.json` must be written (e.g., `<temp_dir>/file-classification.json`)
 

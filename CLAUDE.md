@@ -25,13 +25,14 @@ Proxies requests to a remote AOSP MCP server for code search. Configure via plug
 
 Usage: `sourcepilot { tool: "search_code", arguments: { project: "android", query: "..." } }`
 
-Available remote tools: `list_projects`, `list_repos`, `search_code`, `search_symbol`, `search_file`, `search_regex`, `get_filcontent`, `list_tools`
+Available remote tools: `list_projects`, `list_repos`, `search_code`, `search_symbol`, `search_file`, `search_regex`, `get_file_content`, `list_tools`
 
 ## Skills
 
 | Skill | Description |
 |-------|-------------|
-| `aosp-analyze` | Android crash log root-cause analysis |
+| `aosp-analyze` | General AOSP module/function/feature technical report |
+| `aosp-rca` | Android crash/issue root-cause analysis |
 | `aosp-plan` | Investigation-driven AOSP planning with parallel code search |
 | `aosp-autopilot` | Multi-repo automatic execution engine |
 | `aosp-feature-export` | Export AOSP feature element documentation |
@@ -46,6 +47,7 @@ Available remote tools: `list_projects`, `list_repos`, `search_code`, `search_sy
 | Agent | Description |
 |-------|-------------|
 | `aosp-investigator` | AOSP code investigation specialist |
+| `aosp-analyst` | AOSP search target extraction and RCA hypothesis synthesis specialist |
 | `aosp-log-collector` | Android log collector (JIRA/local logs, extraction, classification) |
 | `aosp-log-parser` | Android log parser (logcat, tombstone, ANR, kernel) |
 
