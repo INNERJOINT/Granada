@@ -249,7 +249,7 @@ Why good: Local file found (fastest path), clean transformation, no terminology 
 
 <Good>
 ```
-User: /jira-aftersales https://jira.cvte.com/browse/SPFB-600
+User: /jira-aftersales https://jira.example.com/browse/SPFB-600
 
 [Phase 1] Parsed key: SPFB-600. MCP health check pass.
 [Phase 2] Tier 1: No local file found.

@@ -442,7 +442,7 @@ Update state at each phase boundary for resumability. On resume, read state via 
 <Examples>
 <Good>
 ```
-User: /jira-analyze https://jira.cvte.com/browse/SPFB-535
+User: /jira-analyze https://jira.example.com/browse/SPFB-535
 
 [Phase 1] Parsed key: SPFB-535. MCP health checks pass (jira + aosp).
 [Phase 2] Spawned aosp-log-collector agent.

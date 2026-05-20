@@ -15,8 +15,8 @@ Documents vendor/third-party features added on top of AOSP. Takes a feature desc
 ## Usage
 
 ```
-/zaku:aosp-feature-export "公共DNS" --links https://gitlab.gz.cvte.cn/mt8781_androidu/platform/packages/modules/Connectivity/-/merge_requests/3/diffs
-/zaku:aosp-feature-export "fingerprint unlock" --links https://gitlab.gz.cvte.cn/project/path/-/commit/d2794bf5a8132dc9
+/zaku:aosp-feature-export "公共DNS" --links https://gitlab.example.com/mt8781_androidu/platform/packages/modules/Connectivity/-/merge_requests/3/diffs
+/zaku:aosp-feature-export "fingerprint unlock" --links https://gitlab.example.com/project/path/-/commit/d2794bf5a8132dc9
 /zaku:aosp-feature-export "USB audio routing" --links <mr-url1>,<commit-url2>
 /zaku:aosp-feature-export "USB audio routing"
 ```
