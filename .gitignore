@@ -1,4 +1,5 @@
 node_modules/
 .granada/
+.firecrawl/
 .omc/
 *_zh.md

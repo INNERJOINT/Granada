@@ -1,5 +1,4 @@
 ---
-name: aosp-analyze
 description: General AOSP source/module/function technical report — analyze a feature, module, function, or subsystem via AOSP source search and produce a structured Chinese technical report. For crash/ANR/tombstone/log-based root-cause analysis, use aosp-rca instead.
 argument-hint: '--title <description> [--query <description>] [--project <name>] [--fresh]'
 model: opus
