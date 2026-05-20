@@ -1,5 +1,4 @@
 ---
-name: aosp-feature-export
 description: Export AOSP feature element documentation by iteratively searching related code across all AOSP projects
 argument-hint: '"<feature description>" --links <url1,url2,...>'
 model: opus

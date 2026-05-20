@@ -1,5 +1,4 @@
 ---
-name: aosp-plan
 description: AOSP investigation-driven planning with parallel code search
 argument-hint: <AOSP investigation query>
 model: opus

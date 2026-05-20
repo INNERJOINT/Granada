@@ -1,5 +1,4 @@
 ---
-name: git-commit-generator
 description: Generate a Git commit message from staged changes by first inspecting recent repository commit history and following the dominant local style. Use when the user asks to write a commit message, summarize staged changes, or commit already-staged files without running `git add`.
 model: sonnet
 ---
