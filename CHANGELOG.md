@@ -1,3 +1,9 @@
+## [2.8.0](https://github.com/INNERJOINT/Granada/compare/v2.7.0...v2.8.0) (2026-05-21)
+
+### Features
+
+* **skills:** update aosp-analyst model to opus ([27f2275](https://github.com/INNERJOINT/Granada/commit/27f22759bd80b917b4e74c16da0bac2db5c67cbd))
+
 ## [2.7.0](https://github.com/INNERJOINT/Granada/compare/v2.6.1...v2.7.0) (2026-05-20)
 
 ### Features
