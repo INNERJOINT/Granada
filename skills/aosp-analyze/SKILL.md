@@ -121,7 +121,7 @@ Extract structured search targets from the title and query. Spawn an analyst sub
 ```
 Agent(
   subagent_type="zaku:aosp-analyst",
-  model="sonnet",
+  model="opus",
   prompt="从以下 AOSP 技术报告主题中提取结构化的源码搜索目标。
 
 报告主题: <title>
@@ -325,7 +325,7 @@ State is lightweight (<10KB). Investigation data lives in temp files (`/tmp/aosp
 <Tool_Usage>
 - `sourcepilot` — search AOSP source for target classes, functions, and modules
 - `Write` / `Read` / `Bash rm` — phase persistence via `.granada/aosp-analyze-state.json`
-- `Agent(subagent_type="zaku:aosp-analyst", model="sonnet")` — target extraction from title/query (Phase 2)
+- `Agent(subagent_type="zaku:aosp-analyst", model="opus")` — target extraction from title/query (Phase 2)
 - `Agent(subagent_type="zaku:aosp-investigator", model="sonnet")` — parallel source investigation (Phase 3)
 - `Write` — save final report to `.granada/specs/aosp-analyze-{slug}.md`
 </Tool_Usage>

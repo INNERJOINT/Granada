@@ -194,7 +194,7 @@ Spawn an `aosp-analyst` subagent to extract structured search targets from parse
 ```
 Agent(
   subagent_type="zaku:aosp-analyst",
-  model="sonnet",
+  model="opus",
   prompt="Extract structured AOSP source search targets for RCA analysis <slug>.
 
 Analysis mode: <analysis_mode>
@@ -281,7 +281,7 @@ Spawn an analyst subagent to generate hypotheses:
 ```
 Agent(
   subagent_type="zaku:aosp-analyst",
-  model="sonnet",
+  model="opus",
   prompt="Analyze Android crash anomalies for analysis <slug> and generate root-cause hypotheses.
 
 Read the anomalies file: /tmp/aosp-rca-<slug>/anomalies.md
@@ -321,7 +321,7 @@ Save output to /tmp/aosp-rca-<slug>/hypotheses.md in this format:
 ```
 Agent(
   subagent_type="zaku:aosp-analyst",
-  model="sonnet",
+  model="opus",
   prompt="基于 AOSP 源码分析结果和问题描述，生成可能的根因假设。
 
 问题描述: <issue_title>
@@ -549,7 +549,7 @@ Update state at each phase boundary for resumability. On resume, read state via 
 - `Write` / `Read` / `Bash rm` — phase persistence via .granada/aosp-rca-state.json
 - `Agent(subagent_type="zaku:aosp-log-collector", model="sonnet")` — local log directory preparation and classification manifest generation (Phase 2)
 - `Agent(subagent_type="zaku:aosp-log-parser", model="sonnet")` — log parsing and timeline construction from the collector-generated classification manifest (Phase 3)
-- `Agent(subagent_type="zaku:aosp-analyst", model="sonnet")` — hypothesis generation (Phase 5)
+- `Agent(subagent_type="zaku:aosp-analyst", model="opus")` — hypothesis generation (Phase 5)
 - `Agent(subagent_type="zaku:aosp-investigator", model="sonnet")` — AOSP context search (Phase 4) + parallel hypothesis investigation (Phase 5)
 - `Write` — save final report
 </Tool_Usage>

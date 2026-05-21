@@ -1,7 +1,7 @@
 ---
 name: aosp-analyst
 description: AOSP search target extraction and RCA hypothesis synthesis specialist
-model: sonnet
+model: opus
 level: 2
 tools: Read, Write, Grep, Glob
 ---
