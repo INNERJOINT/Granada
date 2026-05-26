@@ -285,7 +285,9 @@ If `--execute` flag is set, additionally generate an `aosp-autopilot`-compatible
 
 **6a. Pre-check: Verify AOSP source tree availability**
 
-Before generating the execution plan, verify that a `repo`-managed AOSP source tree is accessible:
+Before generating the execution plan, verify that a `repo`-managed AOSP source tree is accessible. Read `.granada/aosp-config.json` first; if `repoPath` points to an existing `.repo` directory, use its parent directory as `AOSP_ROOT`.
+
+If `repoPath` is missing, empty, or invalid, fall back to searching upward from the current working directory:
 
 ```bash
 path=$(pwd)
@@ -295,10 +297,10 @@ while [ "$path" != "/" ]; do
 done
 ```
 
-If `.repo/` is not found, warn the user and skip plan generation:
+If `.repo/` is still not found, warn the user and skip plan generation:
 ```
 ⚠ 未检测到 AOSP 源码树（未找到 .repo/ 目录）。执行计划需要 repo 管理的源码树。
-导入指南仍将保存，但无法自动执行。如需执行，请在 AOSP 源码树中重新运行。
+导入指南仍将保存，但无法自动执行。如需执行，请先运行 /zaku:aosp-project detect-repo，或在 AOSP 源码树中重新运行。
 ```
 
 **6b. Generate plan**

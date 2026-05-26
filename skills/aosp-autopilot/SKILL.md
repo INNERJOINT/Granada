@@ -54,7 +54,9 @@ AOSP 多仓库自动执行引擎。解析 aosp-plan 产出的按仓库分组的�
 
 **1a. 定位 AOSP 根路径**
 
-从当前工作目录开始，向上逐级查找 `.repo/` 目录：
+先读取 `.granada/aosp-config.json`。如果其中 `repoPath` 指向一个存在的 `.repo` 目录，则将其父目录设为 `AOSP_ROOT`。
+
+如果 `repoPath` 不存在、为空或无效，再从当前工作目录开始，向上逐级查找 `.repo/` 目录：
 
 ```bash
 path=$(pwd)
@@ -67,13 +69,13 @@ while [ "$path" != "/" ]; do
 done
 ```
 
-如果找不到 `.repo/`，调用 `Bash: rm -f .granada/aosp-autopilot-state.json` 后报错退出：
+如果仍找不到 `.repo/`，调用 `Bash: rm -f .granada/aosp-autopilot-state.json` 后报错退出：
 
 ```
-未检测到 AOSP 源码树（未找到 .repo/ 目录）。请确认当前目录在 repo 管理的 AOSP 源码树内。
+未检测到 AOSP 源码树（未找到 .repo/ 目录）。请先运行 /zaku:aosp-project detect-repo，或确认当前目录在 repo 管理的 AOSP 源码树内。
 ```
 
-将检测到的路径设为 `AOSP_ROOT`，后续所有仓库路径均相对于此。
+将配置或检测到的路径设为 `AOSP_ROOT`，后续所有仓库路径均相对于此。
 
 **1b. 验证仓库可用性**
 
