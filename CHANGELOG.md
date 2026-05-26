@@ -1,3 +1,9 @@
+## [2.8.1](https://github.com/INNERJOINT/Granada/compare/v2.8.0...v2.8.1) (2026-05-26)
+
+### Bug Fixes
+
+* **mcp:** use mcp__plugin_zaku_sourcepilot__* tool names ([7e1536e](https://github.com/INNERJOINT/Granada/commit/7e1536e7bb905cce83b4c15a1475a401f8989005))
+
 ## [2.8.0](https://github.com/INNERJOINT/Granada/compare/v2.7.0...v2.8.0) (2026-05-21)
 
 ### Features
