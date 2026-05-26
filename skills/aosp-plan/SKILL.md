@@ -47,7 +47,7 @@ AOSP MCP server unreachable. Check SOURCEPILOT_URL and SOURCEPILOT_KEY environme
 
 After health check passes, read `.granada/aosp-config.json` to display the active AOSP project:
 - If configured: display `**AOSP Project: <project_name>**` prominently
-- If not configured: display `**未配置 AOSP 项目** — 搜索将不限定项目范围。运行 /zaku:aosp-project 设置项目。`
+- If not configured: display `**AOSP Project: not configured** — Searches will not be project-scoped. Run /zaku:aosp-project to configure one.`
 
 ### Step 2: Facet Decomposition
 
@@ -140,17 +140,22 @@ The evidence artifact MUST use this structure:
 ### Gaps
 ### Confidence Notes
 ## Evidence Index
-[E1] <repo>/<path/to/File.java> — <symbol or area> — <one-sentence finding>
-[E2] <repo>/<path/to/File.bp> — <build/test relevance> — <one-sentence finding>
+[E1] <repo>/<path/to/File.java> — type: source|test|config|log|assumption — strength: direct|indirect|weak — facet: entrypoint|owner|boundary|config|tests|risk — <symbol or area> — <one-sentence finding>
+[E2] <repo>/<path/to/File.bp> — type: source|test|config|log|assumption — strength: direct|indirect|weak — facet: entrypoint|owner|boundary|config|tests|risk — <build/test relevance> — <one-sentence finding>
 ## Interactive Feedback
 ```
 
 Rules:
 - Evidence IDs are stable within the plan run and MUST NOT be reused for different facts.
 - Every Evidence Index entry must trace back to an investigator result or direct sourcepilot file read in the same artifact.
+- Every Evidence Index entry MUST include `type`, `strength`, and `facet` metadata.
+- `type` describes the evidence surface: `source`, `test`, `config`, `log`, or `assumption`.
+- `strength` describes how directly the evidence supports the planning claim: `direct`, `indirect`, or `weak`.
+- `facet` maps the evidence to the investigation taxonomy: `entrypoint`, `owner`, `boundary`, `config`, `tests`, or `risk`.
 - Planner, Architect, and Critic MUST read the evidence artifact and cite `E#` IDs in plan steps, risk analysis, and review findings instead of repeating long snippets.
+- Planner, Architect, and Critic MUST treat `weak` or `assumption` entries as insufficient support for code-modifying steps unless paired with `direct` source/test/config evidence.
 - Consensus agent prompts should pass the evidence artifact path plus a compact summary, not the full investigator output inline.
-- The final `## Sources` section must expand each cited `E#` to the full repo/path and relevant snippet summary.
+- The final `## Sources` section must expand each cited `E#` to the full repo/path, metadata, and relevant snippet summary.
 
 ### Step 4.5: Synthesis Review (--interactive only)
 
@@ -171,7 +176,7 @@ Build a compact **AOSP consensus packet** and pass it to every consensus agent. 
 - Active AOSP project/config state
 - Deliberate-mode trigger and reason, if applicable
 - Short synthesis summary, conflicts, gaps, and confidence notes
-- Evidence Index summary with stable `E#` IDs and source mappings
+- Evidence Index summary with stable `E#` IDs, source mappings, and `type`/`strength`/`facet` metadata
 - Step 4.5 user feedback, if any
 - Current iteration number
 - Previous plan markdown, if any
@@ -320,6 +325,7 @@ The consensus loop is capped at 5 iterations:
 
 Critic MUST reject or iterate on:
 - Fewer than 80% of plan steps cite Evidence Index IDs backed by AOSP source files from investigation results
+- Any code-modifying step is backed only by `weak` or `assumption` Evidence Index entries without paired `direct` source/test/config evidence
 - Fewer than 90% of acceptance criteria reference verifiable outcomes such as CTS, VTS, build, adb, dumpsys, or logcat
 - Steps not backed by investigation evidence
 - Subsystem boundary crossings without acknowledgment
@@ -343,7 +349,19 @@ Derive a slug from the query: lowercase, spaces to hyphens, strip special chars.
 
 Confirm the save path to the user after writing.
 
-If not running with `--interactive`, call `Bash: rm -f .granada/aosp-plan-state.json` after confirming the save path. The skill stops here and never invokes execution skills.
+If not running with `--interactive`, print a compact final summary before clearing state:
+
+```markdown
+## AOSP Plan Complete
+- **Plan:** `.granada/plans/aosp-<slug>.md`
+- **Evidence:** `.granada/plans/aosp-<slug>-evidence.md`
+- **Consensus verdict:** APPROVE | best available after 5 iterations | unresolved blockers present
+- **Selected option:** <option from AOSP-DR>
+- **Top risks:** <1-3 highest-impact risks or `none identified`>
+- **Next step:** Review the pending-approval plan, then run `/zaku:aosp-autopilot .granada/plans/aosp-<slug>.md` only if you approve execution.
+```
+
+If not running with `--interactive`, call `Bash: rm -f .granada/aosp-plan-state.json` after printing the summary. The skill stops here and never invokes execution skills.
 
 ### Step 7: Execution Approval (--interactive only)
 

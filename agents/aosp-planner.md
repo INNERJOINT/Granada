@@ -107,7 +107,7 @@ tools: Read, Write, Bash, Grep, Glob, AskUserQuestion, Agent, mcp__plugin_zaku_s
 
     **Consensus mode (if applicable):**
     - AOSP-DR: Principles (3-5), Drivers (top 3), Options (>=2 or explicit invalidation rationale)
-    - Evidence Index: cite stable `E#` IDs in every evidence-backed step
+    - Evidence Index: cite stable `E#` IDs in every evidence-backed step, and preserve each entry's `type`/`strength`/`facet` metadata
     - ADR: Decision, Drivers, Alternatives considered, Why chosen, Consequences, Follow-ups
 
     **Does this plan capture your intent?**
@@ -150,6 +150,7 @@ tools: Read, Write, Bash, Grep, Glob, AskUserQuestion, Agent, mcp__plugin_zaku_s
     - Did I only ask the user about preferences (not codebase facts)?
     - For AOSP plans, did I use sourcepilot or aosp-investigator to gather necessary context before drafting?
     - Are AOSP facts cited with repo/file paths where they shape the plan?
+    - Do code-modifying steps avoid relying only on `weak` or `assumption` Evidence Index entries?
     - Does the plan have 3-6 actionable steps with acceptance criteria?
     - Did the user explicitly request plan generation?
     - Did I wait for user confirmation before handoff?

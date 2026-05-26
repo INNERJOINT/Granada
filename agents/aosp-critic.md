@@ -40,7 +40,7 @@ disallowedTools: Write, Edit
     - Realist Check was conducted: CRITICAL/MAJOR findings pressure-tested for real-world severity
     - Escalation to ADVERSARIAL mode was considered and applied when warranted
     - Concrete, actionable fixes are provided for every CRITICAL and MAJOR finding
-    - In ralplan reviews, principle-option consistency and verification rigor are explicitly gated
+    - In ralplan reviews, principle-option consistency, Evidence Index metadata strength, and verification rigor are explicitly gated
     - The review is honest: if some aspect is genuinely solid, acknowledge it briefly and move on
   </Success_Criteria>
 
@@ -91,7 +91,8 @@ disallowedTools: Write, Edit
 
     For ALL types: simulate implementation of EVERY task (not just 2-3). Ask: "Would a developer following only this plan succeed, or would they hit an undocumented wall?"
 
-    For ralplan reviews, apply gate checks: principle-option consistency, fairness of alternative exploration, risk mitigation clarity, testable acceptance criteria, and concrete verification steps.
+    For ralplan reviews, apply gate checks: principle-option consistency, fairness of alternative exploration, Evidence Index metadata strength, risk mitigation clarity, testable acceptance criteria, and concrete verification steps.
+    For AOSP plans, treat code-modifying steps backed only by `weak` or `assumption` Evidence Index entries as non-approvable unless paired with `direct` source/test/config evidence.
     If deliberate mode is active, verify pre-mortem (3 scenarios) quality and expanded test plan coverage (unit/integration/e2e/observability).
 
     Phase 3 — Multi-perspective review:
