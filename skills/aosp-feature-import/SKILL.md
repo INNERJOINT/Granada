@@ -1,8 +1,8 @@
 ---
-description: Import an exported AOSP feature element report into a different AOSP project, mapping source code locations to target and producing an executable import plan
-argument-hint: '"<path-to-export-report>" [--target <project>] [--depth shallow|deep] [--execute]'
+description: Import an exported AOSP feature element report into a different AOSP project, mapping source code locations to target and producing an import guide for explicit aosp-plan planning
+argument-hint: '"<path-to-export-report>" [--target <project>] [--depth shallow|deep]'
 model: opus
-pipeline: [aosp-feature-import, aosp-autopilot]
+pipeline: [aosp-feature-import, aosp-plan]
 level: 3
 ---
 
@@ -18,7 +18,6 @@ Takes an exported feature element report (功能元报告, produced by `aosp-fea
 /zaku:aosp-feature-import .granada/aosp-exports/public-dns.md
 /zaku:aosp-feature-import .granada/aosp-exports/fingerprint-unlock.md --target rk3588_android14
 /zaku:aosp-feature-import .granada/aosp-exports/usb-audio-routing.md --depth shallow
-/zaku:aosp-feature-import .granada/aosp-exports/public-dns.md --execute
 ```
 
 ## Flags
@@ -27,7 +26,6 @@ Takes an exported feature element report (功能元报告, produced by `aosp-fea
 - `--depth shallow|deep`: Controls investigation depth (default: `deep`)
   - `shallow`: Phase 2 runs 1 round only, no convergence check. Useful for quick feasibility assessment.
   - `deep`: Phase 2 runs up to 4 rounds with convergence-based termination.
-- `--execute`: After producing the import guide, automatically generate an `aosp-autopilot`-compatible plan and hand off for execution.
 - `--skip-source-verify`: Trust the export report without verifying against the source project. Reduces AOSP MCP calls by ~50% but risks stale mappings.
 
 ## When to Use
@@ -279,104 +277,22 @@ Merge all investigator findings into a structured import guide:
 5. **Dependency ordering:** Based on the export report's 依赖关系 section and the mapping results, determine the order in which components should be ported
 6. **Generate the import guide** in Chinese using the output template below
 
-### Step 6: Plan Generation (if `--execute`)
-
-If `--execute` flag is set, additionally generate an `aosp-autopilot`-compatible plan:
-
-**6a. Pre-check: Verify AOSP source tree availability**
-
-Before generating the execution plan, verify that a `repo`-managed AOSP source tree is accessible. Read `.granada/aosp-config.json` first; if `repoPath` points to an existing `.repo` directory, use its parent directory as `AOSP_ROOT`.
-
-If `repoPath` is missing, empty, or invalid, fall back to searching upward from the current working directory:
-
-```bash
-path=$(pwd)
-while [ "$path" != "/" ]; do
-  if [ -d "$path/.repo" ]; then echo "$path"; break; fi
-  path=$(dirname "$path")
-done
-```
-
-If `.repo/` is still not found, warn the user and skip plan generation:
-```
-⚠ 未检测到 AOSP 源码树（未找到 .repo/ 目录）。执行计划需要 repo 管理的源码树。
-导入指南仍将保存，但无法自动执行。如需执行，请先运行 /zaku:aosp-project detect-repo，或在 AOSP 源码树中重新运行。
-```
-
-**6b. Generate plan**
-
-1. Convert the import guide's modification instructions into the `aosp-plan` Evidence-Based Plan format:
-   ```markdown
-   ## Evidence-Based Plan
-
-   ### Step 1: <action based on highest-priority MAPPED component>
-   - **Evidence:** [Import investigation findings]
-   - **AOSP files:** <target_paths>
-   - **Acceptance criteria:** [Verifiable outcome]
-   ```
-
-2. Save the execution plan to `.granada/plans/aosp-import-<slug>.md`
-
-**6c. Quality Gate — Architect + Critic Review**
-
-Review the generated execution plan for AOSP-specific quality. This step runs automatically when `--execute` is set.
-
-**Sequential enforcement**: Architect MUST complete before Critic starts. Do NOT run both in parallel.
-
-**Architect review** via `Agent(subagent_type="zaku:aosp-architect", ...)`:
-
-Review focus:
-- Cross-project mapping correctness (source→target path mappings are sound)
-- Adaptation strategy validity (DIVERGED components have feasible adaptation plans)
-- Dependency ordering correctness (no circular or missing dependencies)
-- Treble/HIDL boundary compliance in target project
-- Risk assessment completeness (MISSING components properly flagged)
-- Steelman antithesis: strongest argument against the proposed port approach
-
-Wait for Architect completion before proceeding to Critic.
-
-**Critic evaluation** via `Agent(subagent_type="zaku:aosp-critic", ...)`:
-
-Quality criteria:
-- 80%+ plan steps cite investigation findings from Phase 1/2 (no unsupported claims)
-- 90%+ acceptance criteria reference verifiable outcomes (build, adb shell, logcat)
-- DIVERGED components have concrete adaptation code or guidance (not just "需要适配")
-- MISSING components have explicit fallback strategy or are flagged as blockers
-- Each step's target file paths were confirmed by target investigators (not copied blindly from source)
-- Build system references (Android.bp/mk) included for steps that add/modify modules
-
-Critic MUST reject: unverified target paths (not found by any investigator), acceptance criteria that cannot be mechanically checked, DIVERGED adaptations without code examples, dependency ordering that contradicts investigation findings.
-
-**Re-review loop** (max 2 iterations):
-If Critic rejects: collect feedback → revise plan → Architect → Critic → repeat.
-If 2 iterations reached without approval: present best version to user with Critic's remaining concerns via `AskUserQuestion`.
-
-**Apply improvements**:
-On approval with suggestions: deduplicate, merge into plan, update the saved plan file.
-
-3. Present to user for approval before handoff
-
-### Step 7: Save
+### Step 6: Save and Explicit aosp-plan Handoff
 
 1. Generate slug from feature name: lowercase, replace spaces/special chars with hyphens, max 50 chars
 2. Create `.granada/aosp-imports/` directory if it doesn't exist
 3. Write import guide to `.granada/aosp-imports/<slug>.md`
-4. If `--execute` plan was generated, save to `.granada/plans/aosp-import-<slug>.md`
-5. Call `Bash: rm -f .granada/aosp-feature-import-state.json`
-6. Confirm to user:
+4. Confirm the saved guide path:
    ```
    功能导入指南已保存: .granada/aosp-imports/<slug>.md
-   [如有执行计划] 执行计划已保存: .granada/plans/aosp-import-<slug>.md
+   ```
+5. Call `Write {"active": false}` to `.granada/aosp-feature-import-state.json`
+6. Invoke `Skill("zaku:aosp-plan")` with this exact planning query:
+   ```
+   根据 .granada/aosp-imports/<slug>.md 生成目标项目 <target_project> 的功能导入修改计划。必须使用导入指南中的映射总览、适配分析、移植步骤、风险评估和依赖顺序作为输入证据。
    ```
 
-### Step 8: Execution Handoff (if `--execute` and user approves)
-
-Use `AskUserQuestion` to present the execution plan with options:
-- **执行** — Hand off to `/zaku:aosp-autopilot .granada/plans/aosp-import-<slug>.md`
-- **修改后执行** — Return to Step 6 with user feedback
-- **仅保留计划** — Stop here, user will execute manually later
-
-On approval: `Write {"active": false} to .granada/aosp-feature-import-state.json` then invoke `Skill("zaku:aosp-autopilot")`.
+The skill MUST NOT generate `.granada/plans/aosp-import-<slug>.md`, run Architect/Critic quality gates itself, or invoke `aosp-autopilot`. Plan generation is delegated to the explicit `aosp-plan` handoff.
 
 ## Output Template
 
@@ -509,11 +425,9 @@ Skill is idempotent — re-running with the same inputs overwrites the output fi
 ## Configuration
 
 - Output directory: `.granada/aosp-imports/` (fixed)
-- Execution plan directory: `.granada/plans/` (fixed, prefix `aosp-import-`)
 - Max Phase 1 agent pairs: 6 (12 agents total: 6 source + 6 target)
 - Max Phase 2 agents: 8 (target-only, gap investigation)
-- Max total agents across all phases: 20 (investigation) + 2 per quality gate iteration (max 4 for architect+critic)
-- Quality gate max iterations: 2 (architect + critic per iteration)
+- Max total agents across all phases: 20 (investigation)
 - Max Phase 2 rounds: 4
 - Convergence threshold: no new findings for DIVERGED/MISSING components
 - State mode: `aosp-feature-import`
@@ -524,25 +438,19 @@ Skill is idempotent — re-running with the same inputs overwrites the output fi
 | Scenario | State Operation |
 |----------|-----------------|
 | On entry | `Write {"active": true} to .granada/aosp-feature-import-state.json` |
-| Normal completion (no --execute) | `Bash: rm -f .granada/aosp-feature-import-state.json` |
-| Execution handoff (--execute approved) | `Write {"active": false} to .granada/aosp-feature-import-state.json` |
+| aosp-plan handoff | `Write {"active": false} to .granada/aosp-feature-import-state.json` |
 | Export report not found (unrecoverable) | `Bash: rm -f .granada/aosp-feature-import-state.json` |
 | MCP unreachable (unrecoverable) | `Bash: rm -f .granada/aosp-feature-import-state.json` |
 | User cancels | `/zaku:cancel` calls `rm -f .granada/*-state.json` |
-
-Note: Do not use `rm -f .granada/*-state.json` before launching `aosp-autopilot`. The 30-second cancel signal disables stop-hook enforcement for the newly launched mode. Use `Write JSON with active=false)` instead.
 
 ## Tool Usage
 
 - `mcp__plugin_zaku_sourcepilot__*`: AOSP MCP health check (`list_projects`) and AOSP code search (via `aosp-investigator` subagents with explicit `project` parameter override)
 - `Agent(subagent_type="zaku:aosp-investigator")`: Parallel investigation of source and target projects
-- `Agent(subagent_type="zaku:aosp-architect")`: Architect review in Step 6c quality gate
-- `Agent(subagent_type="zaku:aosp-critic")`: Critic evaluation in Step 6c quality gate
 - `Read`: Parse export report, read `.granada/aosp-config.json`
-- `Write`: Save import guide and execution plan
+- `Write`: Save import guide and mark handoff state
 - `Write` / `Bash rm`: Manage execution state via .granada/ files
-- `AskUserQuestion`: Execution approval gate (Step 8), quality gate fallback (Step 6c)
-- `Skill("zaku:aosp-autopilot")`: Execution handoff
+- `Skill("zaku:aosp-plan")`: Explicit planning handoff after saving the import guide
 
 ## Keyword Triggers
 
