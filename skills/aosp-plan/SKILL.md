@@ -1,16 +1,16 @@
 ---
-description: AOSP investigation-driven planning with parallel code search
+description: AOSP investigation-driven planning with zaku-native consensus
 argument-hint: <AOSP investigation query>
 model: opus
-pipeline: [aosp-plan, ralph]
-next-skill: ralph
+pipeline: [aosp-plan, aosp-autopilot]
+next-skill: aosp-autopilot
 handoff: .granada/plans/aosp-*.md
 level: 4
 ---
 
 # AOSP Plan Skill
 
-Investigation-first AOSP planning. Decomposes queries into facets, spawns parallel `aosp-investigator` subagents, synthesizes all findings, and produces an evidence-backed plan saved to `.granada/plans/`.
+Investigation-first AOSP consensus planning. Decomposes queries into facets, spawns parallel `aosp-investigator` subagents, synthesizes findings, then runs a zaku-native Planner -> Architect -> Critic consensus loop. Final plans are saved to `.granada/plans/` with `**Status:** pending approval`.
 
 ## Usage
 
@@ -22,14 +22,18 @@ Investigation-first AOSP planning. Decomposes queries into facets, spawns parall
 ## Flags
 
 - `--agents N`: Number of parallel investigator subagents (default: 3, max: 5)
-- `--deliberate`: Force deliberate mode for high-risk AOSP changes. Adds pre-mortem (3 failure scenarios) and expanded test plan. Auto-enables when query involves: SELinux policy, Binder/AIDL interfaces, CTS/VTS tests, public/@SystemApi changes, init/boot sequence, Treble boundaries, kernel/DT changes, or multi-partition modifications.
-- `--interactive`: Enable user prompts at synthesis review and final approval. Without this flag, the workflow outputs the final plan and stops (no auto-execution).
+- `--deliberate`: Force deliberate mode for high-risk AOSP changes. Adds pre-mortem and expanded test planning. Auto-enables for SELinux policy, Binder/AIDL/HIDL interfaces, CTS/VTS tests, public/@SystemApi changes, init/boot sequence, Treble boundaries, kernel/DT changes, or multi-partition modifications.
+- `--interactive`: Enable user prompts at synthesis review and final approval. Without this flag, save the final pending-approval plan and stop.
+
+## Planning / Execution Boundary
+
+This skill may inspect context, query AOSP source, and write pending-approval plan artifacts. Before explicit execution approval, it MUST NOT edit source code, commit, push, open PRs, or invoke execution skills. Consensus approval means the plan is suitable to present; it is not runtime execution authorization.
 
 ## Protocol
 
 ### Step 0: State Initialization
 
-Call `Write {"active": true} to .granada/aosp-plan-state.json` before any other action. This enables stop-hook enforcement during parallel investigation.
+Call `Write {"active": true}` to `.granada/aosp-plan-state.json` before any other action.
 
 ### Step 1: MCP Health Check
 
@@ -41,17 +45,13 @@ If the call fails, call `Bash: rm -f .granada/aosp-plan-state.json` and abort im
 AOSP MCP server unreachable. Check SOURCEPILOT_URL and SOURCEPILOT_KEY environment variables.
 ```
 
-Do NOT proceed to spawn agents if this check fails.
-
 After health check passes, read `.granada/aosp-config.json` to display the active AOSP project:
-- If configured: display `**🔍 AOSP Project: <project_name>**` prominently
-- If not configured: display `**⚠ 未配置 AOSP 项目** — 搜索将不限定项目范围。运行 /zaku:aosp-project 设置项目。`
-
-(The `aosp-investigator` subagent reads this config and passes `project` to search calls automatically.)
+- If configured: display `**AOSP Project: <project_name>**` prominently
+- If not configured: display `**未配置 AOSP 项目** — 搜索将不限定项目范围。运行 /zaku:aosp-project 设置项目。`
 
 ### Step 2: Facet Decomposition
 
-Given the user query, decompose into 2–N independent investigation facets. Each facet targets a different aspect of the AOSP codebase. Show the decomposition to the user:
+Given the user query, decompose into 2-N independent investigation facets. Each facet targets a different aspect of the AOSP codebase. Show the decomposition to the user:
 
 ```markdown
 ## AOSP Investigation Decomposition
@@ -69,13 +69,13 @@ Given the user query, decompose into 2–N independent investigation facets. Eac
 
 ### Step 3: Spawn Investigators
 
-Fire N `aosp-investigator` subagents in parallel (one per facet). N comes from `--agents` (default 3, max 5):
+Fire N `aosp-investigator` subagents in parallel, one per facet. N comes from `--agents` (default 3, max 5):
 
-```
+```text
 Agent(
   subagent_type="zaku:aosp-investigator",
   model="sonnet",
-  prompt="Investigate AOSP facet: <facet description>. Use the mcp__plugin_zaku_sourcepilot__* tools. Report structured findings with file paths, code snippets, and architectural observations."
+  prompt="Investigate AOSP facet: <facet description>. Use the sourcepilot tools. Report structured findings with file paths, code snippets, and architectural observations."
 )
 ```
 
@@ -86,90 +86,92 @@ Cap at 5 agents regardless of `--agents` value.
 Merge all investigation results:
 
 - Deduplicate overlapping findings across investigators
-- Resolve conflicts between investigators (prefer AOSP source-based evidence)
+- Resolve conflicts between investigators, preferring AOSP source-based evidence
 - Rank findings by relevance and evidence strength
 - Note gaps where investigation was inconclusive or returned no results
 
 ### Step 4.5: Synthesis Review (--interactive only)
 
-If running with `--interactive`, use `AskUserQuestion` to present the synthesis results with these options:
-- **Proceed to plan generation** (Recommended) — generate the structured plan
+If running with `--interactive`, use `AskUserQuestion` to present synthesis results with these options:
+- **Proceed to consensus planning phase** (Recommended) — generate the structured plan through Planner -> Architect -> Critic consensus
 - **Request additional investigation** — spawn more investigators for identified gaps
 - **Refine scope** — narrow or broaden the investigation, return to Step 2
 
-If NOT running with `--interactive`, automatically proceed to Step 5.
+If not running with `--interactive`, automatically proceed to Step 5.
 
-### Step 5: Plan Generation
+### Step 5: Planner -> Architect -> Critic Consensus Phase
 
-Generate a structured plan based on investigation evidence. The plan MUST include an AOSP-DR (Decision Rationale) section that articulates explicit reasoning, not just steps.
+After synthesis, always run a sequential zaku-native consensus phase before saving the final plan. This phase runs automatically in both interactive and non-interactive modes; it is not an execution approval gate.
+
+Build an **AOSP evidence bundle** and pass it to every consensus agent. The bundle MUST include:
+- Original query and flags
+- Active AOSP project/config state
+- Deliberate-mode trigger and reason, if applicable
+- Facet decomposition
+- All `zaku:aosp-investigator` outputs with facet labels
+- Synthesis findings, conflicts, gaps, and confidence notes
+- Step 4.5 user feedback, if any
+- Current iteration number
+- Previous plan markdown, if any
+- Previous `ARCHITECT_REVIEW`, if any
+- Previous Critic verdict and feedback, if any
+
+Previous fields are empty on iteration 1. Do not allow consensus agents to invent uncited AOSP facts.
+
+#### Step 5a: Planner draft/revision
+
+Call Planner first:
+
+```text
+Agent(
+  subagent_type="zaku:planner",
+  model="opus",
+  prompt="<AOSP evidence bundle + current iteration feedback>"
+)
+```
+
+Planner MUST create or revise the draft AOSP plan with this structure:
 
 ```markdown
 # AOSP Plan: <query>
+**Status:** pending approval
 
 ## Investigation Summary
-
 [Key findings from all investigators, grouped by facet]
 
 ## AOSP-DR: Decision Rationale
-
 ### Principles (3-5)
-1. [AOSP-grounded principle, e.g., "Respect AOSP layer boundaries"]
-2. [Compatibility principle, e.g., "Maintain CTS/VTS test compatibility"]
-3. [Investigation-derived principle]
-
 ### Decision Drivers (top 3)
-1. [Most important factor, with evidence reference]
-2. [Second factor]
-3. [Third factor]
-
 ### Viable Options (>=2, or explicit invalidation rationale)
-#### Option A: [Name]
-- **Approach:** [1-2 sentences]
-- **Evidence:** [Investigation findings supporting this]
-- **AOSP files:** [Key source files]
-- **Pros:** [Bounded, evidence-grounded]
-- **Cons:** [Bounded, evidence-grounded]
-
-#### Option B: [Name]
-- **Approach:** [1-2 sentences]
-- **Evidence:** [Investigation findings supporting this]
-- **AOSP files:** [Key source files]
-- **Pros:** [Bounded, evidence-grounded]
-- **Cons:** [Bounded, evidence-grounded]
-
 ### Selected Option: [A/B]
-**Why:** [Reasoning referencing drivers and principles]
-
 ### Invalidated Alternatives (if < 2 viable options)
-- [Option C]: [Why invalidated — e.g., "Requires @hide API deprecated in API level 34"]
 
 ## Evidence-Based Plan
-
 ### Step 1: <action>
 - **Evidence:** [which investigation findings support this step]
 - **AOSP files:** [relevant AOSP source files]
 - **Acceptance criteria:** [how to verify this step is complete]
 
-### Step 2: <action>
-- **Evidence:** ...
-- **AOSP files:** ...
-- **Acceptance criteria:** ...
-
 ## Risks and Mitigations
-
-- **Risk:** [AOSP-specific risk] → **Mitigation:** [concrete action]
-- **Risk:** [AOSP-specific risk] → **Mitigation:** [concrete action]
-
 ## Open Questions
-
-[Items where investigation was inconclusive or returned no results — flag for further investigation]
-
 ## Sources
+## Architecture Decision Record
+- **Decision:** [What was decided]
+- **Drivers:** [Top 3 drivers from AOSP-DR]
+- **Alternatives considered:** [All evaluated options]
+- **Why chosen:** [Reasoning referencing principles and drivers]
+- **Consequences:** [Positive outcomes + accepted tradeoffs + acknowledged risks]
+- **Follow-ups:** [Post-implementation verification actions]
 
-[All AOSP file paths and references cited across all investigator results]
+## Consensus Review Changelog
+- **Iteration:** [number]
+- **Architect summary:** [blocking/advisory summary]
+- **Critic verdict:** [APPROVE/ITERATE/REJECT or malformed-output note]
+- **Required revisions applied:** [changes made]
+- **Unresolved blockers:** [remaining blockers, if any]
 ```
 
-In **deliberate mode** (triggered by `--deliberate` or auto-detected high-risk signals), additionally include after Sources:
+In deliberate mode, additionally include:
 
 ```markdown
 ## Pre-Mortem (Deliberate Mode)
@@ -186,59 +188,92 @@ In **deliberate mode** (triggered by `--deliberate` or auto-detected high-risk s
 | Observability | [Logcat / dumpsys / perfetto] |
 ```
 
-### Step 5.5: Quality Gate — Architect + Critic Review
+#### Step 5b: Architect review
 
-Review the generated plan for AOSP-specific quality. This step runs automatically (not gated by `--interactive`).
+Call Architect only after Planner returns the draft plan:
 
-**Sequential enforcement**: Architect MUST complete before Critic starts. Do NOT run both in parallel.
-
-**a. Architect review** via `Agent(subagent_type="zaku:architect", ...)`:
-
-Review focus:
-- Architectural soundness of proposed AOSP modifications
-- Subsystem ownership correctness (Framework, HAL, Kernel, etc.)
-- Treble/HIDL boundary compliance
-- Cross-layer impact (e.g., Framework change requiring SELinux update)
-- AOSP version consistency across cited source files
-- Steelman antithesis: strongest argument against the proposed approach
-- At least one meaningful tradeoff tension
-
-Wait for Architect completion before proceeding to Critic.
-
-**b. Critic evaluation** via `Agent(subagent_type="zaku:critic", ...)`:
-
-Quality criteria:
-- 80%+ plan steps cite AOSP source files from investigation results
-- 90%+ acceptance criteria reference verifiable outcomes (CTS, VTS, build, adb)
-- Each step backed by investigation evidence (no unsupported claims)
-- Subsystem boundaries acknowledged at crossing points
-- @hide/@SystemApi stability risks explicitly flagged
-- Build system references (Android.bp/mk) included for code-modifying steps
-- Open Questions section honestly reflects investigation gaps
-
-Critic MUST reject: uncited AOSP file references, unverifiable acceptance criteria, missing @hide API risk flags, mixed AOSP version references without acknowledgment.
-
-**c. Re-review loop** (max 3 iterations):
-If Critic rejects: collect feedback → revise plan (re-run Step 5) → Architect → Critic → repeat.
-If 3 iterations reached without approval: present best version to user via `AskUserQuestion`.
-
-**d. Apply improvements**:
-On approval with suggestions: deduplicate, merge into plan, add changelog section.
-Final plan output MUST include an **Architecture Decision Record** section appended after Sources:
-
-```markdown
-## Architecture Decision Record
-- **Decision:** [What was decided]
-- **Drivers:** [Top 3 drivers from AOSP-DR]
-- **Alternatives considered:** [All evaluated options]
-- **Why chosen:** [Reasoning referencing principles and drivers]
-- **Consequences:** [Positive outcomes + accepted tradeoffs + acknowledged risks]
-- **Follow-ups:** [Post-implementation verification actions]
+```text
+Agent(
+  subagent_type="zaku:architect",
+  model="opus",
+  prompt="<draft AOSP plan markdown + AOSP evidence bundle>"
+)
 ```
+
+Architect MUST return a structured `ARCHITECT_REVIEW` containing:
+- Blocking concerns
+- Required changes
+- Advisory changes
+- Strongest antithesis
+- Tradeoff tensions
+- Approval recommendation
+
+Malformed or incomplete Architect output is a blocking concern and forces Critic non-approval unless corrected in a later iteration.
+
+#### Step 5c: Critic verdict
+
+Call Critic only after Architect returns:
+
+```text
+Agent(
+  subagent_type="zaku:critic",
+  model="opus",
+  prompt="<draft AOSP plan markdown + AOSP evidence bundle + ARCHITECT_REVIEW>"
+)
+```
+
+Critic MUST include exactly one closed verdict line:
+
+```text
+VERDICT: APPROVE
+```
+
+or
+
+```text
+VERDICT: ITERATE
+```
+
+or
+
+```text
+VERDICT: REJECT
+```
+
+No verdict, multiple verdicts, synonyms, conditional verdicts, or ambiguous wording MUST be treated as `VERDICT: ITERATE`. Malformed Critic output must be recorded in the Consensus Review Changelog as non-compliant/malformed.
+
+#### Step 5d: Consensus loop
+
+The consensus loop is capped at 5 iterations:
+1. Planner creates or revises the draft plan from the evidence bundle.
+2. Architect reviews the draft and returns `ARCHITECT_REVIEW`.
+3. Critic evaluates the draft and returns exactly one `VERDICT`.
+4. Only `VERDICT: APPROVE` exits the loop.
+5. `VERDICT: ITERATE`, `VERDICT: REJECT`, missing verdict, malformed verdict, or ambiguous verdict means Planner MUST revise the plan using Architect and Critic feedback, add a Consensus Review Changelog entry, then rerun Architect and Critic.
+6. If 5 iterations complete without approval, save the best available version with unresolved blockers clearly listed. The saved plan remains `**Status:** pending approval`.
+
+`VERDICT: REJECT` is non-terminal inside the Step 5 consensus loop. Step 7 user rejection remains terminal.
+
+#### Step 5e: Quality criteria
+
+Critic MUST reject or iterate on:
+- Fewer than 80% of plan steps cite AOSP source files from investigation results
+- Fewer than 90% of acceptance criteria reference verifiable outcomes such as CTS, VTS, build, adb, dumpsys, or logcat
+- Steps not backed by investigation evidence
+- Subsystem boundary crossings without acknowledgment
+- @hide/@SystemApi stability risks not flagged where relevant
+- Missing build system references for code-modifying steps
+- Open Questions section hiding investigation gaps
+- Uncited AOSP file references
+- Selected option that conflicts with stated principles or drivers
+- Missing or unfair alternatives without explicit invalidation rationale
+- Risks without concrete mitigation or verification path
 
 ### Step 6: Save
 
-Derive a slug from the query (lowercase, spaces→hyphens, strip special chars). Save to:
+Before saving, assert the plan contains exactly one `**Status:** pending approval`, and it is the first body line after the title. All saved plans MUST remain pending approval.
+
+Derive a slug from the query: lowercase, spaces to hyphens, strip special chars. Save to:
 
 ```
 .granada/plans/aosp-<slug>.md
@@ -246,64 +281,55 @@ Derive a slug from the query (lowercase, spaces→hyphens, strip special chars).
 
 Confirm the save path to the user after writing.
 
-If NOT running with `--interactive`, call `Bash: rm -f .granada/aosp-plan-state.json` after confirming the save path. The skill stops here in non-interactive mode.
+If not running with `--interactive`, call `Bash: rm -f .granada/aosp-plan-state.json` after confirming the save path. The skill stops here and never invokes execution skills.
 
 ### Step 7: Execution Approval (--interactive only)
 
 Use `AskUserQuestion` to present the saved plan with these options:
-- **Approve and implement via team** (Recommended) — proceed to implementation via coordinated parallel team agents
-- **Approve and execute via ralph** — proceed to implementation via ralph sequential execution
-- **Clear context and implement** — compact context first, then ralph (recommended when context is large after investigation)
+- **Approve and execute via aosp-autopilot** (Recommended) — proceed to implementation via zaku multi-repo executor
 - **Request changes** — return to Step 5 with user feedback
 - **Reject** — discard plan, call `Bash: rm -f .granada/aosp-plan-state.json`, stop
 
-On approval: Call `Write {"active": false} to .granada/aosp-plan-state.json` before invoking the execution skill. Do NOT use `rm -f .granada/*-state.json` — its cancel signal disables stop-hook enforcement for the newly launched mode.
-
-- **Approve and implement via team**: Invoke `Skill("zaku:team")` with the plan path
-- **Approve and execute via ralph**: Invoke `Skill("zaku:ralph")` with the plan path
-- **Clear context and implement**: `Write JSON with active=false)` → `Skill("compact")` → `Skill("zaku:ralph")` with plan path
+On approval: Call `Write {"active": false}` to `.granada/aosp-plan-state.json` before invoking `Skill("zaku:aosp-autopilot")` with the plan path.
 
 ## Risk-Adaptive Mode
 
-AOSP-DR uses **short mode** by default (Principles + Drivers + Options only). Switch to **deliberate mode** with `--deliberate` or when the query involves any of these high-risk areas:
+AOSP-DR uses short mode by default. Switch to deliberate mode with `--deliberate` or when the query involves any high-risk areas:
 
-- SELinux policy changes (neverallow, sepolicy, *.te files)
+- SELinux policy changes
 - Binder/AIDL/HIDL interface modifications
 - CTS or VTS test changes
 - Public API or @SystemApi modifications
-- Init/boot sequence changes (init.rc, early boot services)
+- Init/boot sequence changes
 - Treble vendor/system boundary crossings
 - Kernel driver or device tree changes
-- Multi-partition changes (system + vendor + product)
-
-Deliberate mode adds:
-- **Pre-mortem**: 3 AOSP-specific failure scenarios
-- **Expanded test plan**: Unit / Integration (CTS) / E2E (VTS/device) / Observability (logcat/dumpsys/perfetto)
+- Multi-partition changes
 
 ## State Lifecycle
 
-The stop hook uses `aosp-plan` state to enforce continuation during parallel investigation. The skill MUST manage this state:
+- On entry: `Write {"active": true}` to `.granada/aosp-plan-state.json`
+- On MCP failure: `Bash: rm -f .granada/aosp-plan-state.json`
+- On non-interactive completion: `Bash: rm -f .granada/aosp-plan-state.json`
+- On execution handoff: `Write {"active": false}` to `.granada/aosp-plan-state.json`
+- On rejection: `Bash: rm -f .granada/aosp-plan-state.json`
 
-- **On entry**: `Write {"active": true} to .granada/aosp-plan-state.json` before Step 1
-- **On MCP failure**: `Bash: rm -f .granada/aosp-plan-state.json` — terminal exit
-- **On non-interactive completion** (Step 6): `Bash: rm -f .granada/aosp-plan-state.json` — plan output only, no execution follows
-- **On execution handoff** (Step 7 approval): `Write {"active": false} to .granada/aosp-plan-state.json` — preserves stop-hook enforcement for the execution mode
-- **On rejection** (Step 7 reject): `Bash: rm -f .granada/aosp-plan-state.json` — terminal exit
-
-Critical: Never use `rm -f .granada/*-state.json` before launching an execution mode. The 30-second cancel signal disables stop-hook enforcement for ALL modes.
+Never use `rm -f .granada/*-state.json` before launching an execution mode.
 
 ## Configuration
 
-- Maximum 5 parallel `aosp-investigator` agents (matches `external-context` precedent)
+- Maximum 5 parallel `aosp-investigator` agents
 - Keyword trigger: `"aosp plan"` or `"aosp_plan"`
-- State file: `.granada/aosp-plan-state.json` (Write/Read/rm)
-- Non-interactive mode (default): outputs plan and stops after Step 6
-- Interactive mode (`--interactive`): adds synthesis review (Step 4.5) and execution approval (Step 7) gates
+- State file: `.granada/aosp-plan-state.json`
+- Non-interactive mode: outputs plan and stops after Step 6
+- Interactive mode: adds synthesis review and execution approval gates
 
 ## Tool Usage
 
-- Use `Agent(subagent_type="zaku:architect", ...)` for Architect review in Step 5.5a
-- Use `Agent(subagent_type="zaku:critic", ...)` for Critic evaluation in Step 5.5b
-- **CRITICAL**: Architect and Critic calls MUST be sequential, never parallel. Always await the Architect result before issuing the Critic call.
-- Quality gate runs automatically on all plans (not gated by `--interactive`)
-- Re-review loop capped at 3 iterations (narrower scope than general plans)
+- Use `Agent(subagent_type="zaku:aosp-investigator", model="sonnet", ...)` for parallel investigation.
+- Use `Agent(subagent_type="zaku:planner", model="opus", ...)` for Planner draft/revision.
+- Use `Agent(subagent_type="zaku:architect", model="opus", ...)` for Architect review.
+- Use `Agent(subagent_type="zaku:critic", model="opus", ...)` for Critic evaluation.
+- Planner, Architect, and Critic MUST run sequentially: Planner -> Architect -> Critic. Never run consensus agents in parallel.
+- All three consensus agents MUST receive the AOSP evidence bundle.
+- Critic MUST use the closed verdict contract: exactly one of `VERDICT: APPROVE`, `VERDICT: ITERATE`, or `VERDICT: REJECT`.
+- Missing, malformed, multiple, conditional, or ambiguous Critic verdicts MUST be treated as `VERDICT: ITERATE` and recorded in the Consensus Review Changelog.
