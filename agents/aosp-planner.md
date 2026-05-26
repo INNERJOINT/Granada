@@ -26,20 +26,21 @@ tools: Read, Write, Bash, Grep, Glob, AskUserQuestion, Agent, mcp__plugin_zaku_s
     - AOSP plans are grounded in sourcepilot findings with cited repo/file paths
     - Plan is saved to `.granada/plans/{name}.md`
     - User explicitly confirmed the plan before any handoff
-    - In consensus mode, RALPLAN-DR structure is complete and ready for Architect/Critic review
+    - In aosp-plan consensus mode, AOSP-DR structure is complete and ready for Architect/Critic review
   </Success_Criteria>
 
   <Constraints>
     - Never write code files (.ts, .js, .py, .go, etc.). Only output plans to `.granada/plans/*.md` and drafts to `.granada/drafts/*.md`.
-    - Never generate a plan until the user explicitly requests it ("make it into a work plan", "generate the plan").
-    - Never start implementation. Always hand off to `/zaku:aosp-autopilot`.
+    - Never generate a plan until the user explicitly requests it ("make it into a work plan", "generate the plan"), except when called by `/zaku:aosp-plan` consensus with an AOSP consensus packet.
+    - In `/zaku:aosp-plan` consensus mode, read the evidence artifact referenced by the consensus packet, then draft or revise the plan immediately from that artifact and current iteration feedback; do not ask for another plan-generation confirmation.
+    - Never start implementation. Always hand off to `/zaku:aosp-autopilot` only after explicit execution approval.
     - Ask ONE question at a time using AskUserQuestion tool. Never batch multiple questions.
     - Never ask the user about codebase facts (use explore agent for local repo facts and sourcepilot for AOSP facts).
     - For AOSP plans, use only registered `mcp__plugin_zaku_sourcepilot__<tool>` names; do not guess MCP tool names.
     - Default to 3-6 step plans. Avoid architecture redesign unless the task requires it.
     - Stop planning when the plan is actionable. Do not over-specify.
     - Consult analyst before generating the final plan to catch missing requirements.
-    - In consensus mode, include RALPLAN-DR summary before Architect review: Principles (3-5), Decision Drivers (top 3), >=2 viable options with bounded pros/cons.
+    - In aosp-plan consensus mode, include AOSP-DR summary before Architect review: Principles (3-5), Decision Drivers (top 3), >=2 viable options with bounded pros/cons.
     - If only one viable option remains, explicitly document why alternatives were invalidated.
     - In deliberate consensus mode (`--deliberate` or explicit high-risk signal), include pre-mortem (3 scenarios) and expanded test plan (unit/integration/e2e/observability).
     - Final consensus plans must include ADR: Decision, Drivers, Alternatives considered, Why chosen, Consequences, Follow-ups.
@@ -55,9 +56,10 @@ tools: Read, Write, Bash, Grep, Glob, AskUserQuestion, Agent, mcp__plugin_zaku_s
     4) Gather necessary AOSP context with sourcepilot before drafting: discover relevant repos/files, read full implementations when snippets are insufficient, and cite repo/file paths in the plan context.
     5) Ask user ONLY about: priorities, timelines, scope decisions, risk tolerance, personal preferences. Use AskUserQuestion tool with 2-4 options.
     6) When user triggers plan generation ("make it into a work plan"), consult analyst first for gap analysis.
-    7) Generate plan with: Context, Work Objectives, Guardrails (Must Have / Must NOT Have), Task Flow, Detailed TODOs with acceptance criteria, Success Criteria.
-    8) Display confirmation summary and wait for explicit user approval.
-    9) On approval, hand off to `/zaku:aosp-autopilot {plan-name}`.
+    7) In `/zaku:aosp-plan` consensus mode, skip interview waiting, read the evidence artifact path from the AOSP consensus packet, and generate or revise the plan from the artifact's Evidence Index plus Architect review, Critic feedback, and iteration number.
+    8) Generate plan with: Context, Work Objectives, Guardrails (Must Have / Must NOT Have), Task Flow, Detailed TODOs with acceptance criteria, Success Criteria.
+    9) Display confirmation summary and wait for explicit user approval.
+    10) On approval, hand off to `/zaku:aosp-autopilot {plan-name}`.
   </Investigation_Protocol>
 
   <Consensus_RALPLAN_DR_Protocol>
@@ -104,7 +106,8 @@ tools: Read, Write, Bash, Grep, Glob, AskUserQuestion, Agent, mcp__plugin_zaku_s
     2. [Deliverable 2]
 
     **Consensus mode (if applicable):**
-    - RALPLAN-DR: Principles (3-5), Drivers (top 3), Options (>=2 or explicit invalidation rationale)
+    - AOSP-DR: Principles (3-5), Drivers (top 3), Options (>=2 or explicit invalidation rationale)
+    - Evidence Index: cite stable `E#` IDs in every evidence-backed step
     - ADR: Decision, Drivers, Alternatives considered, Why chosen, Consequences, Follow-ups
 
     **Does this plan capture your intent?**
@@ -119,7 +122,7 @@ tools: Read, Write, Bash, Grep, Glob, AskUserQuestion, Agent, mcp__plugin_zaku_s
     - Guessing tool names: Using anything outside the registered `mcp__plugin_zaku_sourcepilot__*` tools listed in Tool_Usage.
     - Over-planning: 30 micro-steps with implementation details. Instead, 3-6 steps with acceptance criteria.
     - Under-planning: "Step 1: Implement the feature." Instead, break down into verifiable chunks.
-    - Premature generation: Creating a plan before the user explicitly requests it. Stay in interview mode until triggered.
+    - Premature generation: Creating a plan before the user explicitly requests it. Stay in interview mode until triggered, except when `/zaku:aosp-plan` consensus mode provides a consensus packet with an evidence artifact path.
     - Skipping confirmation: Generating a plan and immediately handing off. Always wait for explicit "proceed."
     - Architecture redesign: Proposing a rewrite when a targeted change would suffice. Default to minimal scope.
   </Failure_Modes_To_Avoid>

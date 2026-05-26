@@ -51,20 +51,46 @@ After health check passes, read `.granada/aosp-config.json` to display the activ
 
 ### Step 2: Facet Decomposition
 
-Given the user query, decompose into 2-N independent investigation facets. Each facet targets a different aspect of the AOSP codebase. Show the decomposition to the user:
+Given the user query, decompose into 2-N independent investigation facets. Each facet targets a different aspect of the AOSP codebase.
+
+Use this AOSP-oriented facet taxonomy by default, then prune facets that are clearly irrelevant and merge facets when the query is narrow:
+
+1. **Entrypoints and call flow** — public APIs, callbacks, broadcasts, system service entrypoints, command paths, or lifecycle triggers.
+2. **Owning service / manager logic** — framework service, manager, controller, policy, state machine, or native daemon that owns the behavior.
+3. **Boundary crossings** — Binder/AIDL/HIDL, JNI, native service, HAL, vendor/system, Treble, kernel, or device tree boundaries.
+4. **Configuration and build surface** — resources, overlays, properties, XML config, init rc, Soong/Make files, sepolicy, feature flags, permissions.
+5. **Tests and observability** — CTS/VTS/unit tests, instrumentation, dumpsys, stats/logcat, perfetto, bugreport evidence points.
+6. **Compatibility and risk surface** — @SystemApi/@hide, compatibility behavior, migration concerns, multi-user, multi-display, boot/upgrade interactions.
+
+Rules:
+- Always include entrypoint/call-flow and owning-service facets unless the query is purely about build/config/test files.
+- Include boundary-crossing and configuration facets when the query touches HAL, vendor, boot, permissions, SELinux, resources, properties, or multi-partition behavior.
+- Include tests/observability for all implementation plans, even if the search focus is lightweight.
+- Prefer 3 facets for normal mode, up to 5 with `--agents 5`, and include all relevant high-risk facets in `--deliberate` mode.
+- If a default facet is pruned, record the reason so reviewers know it was considered.
+
+Show the decomposition to the user:
 
 ```markdown
 ## AOSP Investigation Decomposition
 
 **Query:** <original query>
+**Facet strategy:** <normal/deliberate/pruned>
 
 ### Facet 1: <facet-name>
+- **Taxonomy:** Entrypoints and call flow / Owning service / Boundary crossings / Configuration / Tests / Compatibility
 - **Search focus:** What to search for in AOSP
-- **Expected areas:** Framework, HAL, kernel, etc.
+- **Expected areas:** Framework, HAL, kernel, tests, sepolicy, build, etc.
+- **Why included:** Why this facet matters for the query
 
 ### Facet 2: <facet-name>
+- **Taxonomy:** ...
 - **Search focus:** ...
 - **Expected areas:** ...
+- **Why included:** ...
+
+### Pruned facets
+- **<facet-name>:** <why it is not relevant or was merged>
 ```
 
 ### Step 3: Spawn Investigators
@@ -90,6 +116,42 @@ Merge all investigation results:
 - Rank findings by relevance and evidence strength
 - Note gaps where investigation was inconclusive or returned no results
 
+After synthesis, build and save an **Evidence Artifact** containing the full investigation context plus a compact **Evidence Index**. Each cited AOSP fact that may influence planning gets a stable ID.
+
+Derive the same slug that Step 6 will use for the final plan and save the artifact before consensus to:
+
+```text
+.granada/plans/aosp-<slug>-evidence.md
+```
+
+The evidence artifact MUST use this structure:
+
+```markdown
+# AOSP Evidence: <query>
+
+## Original Query and Flags
+## Active AOSP Project
+## Deliberate Mode
+## Investigation Decomposition
+## Investigator Outputs
+## Synthesis
+### Findings
+### Conflicts
+### Gaps
+### Confidence Notes
+## Evidence Index
+[E1] <repo>/<path/to/File.java> — <symbol or area> — <one-sentence finding>
+[E2] <repo>/<path/to/File.bp> — <build/test relevance> — <one-sentence finding>
+## Interactive Feedback
+```
+
+Rules:
+- Evidence IDs are stable within the plan run and MUST NOT be reused for different facts.
+- Every Evidence Index entry must trace back to an investigator result or direct sourcepilot file read in the same artifact.
+- Planner, Architect, and Critic MUST read the evidence artifact and cite `E#` IDs in plan steps, risk analysis, and review findings instead of repeating long snippets.
+- Consensus agent prompts should pass the evidence artifact path plus a compact summary, not the full investigator output inline.
+- The final `## Sources` section must expand each cited `E#` to the full repo/path and relevant snippet summary.
+
 ### Step 4.5: Synthesis Review (--interactive only)
 
 If running with `--interactive`, use `AskUserQuestion` to present synthesis results with these options:
@@ -103,20 +165,20 @@ If not running with `--interactive`, automatically proceed to Step 5.
 
 After synthesis, always run a sequential zaku-native consensus phase before saving the final plan. This phase runs automatically in both interactive and non-interactive modes; it is not an execution approval gate.
 
-Build an **AOSP evidence bundle** and pass it to every consensus agent. The bundle MUST include:
+Build a compact **AOSP consensus packet** and pass it to every consensus agent. The packet MUST include:
+- Evidence artifact path: `.granada/plans/aosp-<slug>-evidence.md`
 - Original query and flags
 - Active AOSP project/config state
 - Deliberate-mode trigger and reason, if applicable
-- Facet decomposition
-- All `zaku:aosp-investigator` outputs with facet labels
-- Synthesis findings, conflicts, gaps, and confidence notes
+- Short synthesis summary, conflicts, gaps, and confidence notes
+- Evidence Index summary with stable `E#` IDs and source mappings
 - Step 4.5 user feedback, if any
 - Current iteration number
 - Previous plan markdown, if any
 - Previous `ARCHITECT_REVIEW`, if any
 - Previous Critic verdict and feedback, if any
 
-Previous fields are empty on iteration 1. Do not allow consensus agents to invent uncited AOSP facts.
+The full investigator outputs MUST live in the evidence artifact, not be repeated inline in every consensus prompt. Previous fields are empty on iteration 1. Do not allow consensus agents to invent uncited AOSP facts; they must read the evidence artifact before making source-backed claims.
 
 #### Step 5a: Planner draft/revision
 
@@ -126,7 +188,7 @@ Call Planner first:
 Agent(
   subagent_type="zaku:aosp-planner",
   model="opus",
-  prompt="<AOSP evidence bundle + current iteration feedback>"
+  prompt="<AOSP consensus packet with evidence artifact path + current iteration feedback>"
 )
 ```
 
@@ -148,7 +210,7 @@ Planner MUST create or revise the draft AOSP plan with this structure:
 
 ## Evidence-Based Plan
 ### Step 1: <action>
-- **Evidence:** [which investigation findings support this step]
+- **Evidence:** [Evidence Index IDs, e.g. E1, E3]
 - **AOSP files:** [relevant AOSP source files]
 - **Acceptance criteria:** [how to verify this step is complete]
 
@@ -196,7 +258,7 @@ Call Architect only after Planner returns the draft plan:
 Agent(
   subagent_type="zaku:aosp-architect",
   model="opus",
-  prompt="<draft AOSP plan markdown + AOSP evidence bundle>"
+  prompt="<draft AOSP plan markdown + AOSP consensus packet>"
 )
 ```
 
@@ -218,7 +280,7 @@ Call Critic only after Architect returns:
 Agent(
   subagent_type="zaku:aosp-critic",
   model="opus",
-  prompt="<draft AOSP plan markdown + AOSP evidence bundle + ARCHITECT_REVIEW>"
+  prompt="<draft AOSP plan markdown + AOSP consensus packet + ARCHITECT_REVIEW>"
 )
 ```
 
@@ -245,7 +307,7 @@ No verdict, multiple verdicts, synonyms, conditional verdicts, or ambiguous word
 #### Step 5d: Consensus loop
 
 The consensus loop is capped at 5 iterations:
-1. Planner creates or revises the draft plan from the evidence bundle.
+1. Planner creates or revises the draft plan from the consensus packet and referenced evidence artifact.
 2. Architect reviews the draft and returns `ARCHITECT_REVIEW`.
 3. Critic evaluates the draft and returns exactly one `VERDICT`.
 4. Only `VERDICT: APPROVE` exits the loop.
@@ -257,7 +319,7 @@ The consensus loop is capped at 5 iterations:
 #### Step 5e: Quality criteria
 
 Critic MUST reject or iterate on:
-- Fewer than 80% of plan steps cite AOSP source files from investigation results
+- Fewer than 80% of plan steps cite Evidence Index IDs backed by AOSP source files from investigation results
 - Fewer than 90% of acceptance criteria reference verifiable outcomes such as CTS, VTS, build, adb, dumpsys, or logcat
 - Steps not backed by investigation evidence
 - Subsystem boundary crossings without acknowledgment
@@ -330,6 +392,6 @@ Never use `rm -f .granada/*-state.json` before launching an execution mode.
 - Use `Agent(subagent_type="zaku:aosp-architect", model="opus", ...)` for Architect review.
 - Use `Agent(subagent_type="zaku:aosp-critic", model="opus", ...)` for Critic evaluation.
 - Planner, Architect, and Critic MUST run sequentially: Planner -> Architect -> Critic. Never run consensus agents in parallel.
-- All three consensus agents MUST receive the AOSP evidence bundle.
+- All three consensus agents MUST receive the AOSP consensus packet.
 - Critic MUST use the closed verdict contract: exactly one of `VERDICT: APPROVE`, `VERDICT: ITERATE`, or `VERDICT: REJECT`.
 - Missing, malformed, multiple, conditional, or ambiguous Critic verdicts MUST be treated as `VERDICT: ITERATE` and recorded in the Consensus Review Changelog.

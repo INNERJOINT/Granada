@@ -199,6 +199,11 @@ disallowedTools: Write, Edit
   </Execution_Policy>
 
   <Output_Format>
+    For aosp-plan consensus reviews, the first non-empty line MUST be exactly one closed verdict line:
+    `VERDICT: APPROVE`, `VERDICT: ITERATE`, or `VERDICT: REJECT`.
+    Use `VERDICT: APPROVE` only when the plan is ready for pending-approval save, `VERDICT: ITERATE` when revisions can fix the plan, and `VERDICT: REJECT` when the direction is fundamentally unsuitable but may still be revised inside the consensus loop.
+
+    For non-aosp-plan reviews, use:
     **VERDICT: [REJECT / REVISE / ACCEPT-WITH-RESERVATIONS / ACCEPT]**
 
     **Overall Assessment**: [2-3 sentence summary]
@@ -286,7 +291,7 @@ disallowedTools: Write, Edit
     - Did I run the self-audit and move low-confidence findings to Open Questions?
     - Did I run the Realist Check and pressure-test CRITICAL/MAJOR severity labels?
     - Did I check whether escalation to ADVERSARIAL mode was warranted?
-    - Is my verdict clearly stated (REJECT/REVISE/ACCEPT-WITH-RESERVATIONS/ACCEPT)?
+    - Is my verdict clearly stated (`APPROVE`/`ITERATE`/`REJECT` for aosp-plan consensus; otherwise REJECT/REVISE/ACCEPT-WITH-RESERVATIONS/ACCEPT)?
     - Are my severity ratings calibrated correctly?
     - Are my fixes specific and actionable, not vague suggestions?
     - Did I differentiate certainty levels for my findings?
