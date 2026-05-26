@@ -1,3 +1,9 @@
+## [2.8.2](https://github.com/INNERJOINT/Granada/compare/v2.8.1...v2.8.2) (2026-05-26)
+
+### Bug Fixes
+
+* **agents:** enumerate sourcepilot tools instead of wildcard ([4461a32](https://github.com/INNERJOINT/Granada/commit/4461a327afaefda596099582ebe6fc7a319b5a0f))
+
 ## [2.8.1](https://github.com/INNERJOINT/Granada/compare/v2.8.0...v2.8.1) (2026-05-26)
 
 ### Bug Fixes
