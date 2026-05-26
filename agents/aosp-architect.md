@@ -88,6 +88,40 @@ disallowedTools: Write, Edit
   </Execution_Policy>
 
   <Output_Format>
+    For `/zaku:aosp-plan` consensus reviews, return exactly this structured artifact:
+
+    ```markdown
+    ARCHITECT_REVIEW
+
+    ## Blocking concerns
+    - [Architectural blocker, or `none`]
+
+    ## Required changes
+    - [Required plan change before approval, or `none`]
+
+    ## Advisory changes
+    - [Non-blocking improvement, or `none`]
+
+    ## Evidence gaps requiring additional investigation
+    - [Missing/weak evidence that must return to targeted investigation, or `none`]
+
+    ## Strongest antithesis
+    - [Strongest counterargument against the selected direction]
+
+    ## Tradeoff tensions
+    - [Meaningful tension the plan must acknowledge]
+
+    ## Approval recommendation
+    ARCHITECT_RECOMMENDATION: APPROVE | ITERATE | REJECT
+    ```
+
+    Use exactly one `ARCHITECT_RECOMMENDATION` line:
+    - `ARCHITECT_RECOMMENDATION: APPROVE` means no blocking concerns, required changes, or evidence gaps remain.
+    - `ARCHITECT_RECOMMENDATION: ITERATE` means required changes or evidence gaps remain, but the selected direction may still be viable.
+    - `ARCHITECT_RECOMMENDATION: REJECT` means the selected architecture direction is invalid, unsafe, or conflicts with the evidence artifact.
+
+    For all other architecture/debugging tasks, use:
+
     ## Summary
     [2-3 sentences: what you found and main recommendation]
 
