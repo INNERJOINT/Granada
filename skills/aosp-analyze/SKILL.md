@@ -84,7 +84,7 @@ This skill does NOT parse logs, generate timelines, produce RCA hypotheses, or o
    - If no state exists: start fresh
 
 4. **MCP health check**:
-   - AOSP: call `sourcepilot(tool="list_tools")` — if fails, abort with "sourcepilot MCP unreachable. Check SOURCEPILOT_URL and SOURCEPILOT_KEY env vars."
+   - AOSP: call `mcp__plugin_zaku_sourcepilot__list_projects()` — if fails, abort with "AOSP MCP (sourcepilot) unreachable. Check SOURCEPILOT_URL and SOURCEPILOT_KEY env vars."
 
 5. **Display active AOSP project**:
    - If `--project` override was provided: display `**AOSP Project: <name> (命令行指定)**` and use this value. Skip reading `.granada/aosp-config.json`.
@@ -164,7 +164,7 @@ Spawn one `zaku:aosp-investigator` per cluster from search-targets.json, **in pa
 Agent(
   subagent_type="zaku:aosp-investigator",
   model="sonnet",
-  prompt="[If --project override is active, prepend: **AOSP Project Override:** Use project `<name>` for ALL sourcepilot search calls. Do NOT read `.granada/aosp-config.json` — the project has been specified explicitly via CLI flag.]
+  prompt="[If --project override is active, prepend: **AOSP Project Override:** Use project `<name>` for ALL mcp__plugin_zaku_sourcepilot__* search calls. Do NOT read `.granada/aosp-config.json` — the project has been specified explicitly via CLI flag.]
 
 Investigate AOSP source code for technical report <slug>.
 
@@ -178,7 +178,7 @@ Search targets:
 - Keywords: <cluster.keywords>
 
 For each target:
-1. Use sourcepilot — first call {tool: 'list_tools'} to discover available tools
+1. Use the mcp__plugin_zaku_sourcepilot__* tools (see Tool_Selection_Matrix in the investigator agent)
 2. Search for class/function/module definitions in AOSP
 3. Trace call flows (callers and callees)
 4. Identify data structures, interfaces, and configuration points
@@ -293,7 +293,7 @@ Update state: `current_phase: "sources-investigated"`, `source_finding_count: <N
 </Steps>
 
 <Error_Handling>
-- **AOSP MCP unreachable** → abort with "sourcepilot MCP unreachable. Check SOURCEPILOT_URL and SOURCEPILOT_KEY env vars."
+- **AOSP MCP unreachable** → abort with "AOSP MCP (sourcepilot) unreachable. Check SOURCEPILOT_URL and SOURCEPILOT_KEY env vars."
 - **No topic provided** → abort with "No topic provided. Provide --title <description>."
 - **Target extraction fails** → abort with "Target extraction failed — search-targets.json missing."
 - **AOSP search returns no results** → note "no AOSP source found" in report, do not fail
@@ -323,7 +323,7 @@ State is lightweight (<10KB). Investigation data lives in temp files (`/tmp/aosp
 </State_Schema>
 
 <Tool_Usage>
-- `sourcepilot` — search AOSP source for target classes, functions, and modules
+- `mcp__plugin_zaku_sourcepilot__*` — search AOSP source for target classes, functions, and modules
 - `Write` / `Read` / `Bash rm` — phase persistence via `.granada/aosp-analyze-state.json`
 - `Agent(subagent_type="zaku:aosp-analyst", model="opus")` — target extraction from title/query (Phase 2)
 - `Agent(subagent_type="zaku:aosp-investigator", model="sonnet")` — parallel source investigation (Phase 3)
@@ -390,7 +390,7 @@ Why good: Requires a topic — does not silently proceed with empty analysis.
 
 <Guardrails>
 **Must have:**
-- sourcepilot for AOSP source search (always, not conditional)
+- mcp__plugin_zaku_sourcepilot__* for AOSP source search (always, not conditional)
 - aosp-investigator subagents for parallel source investigation (Phase 3)
 - analyst subagent for search target extraction (Phase 2)
 - Lightweight state (<10KB, file paths not data)

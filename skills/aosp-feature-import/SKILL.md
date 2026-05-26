@@ -28,7 +28,7 @@ Takes an exported feature element report (功能元报告, produced by `aosp-fea
   - `shallow`: Phase 2 runs 1 round only, no convergence check. Useful for quick feasibility assessment.
   - `deep`: Phase 2 runs up to 4 rounds with convergence-based termination.
 - `--execute`: After producing the import guide, automatically generate an `aosp-autopilot`-compatible plan and hand off for execution.
-- `--skip-source-verify`: Trust the export report without verifying against the source project. Reduces sourcepilot calls by ~50% but risks stale mappings.
+- `--skip-source-verify`: Trust the export report without verifying against the source project. Reduces AOSP MCP calls by ~50% but risks stale mappings.
 
 ## When to Use
 
@@ -55,7 +55,7 @@ Write JSON to .granada/aosp-feature-import-state.json with, active=true, task_de
 
 **1a. MCP Health Check**
 
-Call `sourcepilot` with `tool: "list_tools"` to verify MCP server reachability.
+Call `mcp__plugin_zaku_sourcepilot__list_projects()` to verify the MCP server is reachable.
 
 On failure:
 ```
@@ -153,7 +153,7 @@ Agent(
   subagent_type="zaku:aosp-investigator",
   prompt="Verify and enrich AOSP code context for a VENDOR feature import.
 
-  **AOSP Project Override:** Use project '<source_project>' for ALL sourcepilot search calls. Do NOT read .granada/aosp-config.json — the project has been specified explicitly by the orchestrator.
+  **AOSP Project Override:** Use project '<source_project>' for ALL mcp__plugin_zaku_sourcepilot__* search calls. Do NOT read .granada/aosp-config.json — the project has been specified explicitly by the orchestrator.
 
   Component: <component.name>
   Expected file paths from export report:
@@ -180,7 +180,7 @@ Agent(
   subagent_type="zaku:aosp-investigator",
   prompt="Find corresponding AOSP code in the TARGET project for a vendor feature port.
 
-  **AOSP Project Override:** Use project '<target_project>' for ALL sourcepilot search calls. Do NOT read .granada/aosp-config.json — the project has been specified explicitly by the orchestrator.
+  **AOSP Project Override:** Use project '<target_project>' for ALL mcp__plugin_zaku_sourcepilot__* search calls. Do NOT read .granada/aosp-config.json — the project has been specified explicitly by the orchestrator.
 
   Component: <component.name>
   Source project paths (from a different AOSP tree):
@@ -236,7 +236,7 @@ Agent(
   subagent_type="zaku:aosp-investigator",
   prompt="Deep investigation for a MISSING/DIVERGED component in target AOSP project.
 
-  **AOSP Project Override:** Use project '<target_project>' for ALL sourcepilot search calls. Do NOT read .granada/aosp-config.json — the project has been specified explicitly by the orchestrator.
+  **AOSP Project Override:** Use project '<target_project>' for ALL mcp__plugin_zaku_sourcepilot__* search calls. Do NOT read .granada/aosp-config.json — the project has been specified explicitly by the orchestrator.
 
   Component: <component.name>
   Status: <DIVERGED|MISSING>
@@ -487,8 +487,8 @@ On approval: `Write {"active": false} to .granada/aosp-feature-import-state.json
 |----------|----------|
 | Export report file not found | `rm -f .granada/*-state.json` + abort with path suggestion |
 | Export report unparseable (missing required sections) | `rm -f .granada/*-state.json` + abort listing missing sections |
-| Source project unreachable via sourcepilot | Warn, continue with `--skip-source-verify` behavior |
-| Target project unreachable via sourcepilot | `rm -f .granada/*-state.json` + abort (target is required) |
+| Source project unreachable via AOSP MCP | Warn, continue with `--skip-source-verify` behavior |
+| Target project unreachable via AOSP MCP | `rm -f .granada/*-state.json` + abort (target is required) |
 | Source == Target project | `rm -f .granada/*-state.json` + abort with explanation |
 | No target project configured or specified | `rm -f .granada/*-state.json` + abort with setup instructions |
 | >50% of Phase 1 agents fail | Emit partial results with warning, continue with available data |
@@ -532,7 +532,7 @@ Note: Do not use `rm -f .granada/*-state.json` before launching `aosp-autopilot`
 
 ## Tool Usage
 
-- `sourcepilot`: MCP discovery (`list_tools`) and AOSP code search (via `aosp-investigator` subagents with explicit `project` parameter override)
+- `mcp__plugin_zaku_sourcepilot__*`: AOSP MCP health check (`list_projects`) and AOSP code search (via `aosp-investigator` subagents with explicit `project` parameter override)
 - `Agent(subagent_type="zaku:aosp-investigator")`: Parallel investigation of source and target projects
 - `Agent(subagent_type="zaku:architect")`: Architect review in Step 6c quality gate
 - `Agent(subagent_type="zaku:critic")`: Critic evaluation in Step 6c quality gate

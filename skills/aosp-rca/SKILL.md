@@ -92,7 +92,7 @@ Both modes save the report to `.granada/specs/`.
    - If no state exists: start fresh (normal flow)
 
 2. **MCP health check**:
-   - AOSP: call `sourcepilot(tool="list_tools")` — if fails, abort with "sourcepilot MCP unreachable. Check SOURCEPILOT_URL and SOURCEPILOT_KEY env vars."
+   - AOSP: call `mcp__plugin_zaku_sourcepilot__list_projects()` — if fails, abort with "AOSP MCP (sourcepilot) unreachable. Check SOURCEPILOT_URL and SOURCEPILOT_KEY env vars."
 
 4. **Display active AOSP project**:
    - If `--project` override was provided: display `**AOSP Project: <name> (命令行指定)**` and use this value for all subsequent phases. Skip reading `.granada/aosp-config.json`.
@@ -237,7 +237,7 @@ Group search targets into 2-3 clusters by subsystem, then spawn one aosp-investi
 Agent(
   subagent_type="zaku:aosp-investigator",
   model="sonnet",
-  prompt="[If --project override is active, prepend: **AOSP Project Override:** Use project `<name>` for ALL sourcepilot search calls. Do NOT read `.granada/aosp-config.json` — the project has been specified explicitly via CLI flag.]
+  prompt="[If --project override is active, prepend: **AOSP Project Override:** Use project `<name>` for ALL mcp__plugin_zaku_sourcepilot__* search calls. Do NOT read `.granada/aosp-config.json` — the project has been specified explicitly via CLI flag.]
 
 Search AOSP source code for this RCA target cluster from analysis <slug>.
 
@@ -245,7 +245,7 @@ Search target cluster from search-targets.json:
 <cluster with subsystem, components, libraries, functions, keywords, and error_patterns>
 
 For each target:
-1. Use sourcepilot — first call {tool: 'list_tools'} to discover available tools
+1. Use the mcp__plugin_zaku_sourcepilot__* tools (see Tool_Selection_Matrix in the investigator agent)
 2. Search for the class/function definition in AOSP
 3. Find error handling code paths, especially around the crash point
 4. Look for related comments, TODOs, known limitations
@@ -359,7 +359,7 @@ Spawn one agent per hypothesis (max 3). Each agent receives Phase 4 context to a
 Agent(
   subagent_type="zaku:aosp-investigator",
   model="sonnet",
-  prompt="[If --project override is active, prepend: **AOSP Project Override:** Use project `<name>` for ALL sourcepilot search calls. Do NOT read `.granada/aosp-config.json` — the project has been specified explicitly via CLI flag.]
+  prompt="[If --project override is active, prepend: **AOSP Project Override:** Use project `<name>` for ALL mcp__plugin_zaku_sourcepilot__* search calls. Do NOT read `.granada/aosp-config.json` — the project has been specified explicitly via CLI flag.]
 
 Investigate this Android crash hypothesis for analysis <slug>:
 
@@ -368,7 +368,7 @@ Hypothesis: <hypothesis_title>
 ## Pre-existing AOSP Context (from Phase 4 — DO NOT re-search these)
 
 The following AOSP source findings are already available. Use them directly as evidence.
-Only perform NEW sourcepilot searches for code paths NOT covered below.
+Only perform NEW mcp__plugin_zaku_sourcepilot__* searches for code paths NOT covered below.
 
 <Include aosp-context.md sections whose search target class/function names appear in
 the hypothesis's 'Stack frames to investigate' or 'Supporting anomalies'. Filter by
@@ -508,7 +508,7 @@ Report format:
 <Error_Handling>
 Embed these handlers throughout all phases:
 
-- **AOSP MCP unreachable** → abort with "sourcepilot MCP unreachable. Check SOURCEPILOT_URL and SOURCEPILOT_KEY env vars."
+- **AOSP MCP unreachable** → abort with "AOSP MCP (sourcepilot) unreachable. Check SOURCEPILOT_URL and SOURCEPILOT_KEY env vars."
 - **Input path does not exist** → abort with "Path not found: <path>"
 - **Input path is not a directory** → abort with "Path is not a directory: <path>. Provide a directory containing extracted Android logs."
 - **No Android log files found** → abort with "No Android log files found in the directory. Supported types: logcat, tombstone, ANR traces, kernel logs."
@@ -545,7 +545,7 @@ Update state at each phase boundary for resumability. On resume, read state via 
 </State_Schema>
 
 <Tool_Usage>
-- `sourcepilot` — search AOSP source for crash-related code (always, not conditional)
+- `mcp__plugin_zaku_sourcepilot__*` — search AOSP source for crash-related code (always, not conditional)
 - `Write` / `Read` / `Bash rm` — phase persistence via .granada/aosp-rca-state.json
 - `Agent(subagent_type="zaku:aosp-log-collector", model="sonnet")` — local log directory preparation and classification manifest generation (Phase 2)
 - `Agent(subagent_type="zaku:aosp-log-parser", model="sonnet")` — log parsing and timeline construction from the collector-generated classification manifest (Phase 3)
@@ -634,7 +634,7 @@ Why good: Correctly aborts early when path doesn't exist.
 
 <Guardrails>
 **Must have:**
-- sourcepilot for AOSP source (always, not conditional) — **Phase 4 AOSP 源码分析是必选阶段**，除非十分确认问题与 AOSP 源码完全无关才可跳过
+- mcp__plugin_zaku_sourcepilot__* for AOSP source (always, not conditional) — **Phase 4 AOSP 源码分析是必选阶段**，除非十分确认问题与 AOSP 源码完全无关才可跳过
 - aosp-investigator subagent for both Phase 4 (AOSP context) and Phase 5 (hypothesis investigation)
 - Lightweight state (<10KB, file paths not data)
 - All 7 report sections (in Chinese)

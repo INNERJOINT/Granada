@@ -16,16 +16,27 @@ claude plugin install .
 
 ## Tools
 
-### sourcepilot (MCP tool)
+### sourcepilot (MCP server)
 
 Proxies requests to a remote AOSP MCP server for code search. Configure via plugin userConfig (prompted at enable time):
 
 - `SOURCEPILOT_URL` — Remote AOSP MCP server endpoint
 - `SOURCEPILOT_KEY` — Authentication key (stored securely)
 
-Usage: `sourcepilot { tool: "search_code", arguments: { project: "android", query: "..." } }`
+When loaded as the `zaku` plugin, the MCP server is namespaced and each remote operation is exposed as its own tool under `mcp__plugin_zaku_sourcepilot__*`.
 
-Available remote tools: `list_projects`, `list_repos`, `search_code`, `search_symbol`, `search_file`, `search_regex`, `get_file_content`, `list_tools`
+Usage: `mcp__plugin_zaku_sourcepilot__search_code({ project: "android", query: "..." })`
+
+Available tools:
+- `mcp__plugin_zaku_sourcepilot__list_projects`
+- `mcp__plugin_zaku_sourcepilot__list_repos`
+- `mcp__plugin_zaku_sourcepilot__search_code`
+- `mcp__plugin_zaku_sourcepilot__search_symbol`
+- `mcp__plugin_zaku_sourcepilot__search_file`
+- `mcp__plugin_zaku_sourcepilot__search_regex`
+- `mcp__plugin_zaku_sourcepilot__get_file_content`
+
+Subagent `tools:` frontmatter should grant access via the wildcard `mcp__plugin_zaku_sourcepilot__*`.
 
 ## Skills
 

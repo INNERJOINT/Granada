@@ -88,13 +88,13 @@ Group search targets into 2-3 clusters by subsystem, then spawn one aosp-investi
 ```
 Agent(
   subagent_type="zaku:aosp-investigator",
-  prompt="[If --project override is active, prepend: **AOSP Project Override:** Use project `<name>` for ALL sourcepilot search calls. Do NOT read `.granada/aosp-config.json`.]
+  prompt="[If --project override is active, prepend: **AOSP Project Override:** Use project `<name>` for ALL mcp__plugin_zaku_sourcepilot__* search calls. Do NOT read `.granada/aosp-config.json`.]
 
 Search AOSP source code for this RCA target cluster from search-targets.json:
 <cluster with subsystem, components, libraries, functions, keywords, and error_patterns>
 
 For each target:
-1. Use sourcepilot — first call {tool: 'list_tools'} to discover available tools
+1. Use the mcp__plugin_zaku_sourcepilot__* tools (see Tool_Selection_Matrix in the investigator agent)
 2. Search for the class/function definition in AOSP
 3. Find error handling code paths, especially around the crash point
 4. Look for related comments, TODOs, known limitations
@@ -194,7 +194,7 @@ Spawn one agent per hypothesis (max 3). Each agent receives Phase 4 context to a
 ```
 Agent(
   subagent_type="zaku:aosp-investigator",
-  prompt="[If --project override is active, prepend: **AOSP Project Override:** Use project `<name>` for ALL sourcepilot search calls.]
+  prompt="[If --project override is active, prepend: **AOSP Project Override:** Use project `<name>` for ALL mcp__plugin_zaku_sourcepilot__* search calls.]
 
 Investigate this Android crash hypothesis for <MODE_NAME> analysis <ANALYSIS_ID>:
 
@@ -203,7 +203,7 @@ Hypothesis: <hypothesis_title>
 ## Pre-existing AOSP Context (from Phase 4 — DO NOT re-search these)
 
 The following AOSP source findings are already available. Use them directly as evidence.
-Only perform NEW sourcepilot searches for code paths NOT covered below.
+Only perform NEW mcp__plugin_zaku_sourcepilot__* searches for code paths NOT covered below.
 
 <For each hypothesis, include aosp-context.md sections whose search target class/function
 names appear in the hypothesis's 'Stack frames to investigate' list or 'Supporting anomalies'

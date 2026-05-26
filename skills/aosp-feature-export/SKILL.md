@@ -7,7 +7,7 @@ level: 3
 
 # AOSP Feature Export Skill
 
-Documents vendor/third-party features added on top of AOSP. Takes a feature description and GitLab MR/commit URLs (vendor changes) as input, fetches diffs via GitLab MCP tools to identify modification points, then uses `sourcepilot` to search the AOSP codebase for the original code being modified or extended. Outputs a comprehensive Chinese-language markdown document that maps the vendor feature across AOSP layers, archived to `.granada/aosp-exports/`.
+Documents vendor/third-party features added on top of AOSP. Takes a feature description and GitLab MR/commit URLs (vendor changes) as input, fetches diffs via GitLab MCP tools to identify modification points, then uses the `mcp__plugin_zaku_sourcepilot__*` tools to search the AOSP codebase for the original code being modified or extended. Outputs a comprehensive Chinese-language markdown document that maps the vendor feature across AOSP layers, archived to `.granada/aosp-exports/`.
 
 **Key distinction:** The feature being documented is NOT an AOSP built-in feature. It is a vendor customization — code added or modified by the third-party vendor on top of AOSP. The AOSP search phase finds the original context that the vendor code interacts with.
 
@@ -46,7 +46,7 @@ Write JSON to .granada/aosp-feature-export-state.json with, active=true, task_de
 
 ### Step 1: Health Check
 
-Call `sourcepilot` with `tool: "list_tools"` to verify MCP server reachability. Then issue one lightweight search query to confirm upstream is responding.
+Call `mcp__plugin_zaku_sourcepilot__list_projects()` to verify the MCP server is reachable and upstream is responding.
 
 After health check passes, read `.granada/aosp-config.json` to display the active AOSP project:
 - If configured: display `**🔍 AOSP Project: <project_name>**` prominently

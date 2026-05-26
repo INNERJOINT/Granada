@@ -63,7 +63,7 @@ Automates Android bug root-cause analysis by fetching JIRA issue details via mcp
 
 2. **MCP health checks** (run both in parallel):
    - JIRA: call `jira_get_issue(issue_key=<KEY>, fields="summary")` — if fails, abort with "mcp-atlassian unreachable. Check JIRA_URL, JIRA_USERNAME, JIRA_API_TOKEN env vars."
-   - AOSP: call `sourcepilot(tool="list_tools")` — if fails, abort with "sourcepilot MCP unreachable. Check SOURCEPILOT_URL and SOURCEPILOT_KEY env vars."
+   - AOSP: call `mcp__plugin_zaku_sourcepilot__list_projects()` — if fails, abort with "AOSP MCP (sourcepilot) unreachable. Check SOURCEPILOT_URL and SOURCEPILOT_KEY env vars."
 
 3. **Display active AOSP project**:
    - If `--project` override was provided: display `**🔍 AOSP Project: <name> (命令行指定)**` and use this value for all subsequent phases. Skip reading `.granada/aosp-config.json`.
@@ -170,7 +170,7 @@ Group search targets into 2-3 clusters by subsystem, then spawn one aosp-investi
 Agent(
   subagent_type="zaku:aosp-investigator",
   model="sonnet",
-  prompt="[If --project override is active, prepend: **AOSP Project Override:** Use project `<name>` for ALL sourcepilot search calls. Do NOT read `.granada/aosp-config.json` — the project has been specified explicitly via CLI flag.]
+  prompt="[If --project override is active, prepend: **AOSP Project Override:** Use project `<name>` for ALL mcp__plugin_zaku_sourcepilot__* search calls. Do NOT read `.granada/aosp-config.json` — the project has been specified explicitly via CLI flag.]
 
 Search AOSP source code for the following crash-related classes/functions from JIRA issue <KEY>.
 
@@ -178,7 +178,7 @@ Search targets:
 <list of class names, function names, native libraries from anomalies>
 
 For each target:
-1. Use sourcepilot — first call {tool: 'list_tools'} to discover available tools
+1. Use the mcp__plugin_zaku_sourcepilot__* tools (see Tool_Selection_Matrix in the investigator agent)
 2. Search for the class/function definition in AOSP
 3. Find error handling code paths, especially around the crash point
 4. Look for related comments, TODOs, known limitations
@@ -257,7 +257,7 @@ Spawn one agent per hypothesis (max 3). Each agent receives Phase 4 context to a
 Agent(
   subagent_type="zaku:aosp-investigator",
   model="sonnet",
-  prompt="[If --project override is active, prepend: **AOSP Project Override:** Use project `<name>` for ALL sourcepilot search calls. Do NOT read `.granada/aosp-config.json` — the project has been specified explicitly via CLI flag.]
+  prompt="[If --project override is active, prepend: **AOSP Project Override:** Use project `<name>` for ALL mcp__plugin_zaku_sourcepilot__* search calls. Do NOT read `.granada/aosp-config.json` — the project has been specified explicitly via CLI flag.]
 
 Investigate this Android crash hypothesis for JIRA issue <KEY>:
 
@@ -266,7 +266,7 @@ Hypothesis: <hypothesis_title>
 ## Pre-existing AOSP Context (from Phase 4 — DO NOT re-search these)
 
 The following AOSP source findings are already available. Use them directly as evidence.
-Only perform NEW sourcepilot searches for code paths NOT covered below.
+Only perform NEW mcp__plugin_zaku_sourcepilot__* searches for code paths NOT covered below.
 
 <Include aosp-context.md sections whose search target class/function names appear in
 the hypothesis's 'Stack frames to investigate' or 'Supporting anomalies'. Filter by
@@ -434,7 +434,7 @@ Update state at each phase boundary for resumability. On resume, read state via 
 - `Agent(subagent_type="zaku:aosp-analyst", model="opus")` — hypothesis generation (Phase 5)
 - `Agent(subagent_type="zaku:aosp-investigator", model="sonnet")` — AOSP source search (Phase 4) and parallel hypothesis investigation (Phase 5)
 - `jira_add_comment` — post RCA report as comment on JIRA issue (mcp-atlassian)
-- `sourcepilot` — search AOSP source for crash-related code (always, not conditional)
+- `mcp__plugin_zaku_sourcepilot__*` — search AOSP source for crash-related code (always, not conditional)
 - `Write` / `Read` / `Bash rm` — phase persistence via .granada/jira-analyze-state.json and final report output
 </Tool_Usage>
 
@@ -490,7 +490,7 @@ Why bad: AOSP search must run for ALL hypotheses, not just the highest-ranked on
 - `aosp-log-collector` subagent for JIRA issue metadata, log collection, archive handling, extracted directory preparation, and classification manifest generation
 - `aosp-log-parser` subagent for parsing the collector-generated classification manifest, timeline merge, and anomaly merge
 - mcp-atlassian for JIRA access (not jira-cli)
-- sourcepilot for AOSP source (always, not conditional) — **Phase 4 AOSP 源码分析是必选阶段**，除非十分确认问题与 AOSP 源码完全无关才可跳过
+- mcp__plugin_zaku_sourcepilot__* for AOSP source (always, not conditional) — **Phase 4 AOSP 源码分析是必选阶段**，除非十分确认问题与 AOSP 源码完全无关才可跳过
 - aosp-investigator subagent for both Phase 4 (AOSP context) and Phase 5 (hypothesis investigation)
 - Lightweight state (<10KB, file paths not data)
 - All 7 report sections (in Chinese)

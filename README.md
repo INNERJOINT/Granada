@@ -54,9 +54,9 @@ cd Granada && claude plugin install .
 
 ### sourcepilot (MCP)
 
-Proxies requests to a remote AOSP MCP server for code search across multiple Android projects.
+Proxies requests to a remote AOSP MCP server for code search across multiple Android projects. When loaded via the `zaku` plugin, tools are exposed under the `mcp__plugin_zaku_sourcepilot__*` namespace.
 
-Available operations: `list_projects`, `search_code`, `search_symbol`, `search_file`, `search_regex`, `get_file_content`
+Available tools: `mcp__plugin_zaku_sourcepilot__list_projects`, `mcp__plugin_zaku_sourcepilot__search_code`, `mcp__plugin_zaku_sourcepilot__search_symbol`, `mcp__plugin_zaku_sourcepilot__search_file`, `mcp__plugin_zaku_sourcepilot__search_regex`, `mcp__plugin_zaku_sourcepilot__get_file_content`
 
 ## Agents
 

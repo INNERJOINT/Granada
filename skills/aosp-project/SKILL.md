@@ -12,7 +12,7 @@ level: 1
 
 # AOSP Project Selection Skill
 
-List available AOSP projects from the remote MCP server and select one as the active project. The selection is saved to `.granada/aosp-config.json` and used by all sourcepilot-based skills (`aosp-feature-export`, `aosp-plan`, `jira-analyze`) and the `aosp-investigator` agent.
+List available AOSP projects from the remote MCP server and select one as the active project. The selection is saved to `.granada/aosp-config.json` and used by all `mcp__plugin_zaku_sourcepilot__*`-based skills (`aosp-feature-export`, `aosp-plan`, `jira-analyze`) and the `aosp-investigator` agent.
 
 ## Usage
 
@@ -40,28 +40,22 @@ Read `.granada/aosp-config.json` via `Read` tool.
   **当前未配置 AOSP 项目** — 搜索将不限定项目范围
   ```
 
-### Step 2: MCP Health Check
+### Step 2: MCP Health Check + Fetch Projects
 
-Call `sourcepilot(tool: "list_tools")` to verify the MCP server is reachable and discover available tool names.
+Call `mcp__plugin_zaku_sourcepilot__list_projects()` to verify the MCP server is reachable and fetch the project list in a single round trip.
 
-On failure, abort with:
+On failure (network error, auth error, or the tool is not registered), abort with:
 ```
 AOSP MCP server unreachable. Check SOURCEPILOT_URL and SOURCEPILOT_KEY environment variables.
 ```
 
-### Step 3: Discover Project Listing Tool
-
-From the `list_tools` result, find the tool that lists available projects (expected name: `list_projects`).
-
-If no project-listing tool is found, abort with:
+If the call returns an empty list, abort with:
 ```
-AOSP MCP server does not support project listing. You can set the project manually:
+AOSP MCP server returned no projects. You can set the project manually:
 Write {"project": "<project-name>"} to .granada/aosp-config.json
 ```
 
-### Step 4: Fetch and Display Projects
-
-Call `sourcepilot(tool: "<discovered_project_list_tool>", arguments: {})` to fetch all available projects. The `sourcepilot` tool auto-detects whether the remote server requires arguments wrapped in an `inp` object, so always pass flat key-value arguments.
+### Step 4: Display Projects
 
 Display as a numbered list:
 
@@ -114,13 +108,13 @@ Display the result prominently:
 ```
 ✅ AOSP 项目已设置为: <project_name>
 
-所有 sourcepilot 搜索将限定在此项目范围内。
+所有 AOSP 源码搜索将限定在此项目范围内。
 使用 /zaku:aosp-project 可随时更改。
 ```
 
 ## Tool Usage
 
-- `sourcepilot`: MCP discovery (`list_tools`) and project listing (`list_projects`). Arguments are automatically wrapped in `inp` by the sourcepilot tool.
+- `mcp__plugin_zaku_sourcepilot__list_projects`: Lists available AOSP projects from the remote MCP server. Doubles as the MCP health check.
 - `Read`: Read current config from `.granada/aosp-config.json`
 - `Write`: Save config to `.granada/aosp-config.json`
 - `AskUserQuestion`: Interactive project selection
@@ -128,8 +122,7 @@ Display the result prominently:
 ## Error Handling
 
 - **MCP unreachable**: Abort with env var guidance (Step 2)
-- **No project-listing tool**: Abort with manual config instructions (Step 3)
-- **No projects returned**: Display "MCP server returned no projects. Check server configuration."
+- **No projects returned**: Display "MCP server returned no projects. Check server configuration." (Step 2)
 - **Stale project**: Warn user if current config points to a project not in the server's list (Step 4)
 - **Write failure**: Report the error; user can retry or write manually
 
