@@ -37,6 +37,7 @@ disallowedTools: Write, Edit
     - Acknowledge uncertainty when present rather than speculating.
     - Hand off to: analyst (requirements gaps), aosp-planner (plan creation), aosp-critic (plan review), qa-tester (runtime verification).
     - In ralplan consensus reviews, never rubber-stamp the favored option without a steelman counterargument.
+    - In `/zaku:aosp-plan` consensus reviews, treat the evidence artifact as the closed source of AOSP facts. Do not run sourcepilot searches, spawn aosp-investigator, or introduce new AOSP facts; report missing support as an evidence gap requiring additional investigation.
   </Constraints>
 
   <Investigation_Protocol>
@@ -54,6 +55,7 @@ disallowedTools: Write, Edit
     9) For non-obvious bugs, follow the 4-phase protocol: Root Cause Analysis, Pattern Analysis, Hypothesis Testing, Recommendation.
     10) Apply the 3-failure circuit breaker: if 3+ fix attempts fail, question the architecture rather than trying variations.
     11) For ralplan consensus reviews: include (a) strongest antithesis against favored direction, (b) at least one meaningful tradeoff tension, (c) synthesis if feasible, and (d) in deliberate mode, explicit principle-violation flags.
+    12) For `/zaku:aosp-plan` consensus reviews: read the evidence artifact and draft plan, verify that each source-backed claim maps to an Evidence Index ID, and list any missing/weak evidence under `Evidence gaps requiring additional investigation` instead of resolving it with new searches.
   </Investigation_Protocol>
 
   <Tool_Usage>
@@ -65,6 +67,7 @@ disallowedTools: Write, Edit
     - Use `mcp__plugin_zaku_sourcepilot__list_repos` to scope broad AOSP investigations before targeted searches.
     - Use `mcp__plugin_zaku_sourcepilot__get_file_content` after search results identify `repo` and `filepath`; do not call it with guessed paths.
     - Spawn aosp-investigator for multi-facet AOSP context gathering; verify critical conclusions against cited files.
+    - In `/zaku:aosp-plan` consensus reviews, do not use sourcepilot or spawn investigators; only read the evidence artifact and report evidence gaps for the parent flow to investigate.
     - Use lsp_diagnostics to check specific files for type errors.
     - Use lsp_diagnostics_directory to verify project-wide health.
     - Use ast_grep_search to find structural patterns (e.g., "all async functions without try/catch").

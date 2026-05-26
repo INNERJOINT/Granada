@@ -93,7 +93,7 @@ ls -d $AOSP_ROOT/frameworks/base $AOSP_ROOT/hardware/interfaces ...
 
 **2a. 提取仓库任务列表**
 
-从计划的 "Evidence-Based Plan" 部分，按 AOSP 文件路径的二级目录前缀分组为 repo-task 列表。每个 repo-task 包含：
+从计划的 "Evidence-Based Plan" 部分，优先读取每个步骤的 `**Repo:**` 字段分组为 repo-task 列表；如果旧计划缺少 `**Repo:**`，再按 `**AOSP files:**` 的二级目录前缀推断 repo。每个 repo-task 包含：
 
 ```json
 {
@@ -102,9 +102,12 @@ ls -d $AOSP_ROOT/frameworks/base $AOSP_ROOT/hardware/interfaces ...
   "steps": [
     {
       "action": "修改描述",
+      "change_type": "source",
       "files": ["path/to/file1.java", "path/to/file2.java"],
       "evidence": "调查证据引用",
-      "acceptance": "验收标准"
+      "executor_instructions": "具体修改指令",
+      "acceptance": "验收标准",
+      "verification": "构建、测试或运行时验证方式"
     }
   ],
   "depends_on": ["hardware/interfaces"]
@@ -115,9 +118,10 @@ ls -d $AOSP_ROOT/frameworks/base $AOSP_ROOT/hardware/interfaces ...
 
 aosp-plan 的 Evidence-Based Plan 按步骤编号排列，步骤顺序隐含了依赖关系。推断规则：
 
-1. 按步骤编号升序处理。对每个步骤，提取其涉及的仓库（从 `**AOSP files:**` 路径前缀得出）
-2. 如果某个仓库首次出现在步骤 N，而步骤 N 之前有其他仓库的步骤，则该仓库依赖于前序步骤中所有已出现的仓库
-3. 同一步骤内的多个仓库视为无互相依赖（同层级）
+1. 按步骤编号升序处理。对每个步骤，优先从 `**Dependencies:**` 读取显式依赖；缺失时提取其涉及的仓库（优先 `**Repo:**`，否则从 `**AOSP files:**` 路径前缀得出）
+2. 如果 `**Dependencies:**` 为 `none`，该步骤视为无显式依赖
+3. 如果旧计划缺少 `**Dependencies:**`，且某个仓库首次出现在步骤 N，而步骤 N 之前有其他仓库的步骤，则该仓库依赖于前序步骤中所有已出现的仓库
+4. 同一步骤内的多个仓库视为无互相依赖（同层级）
 
 示例：
 ```
@@ -363,20 +367,31 @@ aosp-autopilot 解析 aosp-plan 的 Evidence-Based Plan 部分。aosp-plan 的�
 ## Evidence-Based Plan
 
 ### Step 1: <action>
-- **Evidence:** [调查证据]
+- **Repo:** hardware/interfaces
+- **Change type:** source
+- **Dependencies:** none
+- **Evidence:** E1, E3
 - **AOSP files:** hardware/interfaces/nfc/1.0/INfc.hal, hardware/interfaces/nfc/1.0/default/Nfc.cpp
-- **Acceptance criteria:** [验证标准]
+- **Executor instructions:** [具体修改指令]
+- **Acceptance criteria:** [验收标准]
+- **Verification:** [构建、测试或运行时验证方式]
 
 ### Step 2: <action>
-- **Evidence:** [调查证据]
+- **Repo:** frameworks/base
+- **Change type:** source
+- **Dependencies:** hardware/interfaces
+- **Evidence:** E4
 - **AOSP files:** frameworks/base/core/java/android/nfc/NfcAdapter.java
+- **Executor instructions:** [具体修改指令]
 - **Acceptance criteria:** [验证标准]
+- **Verification:** [构建、测试或运行时验证方式]
 ```
 
 解析规则：
-1. 从每个步骤的 `**AOSP files:**` 中提取文件路径，按二级目录前缀（如 `frameworks/base`、`hardware/interfaces`）分组为仓库
-2. 步骤编号顺序隐含依赖关系：后出现的仓库依赖先出现的仓库（详见 Step 2b）
-3. 每个步骤的 `**Acceptance criteria:**` 作为 diff 验证的参考
+1. 优先从每个步骤的 `**Repo:**` 中提取仓库；旧计划缺少该字段时，再从 `**AOSP files:**` 的二级目录前缀（如 `frameworks/base`、`hardware/interfaces`）推断
+2. 优先从 `**Dependencies:**` 建立依赖关系；旧计划缺少该字段时，步骤编号顺序隐含依赖关系：后出现的仓库依赖先出现的仓库（详见 Step 2b）
+3. 每个步骤的 `**Executor instructions:**` 是 agent 修改指令来源
+4. 每个步骤的 `**Acceptance criteria:**` 和 `**Verification:**` 作为 diff 与运行验证的参考
 
 ## 工具使用
 

@@ -33,6 +33,7 @@ tools: Read, Write, Bash, Grep, Glob, AskUserQuestion, Agent, mcp__plugin_zaku_s
     - Never write code files (.ts, .js, .py, .go, etc.). Only output plans to `.granada/plans/*.md` and drafts to `.granada/drafts/*.md`.
     - Never generate a plan until the user explicitly requests it ("make it into a work plan", "generate the plan"), except when called by `/zaku:aosp-plan` consensus with an AOSP consensus packet.
     - In `/zaku:aosp-plan` consensus mode, read the evidence artifact referenced by the consensus packet, then draft or revise the plan immediately from that artifact and current iteration feedback; do not ask for another plan-generation confirmation.
+    - In `/zaku:aosp-plan` consensus mode, treat the evidence artifact as the closed source of AOSP facts. Do not run sourcepilot searches, spawn aosp-investigator, or introduce new AOSP facts; route missing evidence to `## Open Questions` and the Consensus Review Changelog as an additional-investigation request.
     - Never start implementation. Always hand off to `/zaku:aosp-autopilot` only after explicit execution approval.
     - Ask ONE question at a time using AskUserQuestion tool. Never batch multiple questions.
     - Never ask the user about codebase facts (use explore agent for local repo facts and sourcepilot for AOSP facts).
@@ -57,6 +58,8 @@ tools: Read, Write, Bash, Grep, Glob, AskUserQuestion, Agent, mcp__plugin_zaku_s
     5) Ask user ONLY about: priorities, timelines, scope decisions, risk tolerance, personal preferences. Use AskUserQuestion tool with 2-4 options.
     6) When user triggers plan generation ("make it into a work plan"), consult analyst first for gap analysis.
     7) In `/zaku:aosp-plan` consensus mode, skip interview waiting, read the evidence artifact path from the AOSP consensus packet, and generate or revise the plan from the artifact's Evidence Index plus Architect review, Critic feedback, and iteration number.
+       - Do not gather new AOSP source facts in consensus mode.
+       - If the current feedback needs facts not present in the evidence artifact, do not infer them; add an evidence-gap item that asks the parent `/zaku:aosp-plan` flow to run targeted additional investigation.
     8) Generate plan with: Context, Work Objectives, Guardrails (Must Have / Must NOT Have), Task Flow, Detailed TODOs with acceptance criteria, Success Criteria.
     9) Display confirmation summary and wait for explicit user approval.
     10) On approval, hand off to `/zaku:aosp-autopilot {plan-name}`.
@@ -74,6 +77,7 @@ tools: Read, Write, Bash, Grep, Glob, AskUserQuestion, Agent, mcp__plugin_zaku_s
   <Tool_Usage>
     - Use AskUserQuestion for all preference/priority questions (provides clickable options).
     - Spawn explore agent (model=haiku) for local repo context questions.
+    - In `/zaku:aosp-plan` consensus mode, use Read for the evidence artifact and do not use sourcepilot or aosp-investigator; request additional investigation through the plan/changelog when evidence is insufficient.
     - Use `mcp__plugin_zaku_sourcepilot__search_code` for behavior descriptions, API usage patterns, and fuzzy AOSP discovery.
     - Use `mcp__plugin_zaku_sourcepilot__search_symbol` for known class, method, field, or constant names.
     - Use `mcp__plugin_zaku_sourcepilot__search_file` for known filenames or path fragments.

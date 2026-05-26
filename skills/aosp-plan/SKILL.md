@@ -118,10 +118,17 @@ Merge all investigation results:
 
 After synthesis, build and save an **Evidence Artifact** containing the full investigation context plus a compact **Evidence Index**. Each cited AOSP fact that may influence planning gets a stable ID.
 
-Derive the same slug that Step 6 will use for the final plan and save the artifact before consensus to:
+Derive the final artifact slug once before saving evidence, then reuse that exact slug in Step 6 for the final plan:
+- Lowercase the query, convert whitespace runs to `-`, strip characters outside `a-z`, `0-9`, and `-`, collapse repeated `-`, and trim leading/trailing `-`.
+- Limit the slug body to 64 characters after normalization.
+- If normalization produces an empty slug, use `plan`.
+- If either `.granada/plans/aosp-<slug>.md` or `.granada/plans/aosp-<slug>-evidence.md` already exists, append `-2`, `-3`, etc. until both paths are free.
+- The evidence artifact, consensus packet, final plan path, and final summary MUST all use this resolved slug; do not recompute it later.
+
+Save the artifact before consensus to:
 
 ```text
-.granada/plans/aosp-<slug>-evidence.md
+.granada/plans/aosp-<resolved-slug>-evidence.md
 ```
 
 The evidence artifact MUST use this structure:
@@ -153,7 +160,10 @@ Rules:
 - `strength` describes how directly the evidence supports the planning claim: `direct`, `indirect`, or `weak`.
 - `facet` maps the evidence to the investigation taxonomy: `entrypoint`, `owner`, `boundary`, `config`, `tests`, or `risk`.
 - Planner, Architect, and Critic MUST read the evidence artifact and cite `E#` IDs in plan steps, risk analysis, and review findings instead of repeating long snippets.
-- Planner, Architect, and Critic MUST treat `weak` or `assumption` entries as insufficient support for code-modifying steps unless paired with `direct` source/test/config evidence.
+- Every code-modifying plan step MUST cite at least one Evidence Index entry with `type: source` and `strength: direct`.
+- `test` or `config` evidence can support verification/build/config work, but MUST NOT be the only evidence for source-code modification steps.
+- `weak` evidence can only support exploratory, verification, or follow-up steps unless paired with direct source evidence.
+- `assumption` entries MUST be routed to `## Open Questions` or non-executing follow-ups; they MUST NOT support executor instructions or code-modifying steps.
 - Consensus agent prompts should pass the evidence artifact path plus a compact summary, not the full investigator output inline.
 - The final `## Sources` section must expand each cited `E#` to the full repo/path, metadata, and relevant snippet summary.
 
@@ -183,7 +193,14 @@ Build a compact **AOSP consensus packet** and pass it to every consensus agent. 
 - Previous `ARCHITECT_REVIEW`, if any
 - Previous Critic verdict and feedback, if any
 
-The full investigator outputs MUST live in the evidence artifact, not be repeated inline in every consensus prompt. Previous fields are empty on iteration 1. Do not allow consensus agents to invent uncited AOSP facts; they must read the evidence artifact before making source-backed claims.
+The full investigator outputs MUST live in the evidence artifact, not be repeated inline in every consensus prompt. Previous fields are empty on iteration 1.
+
+Consensus evidence scope:
+- Planner, Architect, and Critic MUST treat the evidence artifact as the closed source of AOSP facts during Step 5.
+- Consensus agents MUST NOT run sourcepilot searches, spawn aosp-investigator, or introduce new uncited AOSP facts during Step 5.
+- If a consensus agent finds missing, weak, contradictory, or stale evidence, it MUST mark the affected item as an evidence gap and request additional investigation instead of filling the gap itself.
+- Additional investigation is handled by returning to Step 2/3, updating the evidence artifact with new investigator output and new Evidence Index IDs, then restarting or continuing consensus with the updated artifact.
+- Local file reads are allowed only for reading the evidence artifact, draft plan, and local zaku skill/agent instructions; they are not a substitute for new AOSP evidence.
 
 #### Step 5a: Planner draft/revision
 
@@ -215,9 +232,14 @@ Planner MUST create or revise the draft AOSP plan with this structure:
 
 ## Evidence-Based Plan
 ### Step 1: <action>
-- **Evidence:** [Evidence Index IDs, e.g. E1, E3]
-- **AOSP files:** [relevant AOSP source files]
+- **Repo:** `<repo path, e.g. frameworks/base>`
+- **Change type:** source|test|config|build|sepolicy|docs|verification
+- **Dependencies:** [Step IDs or repo paths that must land first; `none` if independent]
+- **Evidence:** [Evidence Index IDs, e.g. E1, E3; code-modifying steps require at least one `type: source`, `strength: direct` ID]
+- **AOSP files:** [repo-relative or AOSP-root-relative files; must be specific enough for aosp-autopilot to group by repo]
+- **Executor instructions:** [concrete modification guidance for the executor; no assumptions or unresolved questions]
 - **Acceptance criteria:** [how to verify this step is complete]
+- **Verification:** [specific build/test/runtime command or observable outcome, e.g. CTS, VTS, m, adb, dumpsys, logcat]
 
 ## Risks and Mitigations
 ## Open Questions
@@ -271,6 +293,7 @@ Architect MUST return a structured `ARCHITECT_REVIEW` containing:
 - Blocking concerns
 - Required changes
 - Advisory changes
+- Evidence gaps requiring additional investigation
 - Strongest antithesis
 - Tradeoff tensions
 - Approval recommendation
@@ -317,17 +340,23 @@ The consensus loop is capped at 5 iterations:
 3. Critic evaluates the draft and returns exactly one `VERDICT`.
 4. Only `VERDICT: APPROVE` exits the loop.
 5. `VERDICT: ITERATE`, `VERDICT: REJECT`, missing verdict, malformed verdict, or ambiguous verdict means Planner MUST revise the plan using Architect and Critic feedback, add a Consensus Review Changelog entry, then rerun Architect and Critic.
-6. If 5 iterations complete without approval, save the best available version with unresolved blockers clearly listed. The saved plan remains `**Status:** pending approval`.
+6. If Architect or Critic reports evidence gaps requiring additional investigation, pause the consensus loop, return to Step 2/3 for targeted investigation, update the evidence artifact with new Evidence Index IDs, then resume consensus with the updated artifact.
+7. If 5 iterations complete without approval, save the best available version with unresolved blockers clearly listed. The saved plan remains `**Status:** pending approval`.
 
 `VERDICT: REJECT` is non-terminal inside the Step 5 consensus loop. Step 7 user rejection remains terminal.
 
 #### Step 5e: Quality criteria
 
 Critic MUST reject or iterate on:
+- Any Evidence-Based Plan step missing `Repo`, `Change type`, `Dependencies`, `Evidence`, `AOSP files`, `Executor instructions`, `Acceptance criteria`, or `Verification`
 - Fewer than 80% of plan steps cite Evidence Index IDs backed by AOSP source files from investigation results
-- Any code-modifying step is backed only by `weak` or `assumption` Evidence Index entries without paired `direct` source/test/config evidence
+- Any code-modifying step without at least one Evidence Index ID marked `type: source` and `strength: direct`
+- Any source-code modification step backed only by `test`, `config`, `log`, `weak`, or `assumption` evidence
+- Any executor instruction supported by an `assumption` Evidence Index entry
 - Fewer than 90% of acceptance criteria reference verifiable outcomes such as CTS, VTS, build, adb, dumpsys, or logcat
 - Steps not backed by investigation evidence
+- Consensus review that introduces source-backed AOSP claims not present in the evidence artifact
+- Evidence gaps handled by ad hoc Architect/Critic searches instead of returning to targeted investigation
 - Subsystem boundary crossings without acknowledgment
 - @hide/@SystemApi stability risks not flagged where relevant
 - Missing build system references for code-modifying steps
@@ -341,11 +370,13 @@ Critic MUST reject or iterate on:
 
 Before saving, assert the plan contains exactly one `**Status:** pending approval`, and it is the first body line after the title. All saved plans MUST remain pending approval.
 
-Derive a slug from the query: lowercase, spaces to hyphens, strip special chars. Save to:
+Use the resolved slug from Step 4. Do not recompute, shorten, or renumber it during save. Save to:
 
 ```
-.granada/plans/aosp-<slug>.md
+.granada/plans/aosp-<resolved-slug>.md
 ```
+
+Before writing, verify that the plan path still does not exist. If it now exists because of a concurrent run, return to Step 4 slug collision handling, choose the next available numeric suffix, rename/rewrite the evidence artifact to match, and update the consensus packet/final summary paths.
 
 Confirm the save path to the user after writing.
 

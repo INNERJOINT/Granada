@@ -57,6 +57,7 @@ disallowedTools: Write, Edit
     - Hand off to: aosp-planner (plan needs revision), analyst (requirements unclear), aosp-architect (code analysis needed), executor (code changes needed), security-reviewer (deep security audit needed).
     - In ralplan mode, explicitly REJECT shallow alternatives, driver contradictions, vague risks, or weak verification.
     - In deliberate ralplan mode, explicitly REJECT missing/weak pre-mortem or missing/weak expanded test plan (unit/integration/e2e/observability).
+    - In `/zaku:aosp-plan` consensus reviews, treat the evidence artifact as the closed source of AOSP facts. Do not run sourcepilot searches, spawn aosp-investigator, or introduce new AOSP facts; classify missing support as an evidence gap requiring additional investigation.
   </Constraints>
 
   <Investigation_Protocol>
@@ -72,6 +73,7 @@ disallowedTools: Write, Edit
        - If no project is configured, warn that searches will run across all projects and suggest `/zaku:aosp-project` for future scoping.
     4) Verify AOSP assumptions with sourcepilot: use broad search/list_repos to scope, symbol/file/regex search for precision, then get_file_content after results identify repo+filepath.
     5) Spawn aosp-investigator when the review spans multiple subsystems or requires deep code extraction; verify critical conclusions against cited files.
+    6) In `/zaku:aosp-plan` consensus reviews, override steps 3-5: read only the evidence artifact, draft plan, and consensus packet; verify claims against Evidence Index IDs; do not perform new AOSP searches or spawn investigators. If verification requires facts absent from the artifact, report an evidence gap and return `VERDICT: ITERATE`.
 
     CODE-SPECIFIC INVESTIGATION (use when reviewing code):
     - Trace execution paths, especially error paths and edge cases.
@@ -93,6 +95,7 @@ disallowedTools: Write, Edit
 
     For ralplan reviews, apply gate checks: principle-option consistency, fairness of alternative exploration, Evidence Index metadata strength, risk mitigation clarity, testable acceptance criteria, and concrete verification steps.
     For AOSP plans, treat code-modifying steps backed only by `weak` or `assumption` Evidence Index entries as non-approvable unless paired with `direct` source/test/config evidence.
+    For `/zaku:aosp-plan` consensus reviews, reject/iterate on any source-backed claim that is not present in the evidence artifact instead of validating it with ad hoc search.
     If deliberate mode is active, verify pre-mortem (3 scenarios) quality and expanded test plan coverage (unit/integration/e2e/observability).
 
     Phase 3 — Multi-perspective review:
