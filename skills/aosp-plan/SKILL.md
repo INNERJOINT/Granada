@@ -1,5 +1,5 @@
 ---
-description: AOSP investigation-driven planning with zaku-native consensus
+description: AOSP investigation-driven planning with consensus review
 argument-hint: <AOSP investigation query>
 model: opus
 pipeline: [aosp-plan, aosp-autopilot]
@@ -124,7 +124,7 @@ Call Planner first:
 
 ```text
 Agent(
-  subagent_type="zaku:planner",
+  subagent_type="zaku:aosp-planner",
   model="opus",
   prompt="<AOSP evidence bundle + current iteration feedback>"
 )
@@ -194,7 +194,7 @@ Call Architect only after Planner returns the draft plan:
 
 ```text
 Agent(
-  subagent_type="zaku:architect",
+  subagent_type="zaku:aosp-architect",
   model="opus",
   prompt="<draft AOSP plan markdown + AOSP evidence bundle>"
 )
@@ -216,7 +216,7 @@ Call Critic only after Architect returns:
 
 ```text
 Agent(
-  subagent_type="zaku:critic",
+  subagent_type="zaku:aosp-critic",
   model="opus",
   prompt="<draft AOSP plan markdown + AOSP evidence bundle + ARCHITECT_REVIEW>"
 )
@@ -326,9 +326,9 @@ Never use `rm -f .granada/*-state.json` before launching an execution mode.
 ## Tool Usage
 
 - Use `Agent(subagent_type="zaku:aosp-investigator", model="sonnet", ...)` for parallel investigation.
-- Use `Agent(subagent_type="zaku:planner", model="opus", ...)` for Planner draft/revision.
-- Use `Agent(subagent_type="zaku:architect", model="opus", ...)` for Architect review.
-- Use `Agent(subagent_type="zaku:critic", model="opus", ...)` for Critic evaluation.
+- Use `Agent(subagent_type="zaku:aosp-planner", model="opus", ...)` for Planner draft/revision.
+- Use `Agent(subagent_type="zaku:aosp-architect", model="opus", ...)` for Architect review.
+- Use `Agent(subagent_type="zaku:aosp-critic", model="opus", ...)` for Critic evaluation.
 - Planner, Architect, and Critic MUST run sequentially: Planner -> Architect -> Critic. Never run consensus agents in parallel.
 - All three consensus agents MUST receive the AOSP evidence bundle.
 - Critic MUST use the closed verdict contract: exactly one of `VERDICT: APPROVE`, `VERDICT: ITERATE`, or `VERDICT: REJECT`.

@@ -136,7 +136,7 @@ If the user chose "Clear (search all)", write:
 
 For `detect-repo`, keep the existing `project` value unchanged and only update `repoPath`.
 
-Create the `.granada/` directory if it does not exist (it should already exist in any OMC-enabled project).
+Create the `.granada/` directory if it does not exist.
 
 ### Step 7: Confirm
 

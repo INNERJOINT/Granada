@@ -323,7 +323,7 @@ Review the generated execution plan for AOSP-specific quality. This step runs au
 
 **Sequential enforcement**: Architect MUST complete before Critic starts. Do NOT run both in parallel.
 
-**Architect review** via `Agent(subagent_type="zaku:architect", ...)`:
+**Architect review** via `Agent(subagent_type="zaku:aosp-architect", ...)`:
 
 Review focus:
 - Cross-project mapping correctness (source→target path mappings are sound)
@@ -335,7 +335,7 @@ Review focus:
 
 Wait for Architect completion before proceeding to Critic.
 
-**Critic evaluation** via `Agent(subagent_type="zaku:critic", ...)`:
+**Critic evaluation** via `Agent(subagent_type="zaku:aosp-critic", ...)`:
 
 Quality criteria:
 - 80%+ plan steps cite investigation findings from Phase 1/2 (no unsupported claims)
@@ -536,8 +536,8 @@ Note: Do not use `rm -f .granada/*-state.json` before launching `aosp-autopilot`
 
 - `mcp__plugin_zaku_sourcepilot__*`: AOSP MCP health check (`list_projects`) and AOSP code search (via `aosp-investigator` subagents with explicit `project` parameter override)
 - `Agent(subagent_type="zaku:aosp-investigator")`: Parallel investigation of source and target projects
-- `Agent(subagent_type="zaku:architect")`: Architect review in Step 6c quality gate
-- `Agent(subagent_type="zaku:critic")`: Critic evaluation in Step 6c quality gate
+- `Agent(subagent_type="zaku:aosp-architect")`: Architect review in Step 6c quality gate
+- `Agent(subagent_type="zaku:aosp-critic")`: Critic evaluation in Step 6c quality gate
 - `Read`: Parse export report, read `.granada/aosp-config.json`
 - `Write`: Save import guide and execution plan
 - `Write` / `Bash rm`: Manage execution state via .granada/ files

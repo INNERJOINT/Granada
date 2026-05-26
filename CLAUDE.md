@@ -59,9 +59,9 @@ Subagent `tools:` frontmatter should grant access via the wildcard `mcp__plugin_
 |-------|-------------|
 | `aosp-investigator` | AOSP code investigation specialist |
 | `aosp-analyst` | AOSP search target extraction and RCA hypothesis synthesis specialist |
-| `planner` | AOSP consensus planner for pending-approval implementation plans |
-| `architect` | AOSP architecture reviewer for consensus planning |
-| `critic` | AOSP quality gate critic with closed verdicts |
+| `aosp-planner` | AOSP consensus planner for pending-approval implementation plans |
+| `aosp-architect` | AOSP architecture reviewer for consensus planning |
+| `aosp-critic` | AOSP quality gate critic with closed verdicts |
 | `aosp-log-collector` | Android log collector (JIRA/local logs, extraction, classification) |
 | `aosp-log-parser` | Android log parser (logcat, tombstone, ANR, kernel) |
 
