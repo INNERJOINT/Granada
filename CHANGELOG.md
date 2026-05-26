@@ -1,3 +1,13 @@
+## [2.9.0](https://github.com/INNERJOINT/Granada/compare/v2.8.2...v2.9.0) (2026-05-26)
+
+### Features
+
+* **aosp:** record local repo path for project workflows ([e0aad7e](https://github.com/INNERJOINT/Granada/commit/e0aad7ea48b7ac5433a35697adad226321214f00))
+
+### Bug Fixes
+
+* **ci:** allow manual release workflow dispatch ([8f5e35b](https://github.com/INNERJOINT/Granada/commit/8f5e35b3e5eabe13924584757c3ec23aa550adc1))
+
 ## [2.8.2](https://github.com/INNERJOINT/Granada/compare/v2.8.1...v2.8.2) (2026-05-26)
 
 ### Bug Fixes
