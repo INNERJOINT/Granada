@@ -1,3 +1,15 @@
+## [2.10.0](https://github.com/INNERJOINT/Granada/compare/v2.9.0...v2.10.0) (2026-05-26)
+
+### Features
+
+* **aosp:** add native consensus planning agents ([17974ec](https://github.com/INNERJOINT/Granada/commit/17974ec760dcce2fb6596f8988bc4c616c9e4dec))
+* **aosp:** add sourcepilot-aware consensus agents ([f8eb723](https://github.com/INNERJOINT/Granada/commit/f8eb7232b9965ea26272441b4799535d7ef188f5))
+* **aosp:** improve plan evidence reporting ([d635ffa](https://github.com/INNERJOINT/Granada/commit/d635ffa82c6cce1a8f9eb0f2015142fab41a6147))
+* **aosp:** route feature import through aosp-plan ([ead75b1](https://github.com/INNERJOINT/Granada/commit/ead75b1e3e5460020a4c114c2b016376a97f2f82))
+* **aosp:** strengthen plan consensus artifacts ([0a38258](https://github.com/INNERJOINT/Granada/commit/0a382588dd5a10b23917b0ebe95b375cd858ce43))
+* **aosp:** structure architect consensus review ([8bf5d56](https://github.com/INNERJOINT/Granada/commit/8bf5d56ac01950440ceb2897424614eae5c49399))
+* **aosp:** tighten plan consensus evidence scope ([cf78bc2](https://github.com/INNERJOINT/Granada/commit/cf78bc2296f21757242c3f741ae34ab66cfa2e4d))
+
 ## [2.9.0](https://github.com/INNERJOINT/Granada/compare/v2.8.2...v2.9.0) (2026-05-26)
 
 ### Features
