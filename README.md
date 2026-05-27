@@ -1,11 +1,11 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/INNERJOINT/Granada/master/assets/granada.svg" alt="Granada" width="200"/>
+  <img src="https://raw.githubusercontent.com/INNERJOINT/Granada/master/assets/Granada_0080.webp" alt="Granada" width="300"/>
 </p>
 
 <h1 align="center">Granada</h1>
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/INNERJOINT/Granada/master/assets/zaku.svg" alt="Zeonic Zaku" width="120"/>
+  <img src="https://raw.githubusercontent.com/INNERJOINT/Granada/master/assets/MS-06C_Zaku_II.webp" alt="Zeonic Zaku" width="120"/>
 </p>
 
 <p align="center">
@@ -21,7 +21,7 @@
 
 Mass-production dev weapon for Claude Code — AOSP recon, JIRA elimination, Git ammo supply.
 
-Granada（格拉纳达）是 Zeonic 的宇宙要塞，Zaku 从这里量产出击。本项目是一个 Claude Code 插件，为 Android 系统开发者提供 AOSP 源码搜索、JIRA 问题分析、Git 工作流自动化等能力。
+Granada is Zeonic's orbital fortress—where Zaku mobile suits are mass-produced before they sortie into combat. This project is a Claude Code plugin for Android platform developers: AOSP source search, JIRA-driven root-cause analysis, and Git workflow automation.
 
 ## Installation
 
