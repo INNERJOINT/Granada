@@ -1,5 +1,6 @@
 ---
 description: Generate a Git commit message from staged changes by first inspecting recent repository commit history and following the dominant local style. Use when the user asks to write a commit message, summarize staged changes, or commit already-staged files without running `git add`.
+argument-hint: [--repo <path>] [--commit]
 model: sonnet
 ---
 
@@ -21,16 +22,19 @@ other repository-specific styles
 
 ## Workflow
 
-1. Check whether the staged area is empty.
-2. Inspect recent commit subjects to detect the dominant repository style.
-3. Read the staged diff and determine the message content.
-4. If the staged area is empty, stop and tell the user to stage files first.
-5. If the staged area is not empty, check the modified code for obvious syntax errors or incomplete edits before generating the commit message.
-6. If the repository style differs from the bracketed reference format, tell the user which format the repository appears to use.
-7. Generate the commit message in the repository's style.
-8. Run `git commit` only if the user explicitly asks to commit.
+1. Parse optional `--repo <path>` and run all git commands against that repository with `git -C <path>`.
+2. Check whether the staged area is empty.
+3. Inspect recent commit subjects to detect the dominant repository style.
+4. Read the staged diff and determine the message content.
+5. If the staged area is empty, stop and tell the user to stage files first.
+6. If the staged area is not empty, check the modified code for obvious syntax errors or incomplete edits before generating the commit message.
+7. If the repository style differs from the bracketed reference format, tell the user which format the repository appears to use.
+8. Generate the commit message in the repository's style.
+9. Run `git commit` only if the user explicitly asks to commit or passes `--commit`.
 
 ## Commands
+
+When `--repo <path>` is provided, replace `git` with `git -C <path>` in every command below.
 
 Inspect recent commit subjects:
 
@@ -45,7 +49,7 @@ git diff --staged --stat
 git diff --staged
 ```
 
-Commit only when explicitly requested:
+Commit only when explicitly requested or `--commit` is passed:
 
 ```bash
 git commit -F - <<'EOF'
@@ -56,6 +60,7 @@ EOF
 ## Decision Rules
 
 - Only inspect staged changes. Never run `git add`.
+- When `--repo <path>` is provided, do not rely on the shell working directory; use `git -C <path>` for every git command.
 - Default to generating the message only.
 - Follow the repository's dominant recent style over any reference format in this skill.
 - If recent history is mixed, follow the most common recent pattern and mention the ambiguity.

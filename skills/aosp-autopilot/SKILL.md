@@ -245,13 +245,13 @@ cd $AOSP_ROOT/<repo_path> && git add <file1> <file2> ...
 
 文件列表从 Step 2a 解析的 repo-task.steps[].files 中获取。
 
-然后调用 git-commit 技能（git-commit 会检测当前仓库的 commit 历史风格并生成对应格式的 commit message）：
+然后调用 git-commit 技能（git-commit 会检测目标仓库的 commit 历史风格并生成对应格式的 commit message）：
 
 ```
-Skill("git-commit")
+Skill("git-commit", "--repo $AOSP_ROOT/<repo_path> --commit")
 ```
 
-注意：`Skill("git-commit")` 的工作目录由前置 `cd` 命令确定。确保在调用前已 `cd` 到目标仓库目录。
+注意：必须通过 `--repo $AOSP_ROOT/<repo_path>` 显式传入目标仓库路径；不要依赖前置 `cd` 命令或 shell 工作目录持久化。
 
 **注意：** 如果指定了 `--no-commit`，跳过此步骤，修改保留在工作区。
 
@@ -396,7 +396,7 @@ aosp-autopilot 解析 aosp-plan 的 Evidence-Based Plan 部分。aosp-plan 的�
 ## 工具使用
 
 - 使用 `Agent(subagent_type="zaku:executor")` 并行派发各仓库的修改 agent（与 aosp-plan 的 aosp-investigator 派发保持一致的 API 风格）
-- 使用 `Skill("git-commit")` 为每个仓库生成符合历史风格的 commit
+- 使用 `Skill("git-commit", "--repo <absolute-repo-path> --commit")` 为每个仓库生成符合历史风格的 commit
 - 使用 `Write` / `Read` 管理执行状态（.granada/ 目录）
 - 使用 `Bash` 工具执行 `repo start`、`git diff`、`git add <files>` 等 git 操作
 - 使用 `AskUserQuestion` 在需要用户决策时（如分支冲突）交互
