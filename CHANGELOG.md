@@ -1,3 +1,15 @@
+## [2.11.0](https://github.com/INNERJOINT/Granada/compare/v2.10.0...v2.11.0) (2026-05-27)
+
+### Features
+
+* **aosp:** check existing feature branch impact ([56f473c](https://github.com/INNERJOINT/Granada/commit/56f473c426ed9f41fabbc2709df9644d8a34e04f))
+* **aosp:** harden explicit repo commits ([c0d2534](https://github.com/INNERJOINT/Granada/commit/c0d25343319a99c34d8909b78a2bd27097e9e176))
+* **aosp:** support explicit repo commits ([172e6d7](https://github.com/INNERJOINT/Granada/commit/172e6d78029c322866cbed0f512b94df1d2487eb))
+
+### Bug Fixes
+
+* **aosp:** scope autopilot state cleanup ([992aec6](https://github.com/INNERJOINT/Granada/commit/992aec6eedeb2ebac874e540c1afce5252ef0d36))
+
 ## [2.10.0](https://github.com/INNERJOINT/Granada/compare/v2.9.0...v2.10.0) (2026-05-26)
 
 ### Features
