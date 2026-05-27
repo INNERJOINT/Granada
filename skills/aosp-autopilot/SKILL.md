@@ -426,15 +426,15 @@ aosp-autopilot 解析 aosp-plan 的 Evidence-Based Plan 部分。aosp-plan 的�
 
 | 场景 | 处理方式 |
 |------|----------|
-| `.repo/` 未找到 | `rm -f .granada/*-state.json` + 报错退出 |
-| 计划文件无法解析 | `rm -f .granada/*-state.json` + 报错退出 |
+| `.repo/` 未找到 | `rm -f .granada/aosp-autopilot-state.json` + 报错退出 |
+| 计划文件无法解析 | `rm -f .granada/aosp-autopilot-state.json` + 报错退出 |
 | 仓库目录不存在 | 在报告中标记为缺失，跳过该仓库 |
 | 分支已存在 | 询问用户是否切换或重新命名 |
 | agent 执行超时 | 标记为 FAIL，进入重试循环 |
 | diff 验证 PARTIAL | 进入重试循环，附加上一轮差距信息 |
 | 重试耗尽 | 标记为 FAIL，继续处理其他仓库 |
 | git commit 失败 | 标记为 FAIL，修改保留在工作区 |
-| 执行中不可恢复异常 | `rm -f .granada/*-state.json` + 报告当前进度 |
+| 执行中不可恢复异常 | `Write {"active": false, "error": "<reason>"} to .granada/aosp-autopilot-state.json` + 报告当前进度 |
 
 ## 示例
 
