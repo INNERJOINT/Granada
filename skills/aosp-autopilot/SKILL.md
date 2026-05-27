@@ -146,13 +146,37 @@ Step 3 AOSP files: packages/apps/Settings/...   → 依赖 frameworks/base → �
 
 ### Step 3: 创建分支
 
-为每个仓库任务创建 topic branch。按依赖层级顺序执行，无依赖的仓库并行创建：
+为每个仓库任务创建 topic branch。按依赖层级顺序执行，无依赖的仓库并行创建。
+
+**3a. 检查已有 `feat` 分支影响**
+
+在创建目标分支前，先检查目标仓库中已有的 `feat` 前缀本地分支：
+
+```bash
+git -C "$AOSP_ROOT/<repo_path>" for-each-ref --format='%(refname:short)' refs/heads/feat
+```
+
+如果存在 `feat` 分支，必须逐个评估这些分支相对当前基线的改动是否影响即将执行的计划文件：
+
+```bash
+git -C "$AOSP_ROOT/<repo_path>" diff --name-only <base>...<feat-branch>
+git -C "$AOSP_ROOT/<repo_path>" diff <base>...<feat-branch> -- <planned-file1> <planned-file2> ...
+```
+
+评估规则：
+
+1. 如果已有 `feat` 分支未修改任何计划文件，记录为无影响，继续创建目标分支。
+2. 如果已有 `feat` 分支修改了计划文件，但改动区域与本次计划无语义重叠，记录为潜在影响，并在 agent prompt 中提示这些上下文。
+3. 如果已有 `feat` 分支修改了同一计划文件的同一函数、同一接口、同一 HAL/API 定义或同一配置项，视为有影响；暂停并询问用户选择：基于该分支继续、创建新分支但带入其 diff 上下文、或取消该仓库执行。
+4. 如果无法确定影响范围，按有影响处理，不要静默继续。
+
+**3b. 创建目标分支**
 
 ```bash
 cd $AOSP_ROOT/<repo_path> && repo start <branch_name>
 ```
 
-如果分支已存在，询问用户是否切换到现有分支或创建新分支名。
+如果目标分支已存在，先按 3a 的规则评估该分支改动是否影响本次计划，再询问用户是否切换到现有分支或创建新分支名。
 
 **验证分支创建成功：**
 
@@ -429,7 +453,7 @@ aosp-autopilot 解析 aosp-plan 的 Evidence-Based Plan 部分。aosp-plan 的�
 | `.repo/` 未找到 | `rm -f .granada/aosp-autopilot-state.json` + 报错退出 |
 | 计划文件无法解析 | `rm -f .granada/aosp-autopilot-state.json` + 报错退出 |
 | 仓库目录不存在 | 在报告中标记为缺失，跳过该仓库 |
-| 分支已存在 | 询问用户是否切换或重新命名 |
+| 目标分支已存在 | 先评估该分支对计划文件的影响，再询问用户是否切换、重新命名或取消该仓库 |
 | agent 执行超时 | 标记为 FAIL，进入重试循环 |
 | diff 验证 PARTIAL | 进入重试循环，附加上一轮差距信息 |
 | 重试耗尽 | 标记为 FAIL，继续处理其他仓库 |
