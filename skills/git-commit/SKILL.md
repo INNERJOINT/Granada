@@ -22,19 +22,20 @@ other repository-specific styles
 
 ## Workflow
 
-1. Parse optional `--repo <path>` and run all git commands against that repository with `git -C <path>`.
-2. Check whether the staged area is empty.
-3. Inspect recent commit subjects to detect the dominant repository style.
-4. Read the staged diff and determine the message content.
-5. If the staged area is empty, stop and tell the user to stage files first.
-6. If the staged area is not empty, check the modified code for obvious syntax errors or incomplete edits before generating the commit message.
-7. If the repository style differs from the bracketed reference format, tell the user which format the repository appears to use.
-8. Generate the commit message in the repository's style.
-9. Run `git commit` only if the user explicitly asks to commit or passes `--commit`.
+1. Parse optional `--repo <path>`; for skill-to-skill calls, require an existing absolute path to the target Git worktree.
+2. Run all git commands against the selected repository with `git -C "$REPO_PATH"`.
+3. Check whether the staged area is empty.
+4. Inspect recent commit subjects to detect the dominant repository style.
+5. Read the staged diff and determine the message content.
+6. If the staged area is empty, stop and tell the user to stage files first.
+7. If the staged area is not empty, check the modified code for obvious syntax errors or incomplete edits before generating the commit message.
+8. If the repository style differs from the bracketed reference format, tell the user which format the repository appears to use.
+9. Generate the commit message in the repository's style.
+10. Run `git commit` only if the user explicitly asks to commit or passes `--commit` as delegated commit authorization.
 
 ## Commands
 
-When `--repo <path>` is provided, replace `git` with `git -C <path>` in every command below.
+When `--repo <path>` is provided, set `REPO_PATH` to that existing Git worktree path and replace `git` with `git -C "$REPO_PATH"` in every command below.
 
 Inspect recent commit subjects:
 
@@ -60,7 +61,10 @@ EOF
 ## Decision Rules
 
 - Only inspect staged changes. Never run `git add`.
-- When `--repo <path>` is provided, do not rely on the shell working directory; use `git -C <path>` for every git command.
+- `--commit` commits every currently staged change in the selected repository; callers must ensure the staged set contains only intended files.
+- Treat `--commit` as delegated authorization from the direct user request or an invoking workflow that already has commit approval; never pass it from dry-run or no-commit modes.
+- When `--repo <path>` is provided, do not rely on the shell working directory; use `git -C "$REPO_PATH"` for every git command.
+- For skill-to-skill calls, `--repo <path>` must be an existing absolute path to the target Git worktree.
 - Default to generating the message only.
 - Follow the repository's dominant recent style over any reference format in this skill.
 - If recent history is mixed, follow the most common recent pattern and mention the ambiguity.

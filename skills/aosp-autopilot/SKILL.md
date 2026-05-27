@@ -237,13 +237,21 @@ cd $AOSP_ROOT/<repo_path> && git diff
 
 对验证通过（PASS）的仓库，使用 git-commit 技能生成并提交 commit。
 
+提交前先检查目标仓库是否已有 staged 内容，避免把用户预先暂存的无关改动混入自动提交：
+
+```bash
+git -C "$AOSP_ROOT/<repo_path>" diff --staged --name-only
+```
+
+如果输出非空，必须确认这些文件完全属于当前 repo-task 的计划文件；否则暂停并询问用户处理方式，不要继续提交。
+
 只暂存计划中指定的文件（避免意外包含生成文件或 IDE 配置）：
 
 ```bash
-cd $AOSP_ROOT/<repo_path> && git add <file1> <file2> ...
+git -C "$AOSP_ROOT/<repo_path>" add <file1> <file2> ...
 ```
 
-文件列表从 Step 2a 解析的 repo-task.steps[].files 中获取。
+文件列表从 Step 2a 解析的 repo-task.steps[].files 中获取；调用 git-commit 前，staged 文件集合必须只包含这些计划文件。
 
 然后调用 git-commit 技能（git-commit 会检测目标仓库的 commit 历史风格并生成对应格式的 commit message）：
 
