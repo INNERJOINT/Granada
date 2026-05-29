@@ -1,15 +1,17 @@
 ---
-description: Export AOSP feature element documentation by iteratively searching related code
-argument-hint: '"<feature description>" --links <url1,url2,...>'
+description: Export documentation for vendor-modified or vendor-added AOSP features by summarizing implementation methods from related context code
+argument-hint: '"<vendor feature description>" --links <mr-or-commit-url1,url2,...> [--depth shallow|deep] [--append]'
 model: opus
 level: 3
 ---
 
 # AOSP Feature Export Skill
 
-Documents vendor/third-party features added on top of AOSP. Takes a feature description and GitLab MR/commit URLs (vendor changes) as input, delegates URL inspection to `gitlab-info` to identify modification points, then uses the `mcp__plugin_zaku_sourcepilot__*` tools to search the AOSP codebase for the original code being modified or extended. Outputs a comprehensive Chinese-language markdown document that maps the vendor feature across AOSP layers, archived to `.granada/aosp-exports/`.
+Documents vendor/third-party features added on top of AOSP. Takes a concrete vendor feature description and GitLab MR/commit URLs (vendor changes) as input, delegates URL inspection to `gitlab-info` to identify modification points, then uses the `mcp__plugin_zaku_sourcepilot__*` tools to search the AOSP codebase for the original code being modified or extended. Outputs a Chinese-language markdown document focused on the feature's problem, vendor solution, implementation method, related context code, and verification approach, archived to `.granada/aosp-exports/`.
 
 **Key distinction:** The feature being documented is NOT an AOSP built-in feature. It is a vendor customization — code added or modified by the third-party vendor on top of AOSP. The AOSP search phase finds the original context that the vendor code interacts with.
+
+**Scope principle:** One export should describe one concrete vendor feature slice, such as `AIUD 在 Settings 中的定制功能`, not a broad module-level topic like `Settings 定制` or `Connectivity 定制`. If the input is too broad, split it into candidate sub-features, ask the user to confirm one, export only that confirmed sub-feature report, then stop and tell the user to run the skill again for the remaining sub-features.
 
 ## Usage
 
@@ -116,11 +118,31 @@ Abort with: `AOSP MCP server unreachable. Check SOURCEPILOT_URL and SOURCEPILOT_
 2. Merge with keywords extracted from links/commits (if any)
 3. If discovery ran: merge additional keywords from discovered commit messages (noun phrases, identifiers)
 4. Deduplicate all keywords, cap at 10-15
-5. Group into 3 keyword groups by subsystem area (e.g., HAL-related, Framework-related, App-related)
+5. Group into 3 keyword groups by implementation concern (e.g., user-facing entry, framework/service path, native/HAL dependency), not by broad subsystem area alone
 
-### Step 3: Phase 1 — Project Discovery
+### Step 2c: Scope Granularity Check
 
-Spawn 3 `aosp-investigator` subagents in parallel. Each investigator is given the full feature context and independently decides what/how to search. The orchestrator does NOT pre-generate search queries — investigators handle search strategy themselves:
+Before spawning investigators, decide whether the requested feature is concrete enough to export as one report.
+
+**Single-purpose test (primary):** The feature should be describable in one sentence with one purpose. If the sentence contains two independent purposes (for example, `query and display user location`), split it into `query location` and `display location`.
+
+**Split when any of these are true:**
+- The feature contains more than 2 independent logical steps such as fetch, process, store, output, or notify.
+- A part can be expressed as a reusable AOSP feature element composed from primitives such as Intent, System Service, HAL interface, Content Provider, or JobScheduler.
+- The relevant implementation appears to exceed roughly 20-50 logical lines, has cyclomatic complexity > 10, or is hard to unit test independently.
+- Different parts may change for different reasons (AOSP API change, business rule change, UI change, device/HAL change), following Parnas' separation principle.
+- The description names a broad module or domain (`Settings customization`, `Connectivity customization`, `Audio routing`) rather than a concrete user-visible behavior, API behavior, or vendor hook.
+
+**If the input is too broad:**
+1. Derive 2-6 candidate sub-features from the description, GitLab diff paths, class/method names, and modification summaries.
+2. Present the candidates to the user and ask which one should be exported now.
+3. After the user confirms one candidate, continue the protocol using that sub-feature as `<description>` and keep the original broad request as background context only.
+4. Export exactly one confirmed sub-feature report.
+5. At the end, tell the user which candidate was exported and that remaining candidates require separate runs.
+
+### Step 3: Phase 1 — Implementation Context Discovery
+
+Spawn 3 `aosp-investigator` subagents in parallel. Each investigator is given the full confirmed sub-feature context and independently decides what/how to search. The orchestrator does NOT pre-generate search queries — investigators handle search strategy themselves:
 
 ```
 Agent(
@@ -132,13 +154,13 @@ Agent(
   Vendor modification points (from GitLab diffs):
   <changed file paths, class names, method names, and diff summaries from Step 2>
   
-  Your mission: Search AOSP to find the ORIGINAL code that the vendor modifications interact with.
+  Your mission: Search AOSP to find the ORIGINAL context code that explains how this confirmed vendor sub-feature is implemented.
   - Search for the original AOSP classes/interfaces that the vendor code modifies, extends, or calls
-  - Follow cross-references: if the vendor modifies an interface, find its original definition, implementations, and callers in AOSP
-  - Cover multiple AOSP layers: HAL, native, framework, system services, apps
-  - For each finding, document: file path, code snippet, architectural role, and how it relates to the vendor modification points
+  - Follow the implementation path from user-facing entry/API hook to framework/service/native/HAL dependencies when relevant
+  - Identify the concrete problem being solved, the vendor method, the affected code path, and the observable effect
+  - For each finding, document: file path, code snippet, implementation role, and how it supports the vendor solution
   
-  Report ALL discovered AOSP file paths grouped by theme. Include architectural observations about how the vendor changes hook into the AOSP architecture."
+  Report ALL discovered AOSP file paths grouped by implementation concern. Include only architecture observations that explain the vendor implementation method."
 )
 ```
 
@@ -177,13 +199,13 @@ Agent(
   Key interfaces and classes found so far:
   <extracted interface names, class names, AIDL/HIDL definitions from prior rounds>
   
-  Your mission: Find AOSP code OUTSIDE the already-discovered areas that the vendor modifications interact with.
+  Your mission: Find AOSP code OUTSIDE the already-discovered areas that clarifies the confirmed sub-feature's implementation method.
   - Search for callers/implementors of the interfaces found so far
-  - Look for related AOSP subsystems that the vendor feature depends on or extends
-  - Check for configuration, SELinux policies, init scripts, or test code in AOSP related to the modified components
+  - Look for adjacent code that explains why the vendor method works: entry points, state flow, config gates, permissions, persistence, service calls, native/HAL boundaries, or tests
+  - Avoid broad subsystem surveys unless they directly explain the sub-feature's problem-solution path
   - Explore upstream/downstream AOSP dependencies not yet covered
   
-  Report only NEW findings (paths not in the already-discovered list). Group by theme with observations about how vendor changes hook into these AOSP components."
+  Report only NEW findings (paths not in the already-discovered list). Group by implementation concern with observations about how each finding explains the vendor method."
 )
 ```
 
@@ -200,25 +222,29 @@ After each round:
 
 ### Step 5: Synthesis
 
-The orchestrator's only heavy-lifting phase — merge and structure all investigator reports into the final document:
+The orchestrator's only heavy-lifting phase — merge investigator reports into a problem-solution implementation document:
 
 1. Concatenate all investigator findings across all rounds
 2. Deduplicate findings:
-   a. **Exact path dedup:** merge entries with identical file paths (keep the richer observation)
+   a. **Exact path dedup:** merge entries with identical file paths (keep the richer implementation observation)
    b. **Overlapping snippet dedup:** if two findings reference the same file with overlapping line ranges, merge into one entry with the broader range
-   c. **Semantic dedup:** if two findings describe the same interface/class from different angles, consolidate into one entry combining both observations
-3. Group findings by second-level AOSP directory prefix (these become the "projects" in the output)
-4. For each project group: collect key interfaces, code patterns, and design decisions reported by investigators
-5. Synthesize an overall "Design Principles" section from investigators' architectural observations
-6. Map cross-project dependencies from investigators' interface-caller/implementor findings
+   c. **Semantic dedup:** if two findings describe the same interface/class or implementation step from different angles, consolidate into one entry combining both observations
+3. Identify the confirmed sub-feature's problem-solution path:
+   a. **Vendor problem:** what user-visible behavior, API behavior, device behavior, or integration gap the vendor change addresses
+   b. **Vendor method:** what the vendor added/modified and why that method works in the AOSP context
+   c. **Implementation path:** entry point → key modified code → AOSP context code → state/config/permission/service/native/HAL dependency → observable effect
+   d. **Verification path:** logs, settings UI behavior, command/API observation, tests, or runtime state that can prove the feature works
+4. Group findings by implementation concern first, and by AOSP path second. Example concern groups: UI/entry, framework/service flow, persistence/config, permission/SELinux, native/HAL boundary, verification/test.
+5. Synthesize "实现方法" and "实现思路" from concrete code paths and snippets. Do not produce a broad architecture survey unless it directly explains the vendor solution.
+6. Map cross-project dependencies only when they are required to explain the implementation path.
 6b. **Adaptive template sections:**
-   - If ≤ 2 discovered project groups AND findings span a single architectural layer: use condensed output (omit summary table, fold interface mentions into project sections)
-   - If no AIDL/HIDL interfaces found: omit "关键接口" section header, fold any interface mentions into project sections
-   - If only 1 AOSP project discovered: omit the "相关AOSP项目" summary table (redundant with the single project section)
-   - If no cross-project dependencies found: omit "依赖关系" section
-   - If `discovered_commits[]` is empty (no project context or no matches): omit "发现的关联提交" section
-   - **Always include:** 概览, Vendor修改概述, 设计原理, 各项目代码路径, 调查日志
-7. **Construct commit URLs:** For each input link's project, build browsable commit URLs using format `https://{host}/{project_path}/-/commit/{sha}`. If the input was an MR, use the MR's source commits. Include these URLs in the output under "Related Commits".
+   - If the feature is small, use condensed output and fold interface/path summaries into "实现路径".
+   - If no AIDL/HIDL interfaces found, omit "关键接口" and mention relevant APIs inside implementation steps.
+   - If only 1 AOSP project discovered, omit a separate project summary table unless it clarifies the implementation.
+   - If no cross-project dependencies are required to explain the solution, omit "依赖关系".
+   - If `discovered_commits[]` is empty (no project context or no matches), omit "发现的关联提交".
+   - **Always include:** 概览, Vendor问题与解法, 实现方法, 关键上下文代码, 验证方法, 调查日志
+7. **Construct commit URLs:** For each input link's project, build browsable commit URLs using format `https://{host}/{project_path}/-/commit/{sha}`. If the input was an MR, use the MR's source commits. Include these URLs in the output under "Vendor相关提交".
 8. Build the output document **in Chinese** using the template below
 
 ### Step 5b: Append Mode (if `--append` flag)
@@ -274,8 +300,10 @@ Skill is idempotent — re-running with the same inputs overwrites the output fi
 # Vendor功能元导出: {feature_name}
 
 ## 概览
-- **功能:** {description}
+- **功能:** {confirmed_sub_feature_description}
+- **原始输入:** {original_description, if scope was split; otherwise same as 功能}
 - **类型:** Vendor/第三方定制功能
+- **范围粒度:** {单一目的 / 已从大范围拆分 / 用户确认的子功能}
 - **AOSP项目:** {project_name from .granada/aosp-config.json, or "未配置"}
 - **导出日期:** {date}
 - **输入链接:** {url_list or "无"}
@@ -286,52 +314,68 @@ Skill is idempotent — re-running with the same inputs overwrites the output fi
 - **收敛情况:** {在第X轮收敛 / 达到最大轮次}
 - **关联提交发现:** {启用/未启用} {如启用: "发现 N 条, 耗时 Xs" / "工具不可用，已跳过" / "超时，部分结果"}
 
+## Vendor问题与解法
+
+- **要解决的问题:** {vendor改动要解决的具体用户行为、API行为、设备行为或集成缺口}
+- **Vendor做法:** {vendor增加或修改了什么逻辑}
+- **为什么这样可行:** {AOSP原有机制如何允许该做法生效}
+- **最终效果:** {用户可见、系统可观察或接口可验证的结果}
+
 ## Vendor修改概述
 
-{基于GitLab diff的vendor改动摘要。说明vendor修改了哪些文件、增加了什么逻辑、修改的入口点在哪里。}
+{基于GitLab diff的vendor改动摘要。说明vendor修改了哪些文件、增加了什么逻辑、修改入口点在哪里。只保留与确认子功能直接相关的改动。}
 
-## 设计原理
+## 实现方法
 
-{AI综合说明该vendor功能如何嵌入AOSP架构。涵盖vendor代码的hook点、对AOSP原有逻辑的修改方式、跨层交互模式。}
-
-## 相关AOSP项目
-
-| 项目 | 路径 | 层级 | 与Vendor功能的关系 |
-|------|------|------|-------------------|
-| {name} | {aosp_path} | {HAL/Framework/System/App} | {vendor如何修改或依赖此项目} |
-| ... | ... | ... | ... |
-
-## 关键接口
-
-### {接口名称}
-- **文件:** {aosp/path/to/file}
-- **类型:** AIDL / HIDL / Java API / Native / JNI
-- **AOSP原始用途:** {该接口在AOSP中的原始作用}
-- **Vendor修改方式:** {vendor如何修改、扩展或调用此接口}
-- **代码片段:**
+### 1. {实现步骤名称}
+- **目的:** {该步骤解决什么子问题}
+- **Vendor改动:** `{vendor/file/path}` {类/方法/常量/配置的修改方式}
+- **AOSP上下文:** `{aosp/file/path}` {原始机制、调用关系或状态流}
+- **实现思路:** {为什么这个改动能让功能生效}
+- **关键代码:**
   ```
   {relevant code excerpt}
   ```
 
-## 各项目代码路径
+### 2. {实现步骤名称}
+- **目的:** {该步骤解决什么子问题}
+- **Vendor改动:** `{vendor/file/path}` {类/方法/常量/配置的修改方式}
+- **AOSP上下文:** `{aosp/file/path}` {原始机制、调用关系或状态流}
+- **实现思路:** {为什么这个改动能让功能生效}
+- **关键代码:**
+  ```
+  {relevant code excerpt}
+  ```
 
-### {项目名称} ({aosp_path_prefix})
-- **关键文件:**
-  - `{file_path}`: {用途}
-  - `{file_path}`: {用途}
-- **Vendor相关提交:**
-  - [{commit_message}]({https://gitlab.host/project_path/-/commit/full_sha}) ({date})
-- **设计说明:** {vendor代码如何hook进此AOSP项目}
+## 关键上下文代码
 
-## 架构总览
+| 关注点 | 文件 | 类型 | 对实现方法的作用 |
+|--------|------|------|----------------|
+| {UI入口/API入口/服务流程/配置持久化/权限/Native/HAL/测试} | `{file_path}` | {Java/Kotlin/C++/AIDL/HIDL/XML/SELinux/Test} | {该代码如何解释vendor做法} |
+| ... | ... | ... | ... |
 
-{Vendor功能如何跨越Android各层嵌入: App → Framework → Native → HAL → Kernel。标注vendor修改点与AOSP原始代码的边界。}
+## 关键接口与数据流
 
-## 依赖关系
+{仅当接口或跨层数据流对实现方法必要时保留。说明 AIDL/HIDL/Java API/Native/JNI/Intent/Content Provider/System Service/HAL 等如何参与该功能。}
 
-- Vendor功能依赖 {AOSP项目A} 的 {接口/机制}
-- Vendor功能修改了 {AOSP项目B} 的 {类/方法}
-- ...
+```text
+{entry point} -> {vendor modified code} -> {AOSP context code} -> {state/config/service/native/HAL dependency} -> {observable effect}
+```
+
+## 验证方法
+
+- **验证入口:** {Settings页面、命令、API、日志、测试或运行时状态}
+- **预期现象:** {功能生效时应观察到什么}
+- **关键日志/状态:** {可选，log tag、setting key、property、database row、service state等}
+- **回归关注:** {该功能可能影响的相邻逻辑}
+
+## 辅助架构上下文
+
+{只说明理解实现方法所必需的架构关系。避免扩展成完整AOSP模块介绍。}
+
+## Vendor相关提交
+
+- [{commit_message}]({https://gitlab.host/project_path/-/commit/full_sha}) ({date})
 
 ## 发现的关联提交
 
@@ -346,10 +390,10 @@ Skill is idempotent — re-running with the same inputs overwrites the output fi
 
 ## 调查日志
 
-| 轮次 | 查询 | 新增前缀 | 总前缀数 | 总文件数 |
-|------|------|----------|----------|----------|
-| 1 (发现) | {keyword groups} | {n} | {n} | {n} |
-| 2 | {new queries} | {n} | {n} | {n} |
+| 轮次 | 查询/关注点 | 新增前缀 | 总前缀数 | 总文件数 |
+|------|------------|----------|----------|----------|
+| 1 (发现) | {keyword groups or implementation concerns} | {n} | {n} | {n} |
+| 2 | {new implementation concerns} | {n} | {n} | {n} |
 | ... | ... | ... | ... | ... |
 | {final} | {queries} | {n} | {n} | {n} |
 
@@ -360,6 +404,7 @@ Skill is idempotent — re-running with the same inputs overwrites the output fi
 - **上次验证:** {last_verified date}
 - **更新模式:** {完整导出 / 增量追加}
 - **增量历史:** {append count, if applicable}
+- **范围拆分:** {未拆分 / 已拆分，导出子功能: <name>，剩余候选: <list>}
 ```
 
 ## Keyword Triggers
