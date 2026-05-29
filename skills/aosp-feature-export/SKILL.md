@@ -1,5 +1,5 @@
 ---
-description: Export AOSP feature element documentation by iteratively searching related code across all AOSP projects
+description: Export AOSP feature element documentation by iteratively searching related code
 argument-hint: '"<feature description>" --links <url1,url2,...>'
 model: opus
 level: 3
@@ -7,7 +7,7 @@ level: 3
 
 # AOSP Feature Export Skill
 
-Documents vendor/third-party features added on top of AOSP. Takes a feature description and GitLab MR/commit URLs (vendor changes) as input, fetches diffs via GitLab MCP tools to identify modification points, then uses the `mcp__plugin_zaku_sourcepilot__*` tools to search the AOSP codebase for the original code being modified or extended. Outputs a comprehensive Chinese-language markdown document that maps the vendor feature across AOSP layers, archived to `.granada/aosp-exports/`.
+Documents vendor/third-party features added on top of AOSP. Takes a feature description and GitLab MR/commit URLs (vendor changes) as input, delegates URL inspection to `gitlab-info` to identify modification points, then uses the `mcp__plugin_zaku_sourcepilot__*` tools to search the AOSP codebase for the original code being modified or extended. Outputs a comprehensive Chinese-language markdown document that maps the vendor feature across AOSP layers, archived to `.granada/aosp-exports/`.
 
 **Key distinction:** The feature being documented is NOT an AOSP built-in feature. It is a vendor customization — code added or modified by the third-party vendor on top of AOSP. The AOSP search phase finds the original context that the vendor code interacts with.
 
@@ -64,25 +64,24 @@ Abort with: `AOSP MCP server unreachable. Check SOURCEPILOT_URL and SOURCEPILOT_
 
 #### 2a: Fetch change data from links or commits
 
-**If `--links` provided**, parse each URL and call GitLab MCP tools. **Process all URLs in parallel** — each URL's fetches are independent and should be issued concurrently:
+**If `--links` provided**, delegate GitLab URL inspection to `gitlab-info` instead of parsing GitLab URLs locally:
 
-1. For each URL, determine type by pattern matching:
-   - **MR URL** (`{host}/{project_path}/-/merge_requests/{iid}` with optional `/diffs`):
-     - Extract `project_id` = `{project_path}` (e.g., `mt8781_androidu/platform/packages/modules/Connectivity`)
-     - Extract `merge_request_iid` = `{iid}`
-     - Call `mcp__gitlab__get_merge_request(project_id, merge_request_iid)` and `mcp__gitlab__get_merge_request_diffs(project_id, merge_request_iid)` **concurrently** (independent calls for the same MR) → extract MR title, description, changed file paths (old_path, new_path), and diff content
-   - **Commit URL** (`{host}/{project_path}/-/commit/{sha}`):
-     - Extract `project_id` = `{project_path}`
-     - Extract `sha` = `{sha}`
-     - Call `mcp__gitlab__get_commit(project_id, sha)` and `mcp__gitlab__get_commit_diff(project_id, sha, full_diff=true)` **concurrently** → extract commit message, changed file paths, and diff content
+1. Invoke `/zaku:gitlab-info <url1> <url2> ...` with all provided links in one call.
+2. Require `gitlab-info` output to provide, per URL:
+   - parsed `project_id`
+   - URL type and diff scope (`MR overall`, `selected commit`, or `selected diff version`)
+   - MR title/description or commit title/message
+   - changed file paths (`old_path`, `new_path`, added/renamed/deleted when available)
+   - concise modification summary and key diff identifiers
+   - commit SHAs and authored/committed dates when available
+   - any `未确认 / 需要确认` entries
+3. Treat any `未确认 / 需要确认` entries as warnings. Continue with confirmed URLs; if ALL URL inspections fail, fall back to description-only mode.
 
-2. From fetched data, extract:
+4. From `gitlab-info` data, extract:
    - Changed file paths (strip extensions to get class/module names)
    - Class/interface names from path components
    - Noun phrases from MR title/description or commit messages
-   - Key identifiers from diff additions (class declarations, method names, constants)
-
-3. **Error handling:** If any URL returns an error (unreachable, 404, permission denied), log it and continue with remaining URLs. If ALL URLs fail, fall back to description-only mode.
+   - Key identifiers from diff additions or modification summaries (class declarations, method names, constants)
 
 #### 2a-discover: Related commit discovery
 

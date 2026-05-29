@@ -48,6 +48,7 @@ cd Granada && claude plugin install .
 | `aosp-feature-import` | Import AOSP features across projects |
 | `jira-analyze` | JIRA-driven Android bug RCA with parallel hypothesis investigation |
 | `jira-aftersales` | Convert RCA reports to customer-facing scripts |
+| `gitlab-info` | Extract repository, commit, changed files, and diffs from GitLab URLs |
 | `git-commit` | Generate commit messages following repo conventions |
 
 ## Tools

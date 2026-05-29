@@ -51,6 +51,7 @@ Subagent `tools:` frontmatter should grant access via the wildcard `mcp__plugin_
 | `aosp-project` | List and select active AOSP project |
 | `jira-analyze` | JIRA-driven Android bug RCA |
 | `jira-aftersales` | Convert RCA reports to customer-facing scripts |
+| `gitlab-info` | Extract repository, commit, changed files, and diffs from GitLab URLs |
 | `git-commit` | Generate commit messages from staged changes |
 
 ## Agents
