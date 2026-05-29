@@ -202,12 +202,9 @@ Answer in Chinese unless the user asks otherwise.
 
 ## 未确认 / 需要确认
 - <ambiguous refs, missing permissions, skipped large diffs, or unavailable version IDs>
-
-## 使用的 MCP 工具
-- `<tool>(key params)` — <why>
 ```
 
-For simple questions such as “这个链接属于哪个仓库”, answer briefly and skip unnecessary sections. For multiple URLs, repeat the URL-specific sections per URL, then include one combined `使用的 MCP 工具` section.
+For simple questions such as “这个链接属于哪个仓库”, answer briefly and skip unnecessary sections. For multiple URLs, repeat the URL-specific sections per URL.
 
 ## Tool Set
 
