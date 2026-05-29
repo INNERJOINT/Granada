@@ -1,3 +1,9 @@
+## [2.12.0](https://github.com/INNERJOINT/Granada/compare/v2.11.0...v2.12.0) (2026-05-29)
+
+### Features
+
+* **gitlab:** add URL info extraction skill ([89a1335](https://github.com/INNERJOINT/Granada/commit/89a13358e3fee3d18450d76ad13515296d1c5274))
+
 ## [2.11.0](https://github.com/INNERJOINT/Granada/compare/v2.10.0...v2.11.0) (2026-05-27)
 
 ### Features
