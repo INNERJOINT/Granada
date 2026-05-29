@@ -1,6 +1,6 @@
 ---
 description: Export documentation for vendor-modified or vendor-added AOSP features by summarizing implementation methods from related context code
-argument-hint: '"<vendor feature description>" --links <mr-or-commit-url1,url2,...> [--depth shallow|deep] [--append]'
+argument-hint: '"<vendor feature description>"'
 model: opus
 level: 3
 ---
@@ -16,27 +16,12 @@ Documents vendor/third-party features added on top of AOSP. Takes a concrete ven
 ## Usage
 
 ```
-/zaku:aosp-feature-export "公共DNS" --links https://gitlab.example.com/mt8781_androidu/platform/packages/modules/Connectivity/-/merge_requests/3/diffs
-/zaku:aosp-feature-export "fingerprint unlock" --links https://gitlab.example.com/project/path/-/commit/d2794bf5a8132dc9
-/zaku:aosp-feature-export "USB audio routing" --links <mr-url1>,<commit-url2>
-/zaku:aosp-feature-export "USB audio routing"
+/zaku:aosp-feature-export "公共DNS"
+/zaku:aosp-feature-export "fingerprint unlock"
+/zaku:aosp-feature-export "AIUD 在 Settings 中的定制功能"
 ```
 
-## Flags
-
-- `--links <url1,url2,...>`: Comma-separated GitLab MR diff or commit URLs as starting points for keyword extraction (primary input mode)
-- `--depth shallow|deep`: Controls investigation depth (default: `deep`)
-  - `shallow`: Phase 2 (Step 4) runs exactly 1 round with 2 agents. No convergence check is evaluated. Useful for quick overviews or when the feature scope is already well-understood.
-  - `deep`: Phase 2 runs up to 5 rounds with convergence-based termination (existing behavior, unchanged).
-- `--append`: Incremental update mode. If a previous export exists for this feature (matched by slug), load it and expand rather than overwrite. Skips Phase 1 and uses prior findings as the starting set for Phase 2.
-- Without flags: Uses only the description text for keyword extraction
-
-### Supported URL Formats
-
-- **MR diffs:** `https://{host}/{project_path}/-/merge_requests/{iid}/diffs` (trailing `/diffs` optional)
-- **Commit:** `https://{host}/{project_path}/-/commit/{sha}`
-
-Future: URL routing is provider-dispatched. Currently supports GitLab only. GitHub/Gerrit patterns may be added later.
+The only user input is the concrete vendor feature description. If GitLab links, commits, or previous export context are needed, the skill should discover or ask for them during the protocol rather than exposing them as command-line flags.
 
 ## Protocol
 
@@ -64,11 +49,11 @@ Abort with: `AOSP MCP server unreachable. Check SOURCEPILOT_URL and SOURCEPILOT_
 
 ### Step 2: Keyword Extraction
 
-#### 2a: Fetch change data from links or commits
+#### 2a: Fetch change data from related links or commits
 
-**If `--links` provided**, delegate GitLab URL inspection to `gitlab-info` instead of parsing GitLab URLs locally:
+If GitLab MR/commit URLs are discovered from the conversation context or requested from the user during the protocol, delegate GitLab URL inspection to `gitlab-info` instead of parsing GitLab URLs locally:
 
-1. Invoke `/zaku:gitlab-info <url1> <url2> ...` with all provided links in one call.
+1. Invoke `/zaku:gitlab-info <url1> <url2> ...` with all confirmed links in one call.
 2. Require `gitlab-info` output to provide, per URL:
    - parsed `project_id`
    - URL type and diff scope (`MR overall`, `selected commit`, or `selected diff version`)
@@ -90,23 +75,23 @@ Abort with: `AOSP MCP server unreachable. Check SOURCEPILOT_URL and SOURCEPILOT_
 **Prerequisite:** Step 2a (fetch) must complete first — discovery uses project IDs and commit dates from fetched data.
 
 **Skip conditions (any triggers silent skip):**
-- All URL fetches in Step 2a failed AND no `--links` provided (no project/date context)
+- No confirmed GitLab project/date context is available from Step 2a
 
 **Procedure:**
 
 1. **Runtime tool verification:** Call `mcp__gitlab__list_commits` with a minimal query (the first project, `per_page=1`, `since` = 1 hour ago). If the call returns an error indicating the tool does not exist or is unsupported, emit `"⚠ GitLab list_commits 不可用，跳过关联提交发现。"` and skip discovery entirely.
 
-2. **Build discovery queries:** For each unique `project_id` extracted from user-provided URLs:
+2. **Build discovery queries:** For each unique `project_id` extracted from user-confirmed URLs:
    - Determine time window: `since` = (earliest user commit date − 30 days), `until` = (latest user commit date + 7 days)
    - Query: `mcp__gitlab__list_commits(project_id, since, until, per_page=100)`
    - Budget: 1 verification call + up to 29 project queries = 30 total cap
-   - If no project context is available (no `--links`): skip discovery gracefully with `"⚠ 无项目上下文，跳过关联提交发现。"`
+   - If no project context is available: skip discovery gracefully with `"⚠ 无项目上下文，跳过关联提交发现。"`
 
 3. **Execution bounds:**
    - **Call cap:** Maximum 30 total `list_commits` API calls (including verification). Stop querying remaining projects if cap reached.
    - **Timeout:** 30-second wall-clock timeout for entire discovery sub-step. If exceeded, use collected results and emit `"⚠ 关联提交发现超时 (30s)，使用已收集的部分结果。"`
 
-4. **Keyword post-filter:** From returned commits, keep only those whose commit message contains at least one keyword from the Step 2b keyword set (the deduplicated 10-15 terms from description + fetched diff file path stems). Discard commits already in user-provided set (by SHA match).
+4. **Keyword post-filter:** From returned commits, keep only those whose commit message contains at least one keyword from the Step 2b keyword set (the deduplicated 10-15 terms from description + fetched diff file path stems). Discard commits already in user-confirmed set (by SHA match).
 
 5. **Output:** Store as `discovered_commits[]` with fields: `sha`, `project_id`, `title`, `authored_date`, `web_url` (constructed as `https://{host}/{project_path}/-/commit/{sha}`). Cap at 20 commits (sorted by date, most recent first).
 
@@ -168,7 +153,7 @@ Collect all investigator reports. Extract unique second-level directory prefixes
 
 ### Step 4: Phase 2 — Iterative Expansion
 
-**Depth gate:** If `--depth shallow`, execute exactly 1 round (spawn 2 agents), skip convergence check, and proceed directly to Step 5. If `--depth deep` (or no flag specified), run the full loop below.
+Run the full deep investigation loop by default.
 
 Loop up to 5 rounds (max 15 total successful agent spawns across all rounds including Phase 1).
 
@@ -178,8 +163,6 @@ Each round, spawn N `aosp-investigator` subagents where N is determined by disco
 - **Per-round cap:** never exceed 3 agents in a single round
 - **Total cap:** 15 successful spawns across all phases (Phase 1 + Phase 2) still applies
 - **Tunable constant:** The 5-prefix scaling threshold is an initial heuristic. Adjust based on observed discovery patterns — lower it if features consistently under-explore, raise it if agent spawns are wasted on diminishing returns.
-
-When `--depth shallow` is active, dynamic scaling is moot (only 1 round executes with 2 agents).
 
 Pass them the accumulated findings so far and let them independently decide how to expand the search — the orchestrator provides context, not queries:
 
@@ -247,35 +230,28 @@ The orchestrator's only heavy-lifting phase — merge investigator reports into 
 7. **Construct commit URLs:** For each input link's project, build browsable commit URLs using format `https://{host}/{project_path}/-/commit/{sha}`. If the input was an MR, use the MR's source commits. Include these URLs in the output under "Vendor相关提交".
 8. Build the output document **in Chinese** using the template below
 
-### Step 5b: Append Mode (if `--append` flag)
+### Step 5b: Existing Export Context
 
-If `--append` is NOT set, skip this step entirely.
+If `.granada/aosp-exports/<slug>.md` already exists for the confirmed sub-feature, load it as prior context automatically.
 
 1. Compute slug from description (same logic as Step 6)
 2. Check if `.granada/aosp-exports/<slug>.md` exists
-   - If not: emit `"⚠ 未找到已有导出文件，回退到完整模式。"` and proceed normally (append degrades to full mode gracefully — Phase 1 executes as usual)
+   - If not: skip this step
    - If exists: load the file and extract:
-     a. `discovered_prefixes` from the "相关AOSP项目" table
+     a. previously documented implementation concerns and AOSP paths
      b. `last_verified` timestamp from the metadata section
-     c. All previously documented file paths
+     c. all previously documented file paths
 
 3. **Staleness check:**
    - Parse `last_verified` from the existing document's metadata section
-   - If `last_verified` is older than 30 days: emit warning to user: `"⚠ 上次验证已超过30天 ({date})。建议不使用 --append 重新完整导出。"`
+   - If `last_verified` is older than 30 days: emit warning to user: `"⚠ 上次验证已超过30天 ({date})。将基于当前代码重新完整导出。"`
    - Proceed regardless (warning only, not blocking)
 
-4. **Inject prior context into Phase 2:**
-   - Skip Phase 1 (Step 3) entirely — use loaded prefixes as the starting set for `discovered_prefixes`
-   - In Phase 2 agent prompts, include loaded prefixes in the "Previously discovered" list
-   - Phase 2 runs normally (respecting `--depth` flag), searching only for NEW findings
-
-5. **Merge strategy:**
-   - New findings are APPENDED to existing sections (not replacing)
+4. **Merge strategy:**
+   - Use existing findings only as background context for deduplication and comparison
    - Duplicate file paths are deduplicated (keep the newer observation)
    - Update `last_verified` timestamp to current date
-   - Update convergence stats to reflect the append run
-
-**Known limitation:** If the AOSP codebase has undergone major directory renames or module splits since the last export, stale prefixes may send Phase 2 agents down dead paths. In this case, re-run without `--append` for a fresh full export.
+   - Update convergence stats to reflect the current run
 
 ### Step 6: Save
 
@@ -403,7 +379,7 @@ Skill is idempotent — re-running with the same inputs overwrites the output fi
 
 - **上次验证:** {last_verified date}
 - **更新模式:** {完整导出 / 增量追加}
-- **增量历史:** {append count, if applicable}
+- **历史上下文:** {是否发现已有导出并用于对比/去重}
 - **范围拆分:** {未拆分 / 已拆分，导出子功能: <name>，剩余候选: <list>}
 ```
 
@@ -426,7 +402,7 @@ Skill is idempotent — re-running with the same inputs overwrites the output fi
 
 ## Known Limitations (关联提交发现 V1)
 
-- **Multi-project:** Only searches within projects referenced by user-provided `--links` URLs. No cross-project or group-level discovery. (Future: GitLab group-level commit search or cross-reference via MR links.)
+- **Multi-project:** Only searches within projects discovered from confirmed GitLab context. No cross-project or group-level discovery. (Future: GitLab group-level commit search or cross-reference via MR links.)
 - **Precision:** Project-scoped (not path-filtered). Keyword filtering reduces noise but may miss semantically related commits with different terminology. (Future: path-level filtering for higher precision.)
 - **Tool dependency:** Requires `mcp__gitlab__list_commits` from the GitLab MCP server. Silently skipped if unavailable.
-- **Append interaction:** Discovered commits are included in append-mode dedup (by SHA). Re-running with `--append` will not duplicate previously discovered commits.
+- **Existing export interaction:** Previously exported findings are used for comparison and deduplication when an export with the same slug already exists.
