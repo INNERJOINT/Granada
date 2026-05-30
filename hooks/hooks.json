@@ -1,0 +1,19 @@
+{
+  "description": "Zaku plugin hooks",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Write(*/.granada/*.md)",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/hooks/PostToolUse/translate-artifact.cjs"],
+            "timeout": 360
+          }
+        ]
+      }
+    ]
+  }
+}

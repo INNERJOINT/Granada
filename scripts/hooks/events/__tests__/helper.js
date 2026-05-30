@@ -8,14 +8,16 @@ const HOOKS_DIR = resolve(import.meta.dirname, '..');
  * Returns { stdout, stderr, exitCode, json }.
  */
 export function runHook(hookFile, input, options = {}) {
-  const { timeout = 5000 } = options;
+  const { timeout = 5000, env = {}, cwd, args = [] } = options;
   const scriptPath = resolve(HOOKS_DIR, hookFile);
   const inputStr = typeof input === 'string' ? input : JSON.stringify(input);
 
   return new Promise((res) => {
-    const child = spawn('node', [scriptPath], {
+    const child = spawn('node', [scriptPath, ...args], {
       stdio: ['pipe', 'pipe', 'pipe'],
       timeout,
+      cwd,
+      env: { ...process.env, ...env },
     });
 
     let stdout = '';

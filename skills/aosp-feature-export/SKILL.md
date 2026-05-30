@@ -3,11 +3,12 @@ description: Export documentation for vendor-modified or vendor-added AOSP featu
 argument-hint: '"<vendor feature description>"'
 model: opus
 level: 3
+translate-dirs: [.granada/aosp-exports]
 ---
 
 # AOSP Feature Export Skill
 
-Documents vendor/third-party features added on top of AOSP. Takes a concrete vendor feature description and GitLab MR/commit URLs (vendor changes) as input, delegates URL inspection to `gitlab-info` to identify modification points, then uses the `mcp__plugin_zaku_sourcepilot__*` tools to search the AOSP codebase for the original code being modified or extended. Outputs a Chinese-language markdown document focused on the feature's problem, vendor solution, implementation method, related context code, and verification approach, archived to `.granada/aosp-exports/`.
+Documents vendor/third-party features added on top of AOSP. Takes a concrete vendor feature description and GitLab MR/commit URLs (vendor changes) as input, delegates URL inspection to `gitlab-info` to identify modification points, then uses the `mcp__plugin_zaku_sourcepilot__*` tools to search the AOSP codebase for the original code being modified or extended. Outputs an English canonical markdown document focused on the feature's problem, vendor solution, implementation method, related context code, and verification approach, archived to `.granada/aosp-exports/`. After the canonical export is written, the plugin `PostToolUse` hook generates a best-effort Simplified Chinese sibling file with `_zh.md` suffix in the same directory.
 
 **Key distinction:** The feature being documented is NOT an AOSP built-in feature. It is a vendor customization — code added or modified by the third-party vendor on top of AOSP. The AOSP search phase finds the original context that the vendor code interacts with.
 
@@ -218,7 +219,7 @@ The orchestrator's only heavy-lifting phase — merge investigator reports into 
    c. **Implementation path:** entry point → key modified code → AOSP context code → state/config/permission/service/native/HAL dependency → observable effect
    d. **Verification path:** logs, settings UI behavior, command/API observation, tests, or runtime state that can prove the feature works
 4. Group findings by implementation concern first, and by AOSP path second. Example concern groups: UI/entry, framework/service flow, persistence/config, permission/SELinux, native/HAL boundary, verification/test.
-5. Synthesize "实现方法" and "实现思路" from concrete code paths and snippets. Do not produce a broad architecture survey unless it directly explains the vendor solution.
+5. Synthesize "Implementation method" and "implementation rationale" from concrete code paths and snippets. Do not produce a broad architecture survey unless it directly explains the vendor solution.
 6. Map cross-project dependencies only when they are required to explain the implementation path.
 6b. **Adaptive template sections:**
    - If the feature is small, use condensed output and fold interface/path summaries into "实现路径".
@@ -226,9 +227,9 @@ The orchestrator's only heavy-lifting phase — merge investigator reports into 
    - If only 1 AOSP project discovered, omit a separate project summary table unless it clarifies the implementation.
    - If no cross-project dependencies are required to explain the solution, omit "依赖关系".
    - If `discovered_commits[]` is empty (no project context or no matches), omit "发现的关联提交".
-   - **Always include:** 概览, Vendor问题与解法, 实现方法, 关键上下文代码, 验证方法, 调查日志
-7. **Construct commit URLs:** For each input link's project, build browsable commit URLs using format `https://{host}/{project_path}/-/commit/{sha}`. If the input was an MR, use the MR's source commits. Include these URLs in the output under "Vendor相关提交".
-8. Build the output document **in Chinese** using the template below
+   - **Always include:** Overview, Vendor Problem and Solution, Implementation Method, Key Context Code, Verification Method, Investigation Log
+7. **Construct commit URLs:** For each input link's project, build browsable commit URLs using format `https://{host}/{project_path}/-/commit/{sha}`. If the input was an MR, use the MR's source commits. Include these URLs in the output under "Vendor-Related Commits".
+8. Build the canonical output document **in English** using the template below
 
 ### Step 5b: Existing Export Context
 
@@ -244,7 +245,7 @@ If `.granada/aosp-exports/<slug>.md` already exists for the confirmed sub-featur
 
 3. **Staleness check:**
    - Parse `last_verified` from the existing document's metadata section
-   - If `last_verified` is older than 30 days: emit warning to user: `"⚠ 上次验证已超过30天 ({date})。将基于当前代码重新完整导出。"`
+   - If `last_verified` is older than 30 days: emit warning to user: `"⚠ Last verification is older than 30 days ({date}). A full export will be regenerated from current code."`
    - Proceed regardless (warning only, not blocking)
 
 4. **Merge strategy:**
@@ -257,14 +258,15 @@ If `.granada/aosp-exports/<slug>.md` already exists for the confirmed sub-featur
 
 1. Generate slug from description: lowercase, replace spaces/special chars with hyphens, max 50 chars
 2. Create `.granada/aosp-exports/` directory if it doesn't exist
-3. Write output to `.granada/aosp-exports/<slug>.md`
-4. Call `Bash: rm -f .granada/aosp-feature-export-state.json`
-5. Confirm to user: `Feature export saved to .granada/aosp-exports/<slug>.md`
+3. Write the English canonical output to `.granada/aosp-exports/<slug>.md`
+4. The plugin `PostToolUse` hook will best-effort generate `.granada/aosp-exports/<slug>_zh.md` after the canonical file is written. Translation failures warn but do not invalidate or modify the English canonical export.
+5. Call `Bash: rm -f .granada/aosp-feature-export-state.json`
+6. Confirm to user: `Feature export saved to .granada/aosp-exports/<slug>.md`; if the hook succeeded, also mention `.granada/aosp-exports/<slug>_zh.md`.
 
 ### Error Recovery
 
 On any unrecoverable error after Step 0:
-- If agent data has been collected, write partial results to `.granada/aosp-exports/<slug>-partial.md`
+- If agent data has been collected, write partial results to `.granada/aosp-exports/<slug>-partial.md` (partial files are not translated by the hook)
 - Call `Bash: rm -f .granada/aosp-feature-export-state.json`
 - Report the error to the user
 
@@ -273,114 +275,114 @@ Skill is idempotent — re-running with the same inputs overwrites the output fi
 ## Output Template
 
 ```markdown
-# Vendor功能元导出: {feature_name}
+# Vendor Feature Element Export: {feature_name}
 
-## 概览
-- **功能:** {confirmed_sub_feature_description}
-- **原始输入:** {original_description, if scope was split; otherwise same as 功能}
-- **类型:** Vendor/第三方定制功能
-- **范围粒度:** {单一目的 / 已从大范围拆分 / 用户确认的子功能}
-- **AOSP项目:** {project_name from .granada/aosp-config.json, or "未配置"}
-- **导出日期:** {date}
-- **输入链接:** {url_list or "无"}
-- **输入提交:** {commit_list or "无"}
-- **提取关键词:** {keyword_list}
-- **搜索轮次:** {n}/5
-- **发现AOSP关联项目数:** {count}
-- **收敛情况:** {在第X轮收敛 / 达到最大轮次}
-- **关联提交发现:** {启用/未启用} {如启用: "发现 N 条, 耗时 Xs" / "工具不可用，已跳过" / "超时，部分结果"}
+## Overview
+- **Feature:** {confirmed_sub_feature_description}
+- **Original input:** {original_description, if scope was split; otherwise same as Feature}
+- **Type:** Vendor/third-party customization
+- **Scope granularity:** {single purpose / split from broad scope / user-confirmed sub-feature}
+- **AOSP project:** {project_name from .granada/aosp-config.json, or "not configured"}
+- **Export date:** {date}
+- **Input links:** {url_list or "none"}
+- **Input commits:** {commit_list or "none"}
+- **Extracted keywords:** {keyword_list}
+- **Search rounds:** {n}/5
+- **Discovered AOSP project count:** {count}
+- **Convergence:** {converged at round X / reached max rounds}
+- **Related commit discovery:** {enabled/disabled} {if enabled: "found N commits in Xs" / "tool unavailable, skipped" / "timed out, partial results"}
 
-## Vendor问题与解法
+## Vendor Problem and Solution
 
-- **要解决的问题:** {vendor改动要解决的具体用户行为、API行为、设备行为或集成缺口}
-- **Vendor做法:** {vendor增加或修改了什么逻辑}
-- **为什么这样可行:** {AOSP原有机制如何允许该做法生效}
-- **最终效果:** {用户可见、系统可观察或接口可验证的结果}
+- **Problem to solve:** {specific user behavior, API behavior, device behavior, or integration gap addressed by the vendor change}
+- **Vendor method:** {what logic the vendor added or modified}
+- **Why it works:** {how the original AOSP mechanism allows this approach to take effect}
+- **Final effect:** {user-visible, system-observable, or interface-verifiable result}
 
-## Vendor修改概述
+## Vendor Modification Summary
 
-{基于GitLab diff的vendor改动摘要。说明vendor修改了哪些文件、增加了什么逻辑、修改入口点在哪里。只保留与确认子功能直接相关的改动。}
+{Summarize the vendor change from the GitLab diff. Explain which files were changed, what logic was added, and where the modified entry point is. Keep only changes directly related to the confirmed sub-feature.}
 
-## 实现方法
+## Implementation Method
 
-### 1. {实现步骤名称}
-- **目的:** {该步骤解决什么子问题}
-- **Vendor改动:** `{vendor/file/path}` {类/方法/常量/配置的修改方式}
-- **AOSP上下文:** `{aosp/file/path}` {原始机制、调用关系或状态流}
-- **实现思路:** {为什么这个改动能让功能生效}
-- **关键代码:**
+### 1. {implementation step name}
+- **Purpose:** {what sub-problem this step solves}
+- **Vendor change:** `{vendor/file/path}` {how the class/method/constant/configuration was changed}
+- **AOSP context:** `{aosp/file/path}` {original mechanism, call relationship, or state flow}
+- **Implementation rationale:** {why this change makes the feature work}
+- **Key code:**
   ```
   {relevant code excerpt}
   ```
 
-### 2. {实现步骤名称}
-- **目的:** {该步骤解决什么子问题}
-- **Vendor改动:** `{vendor/file/path}` {类/方法/常量/配置的修改方式}
-- **AOSP上下文:** `{aosp/file/path}` {原始机制、调用关系或状态流}
-- **实现思路:** {为什么这个改动能让功能生效}
-- **关键代码:**
+### 2. {implementation step name}
+- **Purpose:** {what sub-problem this step solves}
+- **Vendor change:** `{vendor/file/path}` {how the class/method/constant/configuration was changed}
+- **AOSP context:** `{aosp/file/path}` {original mechanism, call relationship, or state flow}
+- **Implementation rationale:** {why this change makes the feature work}
+- **Key code:**
   ```
   {relevant code excerpt}
   ```
 
-## 关键上下文代码
+## Key Context Code
 
-| 关注点 | 文件 | 类型 | 对实现方法的作用 |
-|--------|------|------|----------------|
-| {UI入口/API入口/服务流程/配置持久化/权限/Native/HAL/测试} | `{file_path}` | {Java/Kotlin/C++/AIDL/HIDL/XML/SELinux/Test} | {该代码如何解释vendor做法} |
+| Concern | File | Type | Role in the implementation method |
+|---------|------|------|-----------------------------------|
+| {UI entry/API entry/service flow/config persistence/permission/Native/HAL/test} | `{file_path}` | {Java/Kotlin/C++/AIDL/HIDL/XML/SELinux/Test} | {how this code explains the vendor approach} |
 | ... | ... | ... | ... |
 
-## 关键接口与数据流
+## Key Interfaces and Data Flow
 
-{仅当接口或跨层数据流对实现方法必要时保留。说明 AIDL/HIDL/Java API/Native/JNI/Intent/Content Provider/System Service/HAL 等如何参与该功能。}
+{Keep this section only when interfaces or cross-layer data flow are necessary to explain the implementation method. Explain how AIDL/HIDL/Java API/Native/JNI/Intent/Content Provider/System Service/HAL participate in the feature.}
 
 ```text
 {entry point} -> {vendor modified code} -> {AOSP context code} -> {state/config/service/native/HAL dependency} -> {observable effect}
 ```
 
-## 验证方法
+## Verification Method
 
-- **验证入口:** {Settings页面、命令、API、日志、测试或运行时状态}
-- **预期现象:** {功能生效时应观察到什么}
-- **关键日志/状态:** {可选，log tag、setting key、property、database row、service state等}
-- **回归关注:** {该功能可能影响的相邻逻辑}
+- **Verification entry:** {Settings page, command, API, log, test, or runtime state}
+- **Expected behavior:** {what should be observed when the feature works}
+- **Key logs/state:** {optional log tag, setting key, property, database row, service state, etc.}
+- **Regression focus:** {adjacent logic that may be affected by this feature}
 
-## 辅助架构上下文
+## Supporting Architecture Context
 
-{只说明理解实现方法所必需的架构关系。避免扩展成完整AOSP模块介绍。}
+{Only describe architecture relationships required to understand the implementation method. Avoid expanding this into a full AOSP module overview.}
 
-## Vendor相关提交
+## Vendor-Related Commits
 
 - [{commit_message}]({https://gitlab.host/project_path/-/commit/full_sha}) ({date})
 
-## 发现的关联提交
+## Discovered Related Commits
 
-> 以下提交通过关联提交发现自动获取，非用户直接提供。基于项目时间窗口和关键词匹配筛选。
+> These commits were discovered automatically, not directly provided by the user. They are filtered by project time window and keyword matching.
 
-| 项目 | SHA | 提交信息 | 日期 | 链接 |
-|------|-----|----------|------|------|
-| {project_path} | {short_sha} | {title} | {date} | [查看]({web_url}) |
+| Project | SHA | Commit message | Date | Link |
+|---------|-----|----------------|------|------|
+| {project_path} | {short_sha} | {title} | {date} | [View]({web_url}) |
 | ... | ... | ... | ... | ... |
 
-**发现参数:** 时间窗口 {since} ~ {until}, 关键词匹配 {keyword_count} 个, 扫描项目 {project_count} 个
+**Discovery parameters:** time window {since} ~ {until}, matched {keyword_count} keywords, scanned {project_count} projects
 
-## 调查日志
+## Investigation Log
 
-| 轮次 | 查询/关注点 | 新增前缀 | 总前缀数 | 总文件数 |
-|------|------------|----------|----------|----------|
-| 1 (发现) | {keyword groups or implementation concerns} | {n} | {n} | {n} |
+| Round | Query/focus | New prefixes | Total prefixes | Total files |
+|-------|-------------|--------------|----------------|-------------|
+| 1 (discovery) | {keyword groups or implementation concerns} | {n} | {n} | {n} |
 | 2 | {new implementation concerns} | {n} | {n} | {n} |
 | ... | ... | ... | ... | ... |
 | {final} | {queries} | {n} | {n} | {n} |
 
-**终止原因:** {收敛 (< 3个新前缀) / 达到最大轮次 / 部分失败}
+**Stop reason:** {converged (< 3 new prefixes) / reached max rounds / partial failure}
 
-## 元数据
+## Metadata
 
-- **上次验证:** {last_verified date}
-- **更新模式:** {完整导出 / 增量追加}
-- **历史上下文:** {是否发现已有导出并用于对比/去重}
-- **范围拆分:** {未拆分 / 已拆分，导出子功能: <name>，剩余候选: <list>}
+- **Last verified:** {last_verified date}
+- **Update mode:** {full export / incremental append}
+- **Historical context:** {whether an existing export was found and used for comparison/deduplication}
+- **Scope split:** {not split / split, exported sub-feature: <name>, remaining candidates: <list>}
 ```
 
 ## Keyword Triggers
@@ -390,6 +392,20 @@ Skill is idempotent — re-running with the same inputs overwrites the output fi
 ## Configuration
 
 - Output directory: `.granada/aosp-exports/` (fixed)
+- Chinese sibling output: `.granada/aosp-exports/<slug>_zh.md` (best-effort hook-derived translation, overwritten atomically on success)
+- Translation hook configuration:
+  - Skill frontmatter keeps `translate-dirs: [.granada/aosp-exports]` to limit eligible Markdown writes
+  - `GRANADA_TRANSLATE_COMMAND` defines the local translation command; default is `claude -p --model sonnet`
+  - For `claude`, only `claude -p` and `claude -p --model <model>` are accepted
+  - Optional `translate-timeout-ms` can be set in skill frontmatter (default 300000)
+  - `TRANSLATE_MD_ZH_ALLOWED_COMMANDS` (optional comma-separated executable allowlist, default `claude`; tests may set `claude,node`)
+- Debugging:
+  - `GRANADA_DEBUG` controls stderr log threshold without affecting hook stdout JSON
+  - Levels: `V` (verbose), `D` (debug), `I` (info), `W` (warn), `E` (error)
+  - `1` / `true` / `yes` / `on` are treated as `D`
+  - Current events: skip reasons log at `D`; translation start/success log at `I`; translation failures log at `E`
+- Test-only hook override:
+  - `TRANSLATE_MD_ZH_MOCK_TEXT` returns fixed translated text without invoking `translate-command`
 - Max iteration rounds: 5
 - Max total agent spawns: 15
 - Convergence threshold: < 3 new second-level prefixes per round
