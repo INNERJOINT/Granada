@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, renameSync, unlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { runHook, baseInput } from './helper.js';
 
 describe('PreToolUse', () => {
@@ -59,6 +60,173 @@ describe('PreToolUse', () => {
     });
     const { exitCode, json } = await runHook('pre-tool-use.cjs', input);
     expect(exitCode).toBe(0);
+    expect(json).toBeNull();
+  });
+});
+
+describe('PreToolUse ESM slice (direct handler)', () => {
+  const sliceUrl = pathToFileURL(
+    resolve(import.meta.dirname, '../pre-tool-use/index.js'),
+  ).href;
+
+  it('denies dangerous Bash commands without IO', async () => {
+    const { handlePreToolUseHook } = await import(sliceUrl);
+    const output = handlePreToolUseHook(
+      baseInput('PreToolUse', {
+        tool_name: 'Bash',
+        tool_input: { command: 'rm -rf /' },
+        tool_use_id: 'tu_d_001',
+      }),
+      {},
+    );
+    expect(output.hookSpecificOutput.hookEventName).toBe('PreToolUse');
+    expect(output.hookSpecificOutput.permissionDecision).toBe('deny');
+    expect(output.hookSpecificOutput.permissionDecisionReason).toContain('rm -rf /');
+  });
+
+  it('allows read-only tools', async () => {
+    const { handlePreToolUseHook } = await import(sliceUrl);
+    for (const tool of ['Read', 'Glob', 'Grep']) {
+      const output = handlePreToolUseHook(
+        baseInput('PreToolUse', {
+          tool_name: tool,
+          tool_input: { file_path: '/tmp/x' },
+          tool_use_id: `tu_d_${tool}`,
+        }),
+        {},
+      );
+      expect(output.hookSpecificOutput.permissionDecision).toBe('allow');
+    }
+  });
+
+  it('asks before writes to config files', async () => {
+    const { handlePreToolUseHook } = await import(sliceUrl);
+    const output = handlePreToolUseHook(
+      baseInput('PreToolUse', {
+        tool_name: 'Write',
+        tool_input: { file_path: '/project/app.yaml', content: 'k: v' },
+        tool_use_id: 'tu_d_002',
+      }),
+      {},
+    );
+    expect(output.hookSpecificOutput.permissionDecision).toBe('ask');
+    expect(output.hookSpecificOutput.permissionDecisionReason).toContain('app.yaml');
+  });
+
+  it('mutates npm publish input with --dry-run', async () => {
+    const { handlePreToolUseHook } = await import(sliceUrl);
+    const output = handlePreToolUseHook(
+      baseInput('PreToolUse', {
+        tool_name: 'Bash',
+        tool_input: { command: 'npm publish', description: 'release', timeout: 60 },
+        tool_use_id: 'tu_d_003',
+      }),
+      {},
+    );
+    expect(output.hookSpecificOutput.permissionDecision).toBe('allow');
+    expect(output.hookSpecificOutput.updatedInput.command).toBe('npm publish --dry-run');
+    expect(output.hookSpecificOutput.updatedInput.description).toBe('release');
+    expect(output.hookSpecificOutput.updatedInput.timeout).toBe(60);
+  });
+
+  it('returns null for normal Bash commands (no-output sentinel)', async () => {
+    const { handlePreToolUseHook } = await import(sliceUrl);
+    const output = handlePreToolUseHook(
+      baseInput('PreToolUse', {
+        tool_name: 'Bash',
+        tool_input: { command: 'echo hello' },
+        tool_use_id: 'tu_d_004',
+      }),
+      {},
+    );
+    expect(output).toBeNull();
+  });
+
+  it('exports only handlePreToolUseHook from the slice', async () => {
+    const slice = await import(sliceUrl);
+    const exported = Object.keys(slice).filter((k) => k !== 'default');
+    expect(exported).toEqual(['handlePreToolUseHook']);
+    expect(typeof slice.handlePreToolUseHook).toBe('function');
+    expect(slice.default).toBeUndefined();
+  });
+
+  it('imports without side effects (no stdout/stderr, no exit)', async () => {
+    const probeScript = `
+      const chunks = { stdout: '', stderr: '' };
+      const origStdout = process.stdout.write.bind(process.stdout);
+      const origStderr = process.stderr.write.bind(process.stderr);
+      const origExit = process.exit;
+      process.stdout.write = (chunk) => { chunks.stdout += String(chunk); return true; };
+      process.stderr.write = (chunk) => { chunks.stderr += String(chunk); return true; };
+      process.exit = (code) => { chunks.exited = code; };
+      import(${JSON.stringify(sliceUrl)}).then((m) => {
+        process.stdout.write = origStdout;
+        process.stderr.write = origStderr;
+        process.exit = origExit;
+        origStdout(JSON.stringify({
+          stdout: chunks.stdout,
+          stderr: chunks.stderr,
+          exited: chunks.exited ?? null,
+          exportNames: Object.keys(m).filter((k) => k !== 'default'),
+        }));
+      });
+    `;
+    const { spawn } = await import('node:child_process');
+    const result = await new Promise((res) => {
+      const child = spawn('node', ['--input-type=module', '-e', probeScript], {
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      let stdout = '';
+      let stderr = '';
+      child.stdout.on('data', (d) => { stdout += d; });
+      child.stderr.on('data', (d) => { stderr += d; });
+      child.on('close', (code) => res({ stdout, stderr, code }));
+    });
+    expect(result.code).toBe(0);
+    expect(result.stderr).toBe('');
+    const probe = JSON.parse(result.stdout);
+    expect(probe.stdout).toBe('');
+    expect(probe.stderr).toBe('');
+    expect(probe.exited).toBeNull();
+    expect(probe.exportNames).toEqual(['handlePreToolUseHook']);
+  });
+});
+
+describe('PreToolUse wrapper contract', () => {
+  it('produces empty stdout and silent stderr for null handler output', async () => {
+    const input = baseInput('PreToolUse', {
+      tool_name: 'Bash',
+      tool_input: { command: 'echo wrapper' },
+      tool_use_id: 'tu_w_001',
+    });
+    const { exitCode, stdout, stderr } = await runHook('pre-tool-use.cjs', input);
+    expect(exitCode).toBe(0);
+    expect(stdout).toBe('');
+    expect(stderr).toBe('');
+  });
+
+  it('serializes decision objects exactly to stdout JSON', async () => {
+    const input = baseInput('PreToolUse', {
+      tool_name: 'Read',
+      tool_input: { file_path: '/tmp/exact.js' },
+      tool_use_id: 'tu_w_002',
+    });
+    const { exitCode, stdout, stderr } = await runHook('pre-tool-use.cjs', input);
+    expect(exitCode).toBe(0);
+    expect(stderr).toBe('');
+    expect(JSON.parse(stdout)).toEqual({
+      hookSpecificOutput: {
+        hookEventName: 'PreToolUse',
+        permissionDecision: 'allow',
+        permissionDecisionReason: 'Read-only operation auto-approved',
+      },
+    });
+  });
+
+  it('exits non-zero with empty stdout when input is not valid JSON', async () => {
+    const { exitCode, stdout, json } = await runHook('pre-tool-use.cjs', '{not json');
+    expect(exitCode).not.toBe(0);
+    expect(stdout).toBe('');
     expect(json).toBeNull();
   });
 });
@@ -151,6 +319,110 @@ describe('aosp-feature-export translation hook', () => {
     });
   }
 
+  function translationDeps(cwd, env = {}) {
+    return {
+      fs: { readFileSync, writeFileSync, existsSync, renameSync, unlinkSync },
+      env,
+      cwd,
+      skillPathArg: 'skills/translate-md-zh/SKILL.md',
+      pid: 123,
+      now: () => 456,
+      logger: { log() {} },
+    };
+  }
+
+  it('defaults Claude translation command to no session persistence', async () => {
+    const cwd = makeProject();
+    const configUrl = pathToFileURL(resolve(import.meta.dirname, '../post-tool-use/translate-artifact/config.js')).href;
+    const { readTranslationConfig } = await import(configUrl);
+
+    const config = readTranslationConfig(cwd, translationDeps(cwd));
+
+    expect(config.command).toBe('claude -p --model sonnet --no-session-persistence');
+  });
+
+  it('direct ESM handler writes zh sibling for eligible export writes', async () => {
+    const cwd = makeProject();
+    const source = join(cwd, '.granada', 'aosp-exports', 'feature.md');
+    writeFileSync(source, '# English\n\nHello', 'utf8');
+    const sliceUrl = pathToFileURL(resolve(import.meta.dirname, '../post-tool-use/translate-artifact/index.js')).href;
+    const { handleTranslateArtifactHook } = await import(sliceUrl);
+
+    const output = await handleTranslateArtifactHook(
+      makeExportInput(cwd, '.granada/aosp-exports/feature.md'),
+      translationDeps(cwd, { TRANSLATE_MD_ZH_MOCK_TEXT: '# 中文' }),
+    );
+
+    expect(output).toBeNull();
+    expect(readFileSync(join(cwd, '.granada', 'aosp-exports', 'feature_zh.md'), 'utf8')).toBe('# 中文');
+  });
+
+  it('direct ESM handler returns a warning output for translation failures', async () => {
+    const cwd = makeProject();
+    writeFileSync(join(cwd, '.granada', 'aosp-exports', 'feature.md'), '# English', 'utf8');
+    const sliceUrl = pathToFileURL(resolve(import.meta.dirname, '../post-tool-use/translate-artifact/index.js')).href;
+    const { handleTranslateArtifactHook } = await import(sliceUrl);
+
+    const output = await handleTranslateArtifactHook(
+      makeExportInput(cwd, '.granada/aosp-exports/feature.md'),
+      translationDeps(cwd, { GRANADA_TRANSLATE_COMMAND: 'claude -p; echo unsafe' }),
+    );
+
+    expect(output.hookSpecificOutput.hookEventName).toBe('PostToolUse');
+    expect(output.hookSpecificOutput.additionalContext).toContain('unsafe shell metacharacters');
+    expect(existsSync(join(cwd, '.granada', 'aosp-exports', 'feature_zh.md'))).toBe(false);
+  });
+
+  it('exports only handleTranslateArtifactHook from the translation slice', async () => {
+    const sliceUrl = pathToFileURL(resolve(import.meta.dirname, '../post-tool-use/translate-artifact/index.js')).href;
+    const slice = await import(sliceUrl);
+    const exported = Object.keys(slice).filter((k) => k !== 'default');
+    expect(exported).toEqual(['handleTranslateArtifactHook']);
+    expect(slice.default).toBeUndefined();
+  });
+
+  it('imports translation slice without side effects', async () => {
+    const sliceUrl = pathToFileURL(resolve(import.meta.dirname, '../post-tool-use/translate-artifact/index.js')).href;
+    const probeScript = `
+      const chunks = { stdout: '', stderr: '' };
+      const origStdout = process.stdout.write.bind(process.stdout);
+      const origStderr = process.stderr.write.bind(process.stderr);
+      const origExit = process.exit;
+      process.stdout.write = (chunk) => { chunks.stdout += String(chunk); return true; };
+      process.stderr.write = (chunk) => { chunks.stderr += String(chunk); return true; };
+      process.exit = (code) => { chunks.exited = code; };
+      import(${JSON.stringify(sliceUrl)}).then((m) => {
+        process.stdout.write = origStdout;
+        process.stderr.write = origStderr;
+        process.exit = origExit;
+        origStdout(JSON.stringify({
+          stdout: chunks.stdout,
+          stderr: chunks.stderr,
+          exited: chunks.exited ?? null,
+          exportNames: Object.keys(m).filter((k) => k !== 'default'),
+        }));
+      });
+    `;
+    const { spawn } = await import('node:child_process');
+    const result = await new Promise((res) => {
+      const child = spawn('node', ['--input-type=module', '-e', probeScript], {
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      let stdout = '';
+      let stderr = '';
+      child.stdout.on('data', (d) => { stdout += d; });
+      child.stderr.on('data', (d) => { stderr += d; });
+      child.on('close', (code) => res({ stdout, stderr, code }));
+    });
+    expect(result.code).toBe(0);
+    expect(result.stderr).toBe('');
+    const probe = JSON.parse(result.stdout);
+    expect(probe.stdout).toBe('');
+    expect(probe.stderr).toBe('');
+    expect(probe.exited).toBeNull();
+    expect(probe.exportNames).toEqual(['handleTranslateArtifactHook']);
+  });
+
   it('writes zh sibling for eligible export writes', async () => {
     const cwd = makeProject();
     const source = join(cwd, '.granada', 'aosp-exports', 'feature.md');
@@ -181,7 +453,6 @@ describe('aosp-feature-export translation hook', () => {
       env: {
         GRANADA_DEBUG: 'E',
         GRANADA_TRANSLATE_COMMAND: 'node -e "process.exit(1)"',
-        TRANSLATE_MD_ZH_ALLOWED_COMMANDS: 'claude,node',
       },
     });
 
@@ -234,7 +505,7 @@ describe('aosp-feature-export translation hook', () => {
     writeFileSync(join(cwd, '.granada', 'aosp-exports', 'feature.md'), '# English', 'utf8');
 
     const { exitCode } = await runTranslationHook(cwd, makeExportInput(cwd, '.granada/aosp-exports/feature.md'), {
-      env: { GRANADA_TRANSLATE_COMMAND: 'node -e "process.stdin.pipe(process.stdout)"', TRANSLATE_MD_ZH_ALLOWED_COMMANDS: 'claude,node' },
+      env: { GRANADA_TRANSLATE_COMMAND: 'node -e "process.stdin.pipe(process.stdout)"' },
     });
 
     expect(exitCode).toBe(0);
@@ -286,19 +557,6 @@ describe('aosp-feature-export translation hook', () => {
 
     expect(exitCode).toBe(0);
     expect(json.hookSpecificOutput.additionalContext).toContain('unsafe shell metacharacters');
-    expect(existsSync(join(cwd, '.granada', 'aosp-exports', 'feature_zh.md'))).toBe(false);
-  });
-
-  it('rejects unexpected claude arguments', async () => {
-    const cwd = makeProject('translate-dirs: [.granada/aosp-exports]');
-    writeFileSync(join(cwd, '.granada', 'aosp-exports', 'feature.md'), '# English', 'utf8');
-
-    const { exitCode, json } = await runTranslationHook(cwd, makeExportInput(cwd, '.granada/aosp-exports/feature.md'), {
-      env: { GRANADA_TRANSLATE_COMMAND: 'claude --dangerously-skip-permissions' },
-    });
-
-    expect(exitCode).toBe(0);
-    expect(json.hookSpecificOutput.additionalContext).toContain('must be');
     expect(existsSync(join(cwd, '.granada', 'aosp-exports', 'feature_zh.md'))).toBe(false);
   });
 
