@@ -1,3 +1,9 @@
+## [2.13.0](https://github.com/INNERJOINT/Granada/compare/v2.12.0...v2.13.0) (2026-05-31)
+
+### Features
+
+* **hooks:** add artifact translation hook ([9729fbf](https://github.com/INNERJOINT/Granada/commit/9729fbf077e52a89f43a60cc510cd5f65af6c38c))
+
 ## [2.12.0](https://github.com/INNERJOINT/Granada/compare/v2.11.0...v2.12.0) (2026-05-29)
 
 ### Features
