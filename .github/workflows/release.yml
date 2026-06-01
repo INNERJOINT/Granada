@@ -23,6 +23,11 @@ jobs:
           node-version: 22
 
       - run: npm ci
+      - run: npm run typecheck:hooks
+      - run: npm run build:hooks
+      - run: git diff --exit-code -- dist
+      - run: npm test
+      - run: npm run verify:hooks-package
 
       - name: Semantic Release
         env:

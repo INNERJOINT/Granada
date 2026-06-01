@@ -1,5 +1,11 @@
 # Claude Code Hooks 文档覆盖矩阵（Input / Control）
 
+## Runtime layout
+
+`hooks/hooks.json` intentionally keeps the stable Claude Code entrypoint at `scripts/hooks/adapters/claude-entry.cjs`. That file is a minimal CommonJS bootstrap which imports the committed ESM runtime at `dist/adapters/claude-entry.js` and calls its exported `main(...)` function. TypeScript source lives under `src/hooks/**` and is compiled with `npm run build:hooks`.
+
+Use `npm run typecheck:hooks`, `npm run build:hooks`, `npm test`, and `npm run verify:hooks-package` before release. The package verification command packs the plugin, extracts it, executes the packed manifest-facing hook entrypoint, and verifies transitive `dist/**` imports work outside the repository tree. Malformed hook input and unknown routes intentionally exit quietly to avoid noisy Claude Code hook warnings.
+
 本 README 用于验收：每个 hook event 是否在该文档中**覆盖了事件专属输入字段（input）**以及**控制/输出方式（control/output）**。
 
 说明：

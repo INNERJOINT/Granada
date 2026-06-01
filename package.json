@@ -10,8 +10,11 @@
     "url": "git+https://github.com/INNERJOINT/Granada.git"
   },
   "scripts": {
-    "build": "echo 'no build step needed'",
-    "test": "vitest run",
+    "build": "npm run build:hooks",
+    "typecheck:hooks": "tsc -p tsconfig.json --noEmit",
+    "build:hooks": "tsc -p tsconfig.json",
+    "verify:hooks-package": "node scripts/verify-hooks-package.js",
+    "test": "npm run build:hooks && vitest run",
     "test:watch": "vitest"
   },
   "dependencies": {
@@ -21,8 +24,10 @@
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/exec": "^7.0.3",
     "@semantic-release/git": "^10.0.1",
+    "@types/node": "^25.9.1",
     "conventional-changelog-conventionalcommits": "^8.0.0",
     "semantic-release": "^24.2.3",
+    "typescript": "^6.0.3",
     "vitest": "^4.1.6"
   }
 }
