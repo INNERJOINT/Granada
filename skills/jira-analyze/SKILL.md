@@ -40,26 +40,8 @@ Automates Android bug root-cause analysis by fetching JIRA issue details via mcp
    - Direct key pattern: validate `^[A-Z][A-Z0-9_]+-\d+$`
    - If neither matches, abort with: "Could not parse JIRA issue key from input. Provide a URL (https://jira.example.com/browse/PROJ-123) or key (PROJ-123)."
 
-1b. **Resume check** (before MCP health checks):
-   - If `--fresh` flag is present: remove `.granada/jira-analyze-state.json`; remove `/tmp/jira-analyze-<KEY>` only after the issue key has passed `^[A-Z][A-Z0-9_]+-\d+$`, quote the target, and use `rm -rf -- "$target"`, then proceed as fresh run.
-   - Otherwise, read existing state: `Read .granada/jira-analyze-state.json`
-   - If state exists AND `active == true` AND `state.issue_key` matches current `<KEY>`:
-     - Display: "检测到未完成的分析 (phase: <current_phase>)。从断点恢复..."
-     - Validate temp directory exists: `ls /tmp/jira-analyze-<KEY>`
-     - Validate phase artifacts before skipping:
-       - Skip to Phase 3: verify `/tmp/jira-analyze-<KEY>/extracted/` has files
-       - Skip to Phase 4: verify `anomalies.md` contains at least one `### Anomaly` or `### Rank` heading
-       - Skip to Phase 5: verify `aosp-context.md` contains at least one `###` section heading
-       - Skip to Phase 6: verify `hypotheses.md` contains at least one `## Hypothesis` heading AND at least one `investigation-*.md` contains a `**Confidence:**` line
-     - Resume from the NEXT phase after `current_phase`:
-       - `initialize` → start Phase 2
-       - `data-collected` → start Phase 3
-       - `parsed` → start Phase 4
-       - `aosp-searched` → start Phase 5
-       - `investigated` → start Phase 6
-     - If temp directory missing OR artifact validation fails: restart from the failed phase (not Phase 1)
-   - If state exists but `issue_key` does NOT match: clear old state, start fresh
-   - If no state exists: start fresh (normal flow)
+1b. **Fresh start cleanup** (after issue key validation):
+   - If `--fresh` flag is present: remove `/tmp/jira-analyze-<KEY>` only after the issue key has passed `^[A-Z][A-Z0-9_]+-\d+$`, quote the target, and use `rm -rf -- "$target"`, then proceed.
 
 2. **MCP health checks** (run both in parallel):
    - JIRA: call `jira_get_issue(issue_key=<KEY>, fields="summary")` — if fails, abort with "mcp-atlassian unreachable. Check JIRA_URL, JIRA_USERNAME, JIRA_API_TOKEN env vars."
@@ -72,22 +54,7 @@ Automates Android bug root-cause analysis by fetching JIRA issue details via mcp
      - If not configured: display `**⚠ 未配置 AOSP 项目** — 搜索将不限定项目范围。运行 /zaku:aosp-project 设置项目。`
    (When no `--project` override is provided, the `aosp-investigator` subagent reads this config and passes `project` to search calls automatically. When `--project` is provided, the override is passed explicitly in subagent prompts — see Phase 4 and Phase 5.)
 
-4. **Initialize state**:
-```
-Write JSON to .granada/jira-analyze-state.json with, active=true, current_phase="initialize", state={
-  "issue_key": "<KEY>",
-  "temp_dir": "/tmp/jira-analyze-<KEY>",
-  "issue_summary": null,
-  "attachment_meta": "[]",
-  "log_file_types": "{}",
-  "anomaly_count": "0",
-  "hypothesis_count": "0",
-  "report_path": null,
-  "project_override": "<name>|null"
-})
-```
-
-5. **Create temp directory**:
+4. **Create temp directory**:
 ```bash
 mkdir -p /tmp/jira-analyze-<KEY>/extracted
 ```
@@ -116,7 +83,6 @@ Fetch issue details with comments excluded, collect log attachments or fallback 
 
 2. **Verify collection output**: After the agent completes, check that `/tmp/jira-analyze-<KEY>/extracted/` contains files and `/tmp/jira-analyze-<KEY>/file-classification.json` exists. If the collector reports FAILED or either artifact is missing, abort with "Log collection failed — extracted logs or classification manifest missing."
 
-3. **Update state**: `current_phase: "data-collected"`, persist `attachment_meta` and `log_file_types` from the collector summary.
 
 <!-- SYNC: skills/_shared/rca-pipeline.md#phase-3 -->
 ## Phase 3: Log Parsing and Timeline Construction (via aosp-log-parser Agent)
@@ -145,7 +111,6 @@ Report the total anomaly count at the end of your response."
 
 After the agent completes, check that `/tmp/jira-analyze-<KEY>/timeline.md` and `/tmp/jira-analyze-<KEY>/anomalies.md` exist. If not, abort with "Log parsing failed — timeline or anomalies output missing."
 
-Update state: `current_phase: "parsed"`, `anomaly_count: <N>` (from the agent's summary).
 
 <!-- /SYNC -->
 
@@ -198,7 +163,6 @@ Report for each target:
 - This file feeds into both hypothesis investigation (Phase 5) and the final report (Section 4)
 - If AOSP search returns no results for a target, note it as a gap — do not silently omit
 
-Update state: `current_phase: "aosp-searched"`.
 
 <!-- /SYNC -->
 
@@ -300,7 +264,6 @@ Report format:
 - Parse each agent's findings into structured format
 - Save to `/tmp/jira-analyze-<KEY>/investigation-<N>.md`
 - If an agent fails or times out, mark that hypothesis as "investigation incomplete" — do not fail the entire skill
-- Update state: `current_phase: "investigated"`, `hypothesis_count: <N>`
 
 <!-- /SYNC -->
 
@@ -382,10 +345,7 @@ Report format:
 
 5. **Post report as JIRA comment**: `jira_add_comment(issue_key=<KEY>, body=<redacted_report_content>)` — post the redacted report content as a comment on the JIRA issue. If this fails, warn but do not abort (the local report file is still available).
 
-6. **Finalize state and cleanup**:
-   - On success: `Bash: rm -f .granada/jira-analyze-state.json` — terminal exit
-   - On error-abort: `Write {"active": false, current_phase="error"} to .granada/jira-analyze-state.json` — preserves state for debugging
-   - Announce report location to user
+6. Announce report location to the user.
 
 </Steps>
 
@@ -402,30 +362,6 @@ Embed these handlers throughout all phases:
 - **JIRA comment post fails** → warn user, do not abort (local report file is still available)
 </Error_Handling>
 
-<State_Schema>
-```json
-{
-  "mode": "jira-analyze",
-  "active": true,
-  "current_phase": "initialize | data-collected | parsed | aosp-searched | investigated | complete | error",
-  "state": {
-    "issue_key": "string",
-    "temp_dir": "/tmp/jira-analyze-<KEY>",
-    "issue_summary": "string (title only)",
-    "attachment_meta": "[{\"filename\": \"\", \"type\": \"\", \"size_bytes\": 0}]",
-    "log_file_types": "{\"filename\": \"logcat|tombstone|anr|kernel|other\"}",
-    "anomaly_count": "0",
-    "hypothesis_count": "0",
-    "report_path": "string|null",
-    "project_override": "string|null"
-  }
-}
-```
-
-State is lightweight (<10KB). Parsed data lives in temp files (`/tmp/jira-analyze-<KEY>/`), not in state.
-
-Update state at each phase boundary for resumability. On resume, read state via `Read .granada/jira-analyze-state.json` and continue from `current_phase`.
-</State_Schema>
 
 <Tool_Usage>
 - `jira_get_issue` — Phase 1 JIRA health check (mcp-atlassian)
@@ -435,7 +371,6 @@ Update state at each phase boundary for resumability. On resume, read state via 
 - `Agent(subagent_type="zaku:aosp-investigator", model="sonnet")` — AOSP source search (Phase 4) and parallel hypothesis investigation (Phase 5)
 - `jira_add_comment` — post RCA report as comment on JIRA issue (mcp-atlassian)
 - `mcp__plugin_zaku_sourcepilot__*` — search AOSP source for crash-related code (always, not conditional)
-- `Write` / `Read` / `Bash rm` — phase persistence via .granada/jira-analyze-state.json and final report output
 </Tool_Usage>
 
 <Examples>
@@ -492,10 +427,9 @@ Why bad: AOSP search must run for ALL hypotheses, not just the highest-ranked on
 - mcp-atlassian for JIRA access (not jira-cli)
 - mcp__plugin_zaku_sourcepilot__* for AOSP source (always, not conditional) — **Phase 4 AOSP 源码分析是必选阶段**，除非十分确认问题与 AOSP 源码完全无关才可跳过
 - aosp-investigator subagent for both Phase 4 (AOSP context) and Phase 5 (hypothesis investigation)
-- Lightweight state (<10KB, file paths not data)
 - All 7 report sections (in Chinese)
 - Report posted as JIRA comment via jira_add_comment
-- Lead only orchestrates: MCP calls, state management, subagent spawning, report assembly
+- Lead only orchestrates: MCP calls, subagent spawning, report assembly
 
 **Must NOT have:**
 - Interactive/conversational mode (produces static report)

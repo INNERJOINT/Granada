@@ -67,21 +67,8 @@ This skill does NOT parse logs, generate timelines, produce RCA hypotheses, or o
    - Require `^[A-Za-z0-9._-]{1,40}$`.
    - Derive `target="/tmp/aosp-analyze-${slug}"` and require the resolved target to start with `/tmp/aosp-analyze-`.
 
-3. **Resume check** (after slug and target validation):
-   - If `--fresh` flag is present: remove `.granada/aosp-analyze-state.json`; remove the validated temp directory with `rm -rf -- "$target"`.
-   - Otherwise, read existing state: `Read .granada/aosp-analyze-state.json`
-   - If state exists AND `active == true` AND `state.slug` matches derived slug:
-     - Display: "检测到未完成的分析 (phase: <current_phase>)。从断点恢复..."
-     - Validate temp directory exists: `ls "$target"`
-     - Validate phase artifacts:
-       - Skip to Phase 3: verify `$target/search-targets.json` exists
-       - Skip to Phase 4: verify at least one `$target/source-finding-*.md` exists
-     - Resume from the NEXT phase after `current_phase`:
-       - `initialize` → start Phase 2
-       - `targets-extracted` → start Phase 3
-       - `sources-investigated` → start Phase 4
-   - If state exists but slug does NOT match: clear old state, start fresh
-   - If no state exists: start fresh
+3. **Fresh start cleanup** (after slug and target validation):
+   - If `--fresh` flag is present: remove the validated temp directory with `rm -rf -- "$target"` before continuing.
 
 4. **MCP health check**:
    - AOSP: call `mcp__plugin_zaku_sourcepilot__list_projects()` — if fails, abort with "AOSP MCP (sourcepilot) unreachable. Check SOURCEPILOT_URL and SOURCEPILOT_KEY env vars."
@@ -92,23 +79,7 @@ This skill does NOT parse logs, generate timelines, produce RCA hypotheses, or o
      - If configured: display `**AOSP Project: <project_name>**`
      - If not configured: display `**未配置 AOSP 项目** — 搜索将不限定项目范围。运行 /zaku:aosp-project 设置项目。`
 
-6. **Initialize state**:
-   - Before writing state, redact common secrets from the title and query.
-   - Keep raw topic text in memory only; write only redacted title/query values to disk.
-
-```
-Write JSON to .granada/aosp-analyze-state.json with active=true, current_phase="initialize", state={
-  "slug": "<slug>",
-  "temp_dir": "/tmp/aosp-analyze-<slug>",
-  "title": "<user-provided title>",
-  "query": "<user-provided query or null>",
-  "source_finding_count": "0",
-  "report_path": null,
-  "project_override": "<name>|null"
-}
-```
-
-7. **Create temp directory**:
+6. **Create temp directory**:
 ```bash
 target="/tmp/aosp-analyze-${slug}"
 mkdir -p -- "$target"
@@ -154,7 +125,6 @@ Agent(
 
 Verify `/tmp/aosp-analyze-<slug>/search-targets.json` exists. If not, abort with "Target extraction failed — search-targets.json missing."
 
-Update state: `current_phase: "targets-extracted"`.
 
 ## Phase 3: Parallel Source Investigation
 
@@ -209,7 +179,6 @@ After each investigator returns, the lead writes that agent's report to /tmp/aos
 
 Wait for all agents to complete. If an agent fails or times out, note the gap but continue.
 
-Update state: `current_phase: "sources-investigated"`, `source_finding_count: <N>`.
 
 ## Phase 4: Report Synthesis
 
@@ -285,10 +254,7 @@ Update state: `current_phase: "sources-investigated"`, `source_finding_count: <N
 
 ## Phase 5: Finalize
 
-4. **Finalize state and cleanup**:
-   - On success: `Bash: rm -f .granada/aosp-analyze-state.json` — terminal exit
-   - On error-abort: `Write {"active": false, current_phase="error"} to .granada/aosp-analyze-state.json` — preserves state for debugging
-   - Announce report location to user
+4. Announce report location to the user.
 
 </Steps>
 
@@ -301,30 +267,9 @@ Update state: `current_phase: "sources-investigated"`, `source_finding_count: <N
 - **All agents fail** → report with "insufficient source data" conclusion
 </Error_Handling>
 
-<State_Schema>
-```json
-{
-  "mode": "aosp-analyze",
-  "active": true,
-  "current_phase": "initialize | targets-extracted | sources-investigated | complete | error",
-  "state": {
-    "slug": "string",
-    "temp_dir": "/tmp/aosp-analyze-<slug>",
-    "title": "string",
-    "query": "string | null",
-    "source_finding_count": "0",
-    "report_path": "string | null",
-    "project_override": "string | null"
-  }
-}
-```
-
-State is lightweight (<10KB). Investigation data lives in temp files (`/tmp/aosp-analyze-<slug>/`), not in state.
-</State_Schema>
 
 <Tool_Usage>
 - `mcp__plugin_zaku_sourcepilot__*` — search AOSP source for target classes, functions, and modules
-- `Write` / `Read` / `Bash rm` — phase persistence via `.granada/aosp-analyze-state.json`
 - `Agent(subagent_type="zaku:aosp-analyst", model="opus")` — target extraction from title/query (Phase 2)
 - `Agent(subagent_type="zaku:aosp-investigator", model="sonnet")` — parallel source investigation (Phase 3)
 - `Write` — save final report to `.granada/specs/aosp-analyze-{slug}.md`
@@ -393,7 +338,6 @@ Why good: Requires a topic — does not silently proceed with empty analysis.
 - mcp__plugin_zaku_sourcepilot__* for AOSP source search (always, not conditional)
 - aosp-investigator subagents for parallel source investigation (Phase 3)
 - analyst subagent for search target extraction (Phase 2)
-- Lightweight state (<10KB, file paths not data)
 - All 8 report sections (in Chinese)
 - Report saved to `.granada/specs/aosp-analyze-{slug}.md`
 - Redirect crash/log-directory inputs to aosp-rca

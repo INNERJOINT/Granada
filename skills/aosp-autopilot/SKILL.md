@@ -46,9 +46,6 @@ AOSP 多仓库自动执行引擎。解析 aosp-plan 产出的按仓库分组的�
 
 ## 协议
 
-### Step 0: 状态初始化
-
-调用 `Write {"active": true} to .granada/aosp-autopilot-state.json` 启用 stop-hook 持续执行。
 
 ### Step 1: 环境检测
 
@@ -69,7 +66,7 @@ while [ "$path" != "/" ]; do
 done
 ```
 
-如果仍找不到 `.repo/`，调用 `Bash: rm -f .granada/aosp-autopilot-state.json` 后报错退出：
+如果仍找不到 `.repo/`，报错退出：
 
 ```
 未检测到 AOSP 源码树（未找到 .repo/ 目录）。请先运行 /zaku:aosp-project detect-repo，或确认当前目录在 repo 管理的 AOSP 源码树内。
@@ -358,24 +355,7 @@ Skill("git-commit", "--repo $AOSP_ROOT/<repo_path> --commit")
   - `task-name`：从计划标题提取的简要任务名（小写、空格转连字符、去特殊字符、截断至 50 字符）
 - 示例：`.granada/aosp-autopilot-report/20260515-143022-add-nfc-hal.md`
 
-### Step 9: 清理
 
-调用 `Write {"active": false} to .granada/aosp-autopilot-state.json` 标记完成。
-
-## 状态生命周期
-
-aosp-autopilot 管理自身状态以启用 stop-hook 持续执行。
-
-| 场景 | 状态操作 |
-|------|----------|
-| 进入时 | `Write {"active": true} to .granada/aosp-autopilot-state.json` |
-| 正常完成 | `Write {"active": false} to .granada/aosp-autopilot-state.json` |
-| `.repo/` 未找到（不可恢复） | `Bash: rm -f .granada/aosp-autopilot-state.json` |
-| 计划文件无法解析（不可恢复） | `Bash: rm -f .granada/aosp-autopilot-state.json` |
-| 执行中异常退出 | 状态保留 active=true，下次启动可恢复 |
-| 用户取消 | `/zaku:cancel` 内部调用 `rm -f .granada/*-state.json` |
-
-注意：不要在准备启动后续技能前调用 `rm -f .granada/*-state.json`。`rm -f .granada/*-state.json` 的 30 秒取消信号会禁用所有 mode 的 stop-hook。正常完成时使用 `Write JSON with active=false)`。
 
 ## 与 aosp-plan 的集成
 
@@ -429,7 +409,6 @@ aosp-autopilot 解析 aosp-plan 的 Evidence-Based Plan 部分。aosp-plan 的�
 
 - 使用 `Agent(subagent_type="zaku:executor")` 并行派发各仓库的修改 agent（与 aosp-plan 的 aosp-investigator 派发保持一致的 API 风格）
 - 使用 `Skill("git-commit", "--repo <absolute-repo-path> --commit")` 为每个仓库生成符合历史风格的 commit
-- 使用 `Write` / `Read` 管理执行状态（.granada/ 目录）
 - 使用 `Bash` 工具执行 `repo start`、`git diff`、`git add <files>` 等 git 操作
 - 使用 `AskUserQuestion` 在需要用户决策时（如分支冲突）交互
 
@@ -450,15 +429,15 @@ aosp-autopilot 解析 aosp-plan 的 Evidence-Based Plan 部分。aosp-plan 的�
 
 | 场景 | 处理方式 |
 |------|----------|
-| `.repo/` 未找到 | `rm -f .granada/aosp-autopilot-state.json` + 报错退出 |
-| 计划文件无法解析 | `rm -f .granada/aosp-autopilot-state.json` + 报错退出 |
+| `.repo/` 未找到 | 报错退出 |
+| 计划文件无法解析 | 报错退出 |
 | 仓库目录不存在 | 在报告中标记为缺失，跳过该仓库 |
 | 目标分支已存在 | 先评估该分支对计划文件的影响，再询问用户是否切换、重新命名或取消该仓库 |
 | agent 执行超时 | 标记为 FAIL，进入重试循环 |
 | diff 验证 PARTIAL | 进入重试循环，附加上一轮差距信息 |
 | 重试耗尽 | 标记为 FAIL，继续处理其他仓库 |
 | git commit 失败 | 标记为 FAIL，修改保留在工作区 |
-| 执行中不可恢复异常 | `Write {"active": false, "error": "<reason>"} to .granada/aosp-autopilot-state.json` + 报告当前进度 |
+| 执行中不可恢复异常 | 报告当前进度 |
 
 ## 示例
 

@@ -69,27 +69,8 @@ Both modes save the report to `.granada/specs/`.
    - Require `^[A-Za-z0-9._-]{1,40}$`.
    - Derive `target="/tmp/aosp-rca-${slug}"` and require the resolved target to start with `/tmp/aosp-rca-`.
 
-1c. **Resume check** (after slug and target validation):
-   - If `--fresh` flag is present: remove `.granada/aosp-rca-state.json`; remove the validated temp directory with `rm -rf -- "$target"`, then proceed as fresh run.
-   - Otherwise, read existing state: `Read .granada/aosp-rca-state.json`
-   - If state exists AND `active == true` AND `state.input_path` matches current input (or `state.slug` matches derived slug):
-     - Display: "检测到未完成的分析 (phase: <current_phase>)。从断点恢复..."
-     - Validate temp directory exists: `ls "$target"`
-     - Validate phase artifacts before skipping:
-       - For log-based mode, skip to Phase 3 only after verifying `$target/extracted/` has files.
-       - For log-based mode, skip to Phase 4 only after verifying `$target/anomalies.md` contains at least one `### Anomaly` or `### Rank` heading.
-       - For no-log mode with `current_phase: "parsed"`, resume directly into Phase 4 without requiring extracted logs, `timeline.md`, or `anomalies.md`.
-       - Skip to Phase 5 after verifying `$target/aosp-context.md` contains at least one `###` section heading.
-       - Skip to Phase 6 after verifying `$target/hypotheses.md` contains at least one `## Hypothesis` heading AND at least one `investigation-*.md` contains a `**Confidence:**` line.
-     - Resume from the NEXT phase after `current_phase`:
-       - `initialize` → start Phase 2
-       - `data-collected` → start Phase 3
-       - `parsed` → start Phase 4
-       - `aosp-searched` → start Phase 5
-       - `investigated` → start Phase 6
-     - If temp directory missing OR artifact validation fails: restart from the failed phase (not Phase 1)
-   - If state exists but input does NOT match: clear old state, start fresh
-   - If no state exists: start fresh (normal flow)
+1c. **Fresh start cleanup** (after slug and target validation):
+   - If `--fresh` flag is present: remove the validated temp directory with `rm -rf -- "$target"`, then proceed.
 
 2. **MCP health check**:
    - AOSP: call `mcp__plugin_zaku_sourcepilot__list_projects()` — if fails, abort with "AOSP MCP (sourcepilot) unreachable. Check SOURCEPILOT_URL and SOURCEPILOT_KEY env vars."
@@ -100,26 +81,7 @@ Both modes save the report to `.granada/specs/`.
      - If configured: display `**AOSP Project: <project_name>**` prominently
      - If not configured: display `**未配置 AOSP 项目** — 搜索将不限定项目范围。运行 /zaku:aosp-project 设置项目。`
 
-5. **Initialize state**:
-   - Before writing state, redact common secrets from `issue_title` using the same categories as final report redaction.
-   - Keep raw issue text in memory only; write only the redacted title to disk.
-
-```
-Write JSON to .granada/aosp-rca-state.json with, active=true, current_phase="initialize", state={
-  "slug": "<slug>",
-  "temp_dir": "/tmp/aosp-rca-<slug>",
-  "analysis_mode": "log-based|no-log",
-  "input_path": "<absolute path to log directory>|null",
-  "issue_title": "<redacted user-provided title or null>",
-  "log_file_types": "{}",
-  "anomaly_count": "0",
-  "hypothesis_count": "0",
-  "report_path": null,
-  "project_override": "<name>|null"
-})
-```
-
-6. **Create temp directory**:
+5. **Create temp directory**:
 ```bash
 target="/tmp/aosp-rca-${slug}"
 mkdir -p -- "$target/extracted"
@@ -127,7 +89,7 @@ mkdir -p -- "$target/extracted"
 
 ## Phase 2: Log Collection (via aosp-log-collector Agent)
 
-> **Mode gate:** If `analysis_mode == "no-log"`, skip Phase 2 and Phase 3 entirely. Update state: `current_phase: "parsed"`, then proceed directly to Phase 4.
+> **Mode gate:** If `analysis_mode == "no-log"`, skip Phase 2 and Phase 3 entirely. Proceed directly to Phase 4.
 
 Delegate all local log directory copying/linking, file organization, and file classification to `aosp-log-collector`.
 
@@ -151,7 +113,6 @@ Populate the extracted directory from the input path and generate the classifica
 
 2. **Verify collection output**: After the agent completes, check that `/tmp/aosp-rca-<slug>/extracted/` contains files and `/tmp/aosp-rca-<slug>/file-classification.json` exists. If the collector reports FAILED or either artifact is missing, abort with "Log collection failed — extracted logs or classification manifest missing."
 
-3. **Update state**: `current_phase: "data-collected"`, persist `log_file_types` from the collector summary.
 
 <!-- SYNC: skills/_shared/rca-pipeline.md#phase-3 -->
 ## Phase 3: Log Parsing and Timeline Construction (via aosp-log-parser Agent)
@@ -178,7 +139,6 @@ Report the total anomaly count at the end of your response."
 
 2. **Verify output**: After the agent completes, check that `/tmp/aosp-rca-<slug>/timeline.md` and `/tmp/aosp-rca-<slug>/anomalies.md` exist. If not, abort with "Log parsing failed — timeline or anomalies output missing."
 
-3. **Update state**: `current_phase: "parsed"`, `anomaly_count: <N>` (from the agent's summary).
 
 <!-- /SYNC -->
 
@@ -265,7 +225,6 @@ Report for each target:
 - This file feeds into both hypothesis investigation (Phase 5) and the final report (Section 4)
 - If AOSP search returns no results for a target, note it as a gap — do not silently omit
 
-Update state: `current_phase: "aosp-searched"`.
 
 <!-- /SYNC -->
 
@@ -402,7 +361,6 @@ Report format:
 - Parse each agent's findings into structured format
 - Save to `/tmp/aosp-rca-<slug>/investigation-<N>.md`
 - If an agent fails or times out, mark that hypothesis as "investigation incomplete" — do not fail the entire skill
-- Update state: `current_phase: "investigated"`, `hypothesis_count: <N>`
 
 <!-- /SYNC -->
 
@@ -498,10 +456,7 @@ Report format:
 
 <!-- /SYNC -->
 
-5. **Finalize state and cleanup**:
-   - On success: `Bash: rm -f .granada/aosp-rca-state.json` — terminal exit
-   - On error-abort: `Write {"active": false, current_phase="error"} to .granada/aosp-rca-state.json` — preserves state for debugging
-   - Announce report location to user
+5. Announce report location to the user.
 
 </Steps>
 
@@ -518,35 +473,9 @@ Embed these handlers throughout all phases:
 - **All hypotheses fail investigation** → report with "insufficient evidence" conclusion
 </Error_Handling>
 
-<State_Schema>
-```json
-{
-  "mode": "aosp-rca",
-  "active": true,
-  "current_phase": "initialize | data-collected | parsed | aosp-searched | investigated | complete | error",
-  "state": {
-    "slug": "string",
-    "temp_dir": "/tmp/aosp-rca-<slug>",
-    "analysis_mode": "log-based | no-log",
-    "input_path": "string | null",
-    "issue_title": "string | null",
-    "log_file_types": "{\"filename\": \"logcat|tombstone|anr|kernel|other\"} | null",
-    "anomaly_count": "0",
-    "hypothesis_count": "0",
-    "report_path": "string | null",
-    "project_override": "string | null"
-  }
-}
-```
-
-State is lightweight (<10KB). Parsed data lives in temp files (`/tmp/aosp-rca-<slug>/`), not in state.
-
-Update state at each phase boundary for resumability. On resume, read state via `Read .granada/aosp-rca-state.json` and continue from `current_phase`.
-</State_Schema>
 
 <Tool_Usage>
 - `mcp__plugin_zaku_sourcepilot__*` — search AOSP source for crash-related code (always, not conditional)
-- `Write` / `Read` / `Bash rm` — phase persistence via .granada/aosp-rca-state.json
 - `Agent(subagent_type="zaku:aosp-log-collector", model="sonnet")` — local log directory preparation and classification manifest generation (Phase 2)
 - `Agent(subagent_type="zaku:aosp-log-parser", model="sonnet")` — log parsing and timeline construction from the collector-generated classification manifest (Phase 3)
 - `Agent(subagent_type="zaku:aosp-analyst", model="opus")` — hypothesis generation (Phase 5)
@@ -636,11 +565,10 @@ Why good: Correctly aborts early when path doesn't exist.
 **Must have:**
 - mcp__plugin_zaku_sourcepilot__* for AOSP source (always, not conditional) — **Phase 4 AOSP 源码分析是必选阶段**，除非十分确认问题与 AOSP 源码完全无关才可跳过
 - aosp-investigator subagent for both Phase 4 (AOSP context) and Phase 5 (hypothesis investigation)
-- Lightweight state (<10KB, file paths not data)
 - All 7 report sections (in Chinese)
 - Report saved to `.granada/specs/aosp-rca-{slug}.md`
 - All exploration/analysis delegated to subagents (file classification, log parsing, timeline merge, hypothesis generation, AOSP investigation)
-- Lead only orchestrates: MCP calls, state management, subagent spawning, report assembly
+- Lead only orchestrates: MCP calls, subagent spawning, report assembly
 
 **Must NOT have:**
 - JIRA MCP dependency (no jira_get_issue, jira_download_attachments, jira_add_comment)

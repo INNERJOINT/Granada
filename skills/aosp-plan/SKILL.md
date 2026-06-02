@@ -31,15 +31,12 @@ This skill may inspect context, query AOSP source, and write pending-approval pl
 
 ## Protocol
 
-### Step 0: State Initialization
-
-Call `Write {"active": true}` to `.granada/aosp-plan-state.json` before any other action.
 
 ### Step 1: MCP Health Check
 
 Call `mcp__plugin_zaku_sourcepilot__list_projects()` once at startup to verify the MCP server is reachable.
 
-If the call fails, call `Bash: rm -f .granada/aosp-plan-state.json` and abort immediately with:
+If the call fails, abort immediately with:
 
 ```
 AOSP MCP server unreachable. Check SOURCEPILOT_URL and SOURCEPILOT_KEY environment variables.
@@ -380,7 +377,7 @@ Before writing, verify that the plan path still does not exist. If it now exists
 
 Confirm the save path to the user after writing.
 
-If not running with `--interactive`, print a compact final summary before clearing state:
+If not running with `--interactive`, print a compact final summary before stopping:
 
 ```markdown
 ## AOSP Plan Complete
@@ -392,16 +389,16 @@ If not running with `--interactive`, print a compact final summary before cleari
 - **Next step:** Review the pending-approval plan, then run `/zaku:aosp-autopilot .granada/plans/aosp-<slug>.md` only if you approve execution.
 ```
 
-If not running with `--interactive`, call `Bash: rm -f .granada/aosp-plan-state.json` after printing the summary. The skill stops here and never invokes execution skills.
+If not running with `--interactive`, the skill stops here after printing the summary and never invokes execution skills.
 
 ### Step 7: Execution Approval (--interactive only)
 
 Use `AskUserQuestion` to present the saved plan with these options:
 - **Approve and execute via aosp-autopilot** (Recommended) — proceed to implementation via zaku multi-repo executor
 - **Request changes** — return to Step 5 with user feedback
-- **Reject** — discard plan, call `Bash: rm -f .granada/aosp-plan-state.json`, stop
+- **Reject** — discard plan and stop
 
-On approval: Call `Write {"active": false}` to `.granada/aosp-plan-state.json` before invoking `Skill("zaku:aosp-autopilot")` with the plan path.
+On approval: invoke `Skill("zaku:aosp-autopilot")` with the plan path.
 
 ## Risk-Adaptive Mode
 
@@ -416,21 +413,11 @@ AOSP-DR uses short mode by default. Switch to deliberate mode with `--deliberate
 - Kernel driver or device tree changes
 - Multi-partition changes
 
-## State Lifecycle
-
-- On entry: `Write {"active": true}` to `.granada/aosp-plan-state.json`
-- On MCP failure: `Bash: rm -f .granada/aosp-plan-state.json`
-- On non-interactive completion: `Bash: rm -f .granada/aosp-plan-state.json`
-- On execution handoff: `Write {"active": false}` to `.granada/aosp-plan-state.json`
-- On rejection: `Bash: rm -f .granada/aosp-plan-state.json`
-
-Never use `rm -f .granada/*-state.json` before launching an execution mode.
 
 ## Configuration
 
 - Maximum 5 parallel `aosp-investigator` agents
 - Keyword trigger: `"aosp plan"` or `"aosp_plan"`
-- State file: `.granada/aosp-plan-state.json`
 - Non-interactive mode: outputs plan and stops after Step 6
 - Interactive mode: adds synthesis review and execution approval gates
 

@@ -42,18 +42,7 @@ Converts technical jira-analyze RCA (Root Cause Analysis) reports into customer-
 
 2. **MCP health check**: `jira_get_issue(issue_key=<KEY>, fields="summary")` — if fails, abort with "mcp-atlassian 不可用。请检查 JIRA_URL, JIRA_USERNAME, JIRA_API_TOKEN 环境变量。"
 
-3. **Initialize state**:
-```
-Write JSON to .granada/jira-aftersales-state.json with, active=true, current_phase="initialize", state={
-  "issue_key": "<KEY>",
-  "report_source": "null",
-  "report_completeness": "null",
-  "duplicate_detected": "false",
-  "script_path": "null"
-})
-```
-
-4. **Create temp directory**:
+3. **Create temp directory**:
 ```bash
 mkdir -p /tmp/jira-aftersales-<KEY>
 ```
@@ -64,7 +53,6 @@ mkdir -p /tmp/jira-aftersales-<KEY>
 
 - Read `.granada/specs/jira-analyze-{KEY}.md` using Read tool
 - If file exists and contains `# 根因分析报告:` — use this as the report text
-- Update state: `report_source: "local_file"`
 - Proceed to Phase 3
 
 ### Tier 2: JIRA comments (secondary — works across machines)
@@ -73,25 +61,22 @@ mkdir -p /tmp/jira-aftersales-<KEY>
 - Scan each comment body for line starting with `# 根因分析报告:`
 - If multiple matches: use the one with the latest timestamp (parse from comment metadata, not array position — comment ordering is not guaranteed)
 - Extract the full comment body as raw report text
-- Update state: `report_source: "jira_comment"`
 - Proceed to Phase 3
 
 ### Tier 3: User instruction (fallback — no report available)
 
 - If neither local file nor JIRA comment contains a report:
 - Display: "未找到 jira-analyze 分析报告。请先运行 `/zaku:jira-analyze <KEY>` 生成分析报告，然后重新运行本 skill。"
-- Abort gracefully with `Write {"active": false, current_phase="error"} to .granada/jira-aftersales-state.json`
+- Abort gracefully.
 
 <!-- Design note: We intentionally do NOT auto-invoke jira-analyze via Skill() mid-execution.
-     Mid-execution Skill() invocation creates a state mode conflict (two modes active simultaneously).
-     Instructing the user to run jira-analyze first is a clean, one-time step. -->
+     Instructing the user to run jira-analyze first keeps this workflow single-purpose and predictable. -->
 
 ## Phase 3: Check for Duplicate Aftersales Scripts
 
 - If comments were already fetched in Tier 2, reuse them. Otherwise fetch: `jira_get_issue(issue_key=<KEY>, comment_limit=50)`
 - Scan each comment body for line starting with `# 售后话术:`
 - If found: warn user "该问题已存在售后话术评论。将重新生成并覆盖。"
-- Update state: `duplicate_detected: "true"`
 - Proceed to Phase 4 regardless (regeneration is allowed)
 
 ## Phase 4: Transform to Aftersales Script
@@ -105,7 +90,6 @@ mkdir -p /tmp/jira-aftersales-<KEY>
 - If `## 5.` is missing: mark as partial, note in transformation prompt that root cause hypotheses are unavailable
 - If `## 7.` is missing: mark as partial, note in transformation prompt that fix recommendations are unavailable
 - If both `## 1.` and `## 5.` are missing: abort with "分析报告不完整，缺少问题概述和根因假设，无法生成话术。"
-- Update state: `report_completeness: "full"` or `"partial"`
 
 ### 4b: Transformation subagent
 
@@ -172,7 +156,6 @@ grep -iE '\bANR\b|NullPointerException|tombstone|空指针|死锁|\bSIGSEGV\b|\b
    - Re-invoke subagent with same prompt + added section: "⚠ 上一版输出中包含以下禁止术语：{violations}。请严格替换这些术语后重新生成。"
    - Re-grep after second invocation
    - If violations persist after 2 attempts: append warning to output: "\n\n---\n⚠ 此话术可能包含技术术语，请人工审核后使用。"
-4. Update state: `script_path: "/tmp/jira-aftersales-<KEY>/aftersales-script.md"`
 
 ## Phase 5: Post and Finalize
 
@@ -182,10 +165,7 @@ grep -iE '\bANR\b|NullPointerException|tombstone|空指针|死锁|\bSIGSEGV\b|\b
 
 3. **Save local copy** to `.granada/specs/jira-aftersales-{issue_key}.md`
 
-4. **Finalize state and cleanup**:
-   - On success: `Bash: rm -f .granada/jira-aftersales-state.json` — terminal exit
-   - On error-abort: `Write {"active": false, current_phase="error"} to .granada/jira-aftersales-state.json` — preserves state for debugging
-   - Announce completion: "售后话术已生成并发布到 JIRA 评论。本地副本保存在 .granada/specs/jira-aftersales-{KEY}.md"
+4. Announce completion: "售后话术已生成并发布到 JIRA 评论。本地副本保存在 .granada/specs/jira-aftersales-{KEY}.md"
 
 </Steps>
 
@@ -198,32 +178,11 @@ grep -iE '\bANR\b|NullPointerException|tombstone|空指针|死锁|\bSIGSEGV\b|\b
 - **JIRA comment post fails** → warn user, provide local file path as fallback: "JIRA 评论发布失败，本地副本已保存在 .granada/specs/jira-aftersales-{KEY}.md"
 </Error_Handling>
 
-<State_Schema>
-```json
-{
-  "mode": "jira-aftersales",
-  "active": true,
-  "current_phase": "initialize | report-detected | transforming | complete | error",
-  "state": {
-    "issue_key": "string",
-    "report_source": "local_file|jira_comment|null",
-    "report_completeness": "full|partial|null",
-    "duplicate_detected": "true|false",
-    "script_path": "string|null"
-  }
-}
-```
-
-State is lightweight (<5KB). Report text lives in temp files (`/tmp/jira-aftersales-<KEY>/`), not in state.
-
-Update state at each phase boundary for resumability. On resume, read state via `Read .granada/jira-aftersales-state.json` and continue from `current_phase`.
-</State_Schema>
 
 <Tool_Usage>
 - `Read` tool — check local file `.granada/specs/jira-analyze-{KEY}.md` (primary detection, Tier 1)
 - `jira_get_issue` — fetch issue details and comments (mcp-atlassian). Reads comments for report detection (Tier 2) and duplicate check (Phase 3).
 - `jira_add_comment` — post aftersales script as comment on JIRA issue (mcp-atlassian)
-- `Write` / `Read` / `Bash rm` — phase persistence via .granada/jira-aftersales-state.json
 - `Agent(subagent_type="zaku:executor", model="sonnet")` — transformation subagent (Phase 4b)
 - `Bash` — grep post-processing for forbidden terminology (Phase 4c), temp directory management
 - `Write` tool — save aftersales script to local file (.granada/specs/)
@@ -288,7 +247,7 @@ Why bad: Contains developer terminology (SurfaceFlinger, binder, ANR). Should be
 ```
 [Phase 3] No report found. Invoking Skill("zaku:jira-analyze", "SPFB-535")...
 ```
-Why bad: Mid-execution Skill() invocation creates state mode conflict. Must instruct user to run jira-analyze first instead.
+Why bad: Unexpected nested workflow. Must instruct user to run jira-analyze first instead.
 </Bad>
 </Examples>
 
@@ -304,10 +263,9 @@ Why bad: Mid-execution Skill() invocation creates state mode conflict. Must inst
 - Partial report handling with adapted transformation prompt
 - Report posted as JIRA comment via jira_add_comment
 - Local copy saved to `.granada/specs/jira-aftersales-{KEY}.md`
-- Lightweight state (<5KB, file paths not data)
 
 **Must NOT have:**
-- Mid-execution `Skill()` invocation of jira-analyze (state conflict risk)
+- Mid-execution `Skill()` invocation of jira-analyze
 - Re-implementation of RCA logic (delegate to jira-analyze)
 - Interactive/conversational mode (produces a static aftersales script)
 - Direct log file parsing or AOSP source searching

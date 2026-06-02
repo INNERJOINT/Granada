@@ -43,11 +43,6 @@ Takes an exported feature element report (功能元报告, produced by `aosp-fea
 
 ## Protocol
 
-### Step 0: State Initialization
-
-```
-Write JSON to .granada/aosp-feature-import-state.json with, active=true, task_description="Import: <report_filename>")
-```
 
 ### Step 1: Health Check and Project Resolution
 
@@ -55,11 +50,7 @@ Write JSON to .granada/aosp-feature-import-state.json with, active=true, task_de
 
 Call `mcp__plugin_zaku_sourcepilot__list_projects()` to verify the MCP server is reachable.
 
-On failure:
-```
-Bash: rm -f .granada/aosp-feature-import-state.json
-```
-Abort with: `AOSP MCP server unreachable. Check SOURCEPILOT_URL and SOURCEPILOT_KEY environment variables.`
+On failure, abort with: `AOSP MCP server unreachable. Check SOURCEPILOT_URL and SOURCEPILOT_KEY environment variables.`
 
 **1b. Resolve Target Project**
 
@@ -286,8 +277,7 @@ Merge all investigator findings into a structured import guide:
    ```
    功能导入指南已保存: .granada/aosp-imports/<slug>.md
    ```
-5. Call `Write {"active": false}` to `.granada/aosp-feature-import-state.json`
-6. Invoke `Skill("zaku:aosp-plan")` with this exact planning query:
+5. Invoke `Skill("zaku:aosp-plan")` with this exact planning query:
    ```
    根据 .granada/aosp-imports/<slug>.md 生成目标项目 <target_project> 的功能导入修改计划。必须使用导入指南中的映射总览、适配分析、移植步骤、风险评估和依赖顺序作为输入证据。
    ```
@@ -403,21 +393,20 @@ The skill MUST NOT generate `.granada/plans/aosp-import-<slug>.md`, run Architec
 
 | Scenario | Handling |
 |----------|----------|
-| Export report file not found | `rm -f .granada/*-state.json` + abort with path suggestion |
-| Export report unparseable (missing required sections) | `rm -f .granada/*-state.json` + abort listing missing sections |
+| Export report file not found | Abort with path suggestion |
+| Export report unparseable (missing required sections) | Abort listing missing sections |
 | Source project unreachable via AOSP MCP | Warn, continue with `--skip-source-verify` behavior |
-| Target project unreachable via AOSP MCP | `rm -f .granada/*-state.json` + abort (target is required) |
-| Source == Target project | `rm -f .granada/*-state.json` + abort with explanation |
-| No target project configured or specified | `rm -f .granada/*-state.json` + abort with setup instructions |
+| Target project unreachable via AOSP MCP | Abort (target is required) |
+| Source == Target project | Abort with explanation |
+| No target project configured or specified | Abort with setup instructions |
 | >50% of Phase 1 agents fail | Emit partial results with warning, continue with available data |
 | All target investigators return MISSING for all components | Complete with "high difficulty" assessment, recommend manual review |
 | Partial agent failure in Phase 2 | Continue with successful results, note gaps |
 
 ## Error Recovery
 
-On any unrecoverable error after Step 0:
+On any unrecoverable error:
 - If investigator data has been collected, write partial results to `.granada/aosp-imports/<slug>-partial.md`
-- Call `Bash: rm -f .granada/aosp-feature-import-state.json`
 - Report the error to the user
 
 Skill is idempotent — re-running with the same inputs overwrites the output file.
@@ -430,26 +419,15 @@ Skill is idempotent — re-running with the same inputs overwrites the output fi
 - Max total agents across all phases: 20 (investigation)
 - Max Phase 2 rounds: 4
 - Convergence threshold: no new findings for DIVERGED/MISSING components
-- State mode: `aosp-feature-import`
 - Component cap: 10 (merge related components if export has more)
 
-## State Lifecycle
-
-| Scenario | State Operation |
-|----------|-----------------|
-| On entry | `Write {"active": true} to .granada/aosp-feature-import-state.json` |
-| aosp-plan handoff | `Write {"active": false} to .granada/aosp-feature-import-state.json` |
-| Export report not found (unrecoverable) | `Bash: rm -f .granada/aosp-feature-import-state.json` |
-| MCP unreachable (unrecoverable) | `Bash: rm -f .granada/aosp-feature-import-state.json` |
-| User cancels | `/zaku:cancel` calls `rm -f .granada/*-state.json` |
 
 ## Tool Usage
 
 - `mcp__plugin_zaku_sourcepilot__*`: AOSP MCP health check (`list_projects`) and AOSP code search (via `aosp-investigator` subagents with explicit `project` parameter override)
 - `Agent(subagent_type="zaku:aosp-investigator")`: Parallel investigation of source and target projects
 - `Read`: Parse export report, read `.granada/aosp-config.json`
-- `Write`: Save import guide and mark handoff state
-- `Write` / `Bash rm`: Manage execution state via .granada/ files
+- `Write`: Save import guide
 - `Skill("zaku:aosp-plan")`: Explicit planning handoff after saving the import guide
 
 ## Keyword Triggers

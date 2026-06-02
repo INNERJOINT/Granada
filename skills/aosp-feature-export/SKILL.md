@@ -8,11 +8,11 @@ translate-dirs: [.granada/aosp-exports]
 
 # AOSP Feature Export Skill
 
-Documents vendor/third-party features added on top of AOSP. Takes a concrete vendor feature description and GitLab MR/commit URLs (vendor changes) as input, delegates URL inspection to `gitlab-info` to identify modification points, then uses the `mcp__plugin_zaku_sourcepilot__*` tools to search the AOSP codebase for the original code being modified or extended. Outputs an English canonical markdown document focused on the feature's problem, vendor solution, implementation method, related context code, and verification approach, archived to `.granada/aosp-exports/`. After the canonical export is written, the plugin `PostToolUse` hook generates a best-effort Simplified Chinese sibling file with `_zh.md` suffix in the same directory.
+Documents vendor/third-party features added on top of AOSP. Takes a concrete vendor feature description as input, extracts any available vendor modification context from the description or conversation, then uses the `mcp__plugin_zaku_sourcepilot__*` tools to search the AOSP codebase for the original code being modified or extended. Outputs an English canonical markdown document focused on the problem or requirement the feature addresses, vendor solution, implementation method, related context code, and verification approach, archived to `.granada/aosp-exports/`.
 
 **Key distinction:** The feature being documented is NOT an AOSP built-in feature. It is a vendor customization — code added or modified by the third-party vendor on top of AOSP. The AOSP search phase finds the original context that the vendor code interacts with.
 
-**Scope principle:** One export should describe one concrete vendor feature slice, such as `AIUD 在 Settings 中的定制功能`, not a broad module-level topic like `Settings 定制` or `Connectivity 定制`. If the input is too broad, split it into candidate sub-features, ask the user to confirm one, export only that confirmed sub-feature report, then stop and tell the user to run the skill again for the remaining sub-features.
+**Scope principle:** One export should describe one concrete vendor feature slice, such as `AIUD 在 Settings 中的定制功能`, not a broad module-level topic like `Settings 定制` or `Connectivity 定制`. If the input is too broad, split it into a list of concrete sub-features, then stop without exporting a report and tell the user to run the skill again with one selected sub-feature.
 
 ## Usage
 
@@ -22,15 +22,10 @@ Documents vendor/third-party features added on top of AOSP. Takes a concrete ven
 /zaku:aosp-feature-export "AIUD 在 Settings 中的定制功能"
 ```
 
-The only user input is the concrete vendor feature description. If GitLab links, commits, or previous export context are needed, the skill should discover or ask for them during the protocol rather than exposing them as command-line flags.
+The only user input is the concrete vendor feature description. If additional vendor modification context or previous export context is needed, the skill should discover it from the conversation or ask for it during the protocol rather than exposing it as command-line flags.
 
 ## Protocol
 
-### Step 0: State Initialization
-
-```
-Write JSON to .granada/aosp-feature-export-state.json with, active=true, task_description="<description>")
-```
 
 ### Step 1: Health Check
 
@@ -42,69 +37,29 @@ After health check passes, read `.granada/aosp-config.json` to display the activ
 
 (The `aosp-investigator` subagent reads this config and passes `project` to search calls automatically — no need to inject it into spawn prompts.)
 
-On failure:
-```
-Bash: rm -f .granada/aosp-feature-export-state.json
-```
-Abort with: `AOSP MCP server unreachable. Check SOURCEPILOT_URL and SOURCEPILOT_KEY environment variables.`
+On failure, abort with: `AOSP MCP server unreachable. Check SOURCEPILOT_URL and SOURCEPILOT_KEY environment variables.`
 
 ### Step 2: Keyword Extraction
 
-#### 2a: Fetch change data from related links or commits
+#### 2a: Extract vendor modification context
 
-If GitLab MR/commit URLs are discovered from the conversation context or requested from the user during the protocol, delegate GitLab URL inspection to `gitlab-info` instead of parsing GitLab URLs locally:
+Extract any available vendor modification context from the feature description and conversation history. Do not require a specific hosting provider or source-control system.
 
-1. Invoke `/zaku:gitlab-info <url1> <url2> ...` with all confirmed links in one call.
-2. Require `gitlab-info` output to provide, per URL:
-   - parsed `project_id`
-   - URL type and diff scope (`MR overall`, `selected commit`, or `selected diff version`)
-   - MR title/description or commit title/message
-   - changed file paths (`old_path`, `new_path`, added/renamed/deleted when available)
-   - concise modification summary and key diff identifiers
-   - commit SHAs and authored/committed dates when available
-   - any `未确认 / 需要确认` entries
-3. Treat any `未确认 / 需要确认` entries as warnings. Continue with confirmed URLs; if ALL URL inspections fail, fall back to description-only mode.
+When available, capture:
+- changed file paths or module names
+- class/interface names from path components or text
+- method names, constants, settings keys, properties, resources, or config names
+- concise descriptions of added or modified behavior
+- user-visible entry points, API hooks, service hooks, or HAL/native touch points
 
-4. From `gitlab-info` data, extract:
-   - Changed file paths (strip extensions to get class/module names)
-   - Class/interface names from path components
-   - Noun phrases from MR title/description or commit messages
-   - Key identifiers from diff additions or modification summaries (class declarations, method names, constants)
-
-#### 2a-discover: Related commit discovery
-
-**Prerequisite:** Step 2a (fetch) must complete first — discovery uses project IDs and commit dates from fetched data.
-
-**Skip conditions (any triggers silent skip):**
-- No confirmed GitLab project/date context is available from Step 2a
-
-**Procedure:**
-
-1. **Runtime tool verification:** Call `mcp__gitlab__list_commits` with a minimal query (the first project, `per_page=1`, `since` = 1 hour ago). If the call returns an error indicating the tool does not exist or is unsupported, emit `"⚠ GitLab list_commits 不可用，跳过关联提交发现。"` and skip discovery entirely.
-
-2. **Build discovery queries:** For each unique `project_id` extracted from user-confirmed URLs:
-   - Determine time window: `since` = (earliest user commit date − 30 days), `until` = (latest user commit date + 7 days)
-   - Query: `mcp__gitlab__list_commits(project_id, since, until, per_page=100)`
-   - Budget: 1 verification call + up to 29 project queries = 30 total cap
-   - If no project context is available: skip discovery gracefully with `"⚠ 无项目上下文，跳过关联提交发现。"`
-
-3. **Execution bounds:**
-   - **Call cap:** Maximum 30 total `list_commits` API calls (including verification). Stop querying remaining projects if cap reached.
-   - **Timeout:** 30-second wall-clock timeout for entire discovery sub-step. If exceeded, use collected results and emit `"⚠ 关联提交发现超时 (30s)，使用已收集的部分结果。"`
-
-4. **Keyword post-filter:** From returned commits, keep only those whose commit message contains at least one keyword from the Step 2b keyword set (the deduplicated 10-15 terms from description + fetched diff file path stems). Discard commits already in user-confirmed set (by SHA match).
-
-5. **Output:** Store as `discovered_commits[]` with fields: `sha`, `project_id`, `title`, `authored_date`, `web_url` (constructed as `https://{host}/{project_path}/-/commit/{sha}`). Cap at 20 commits (sorted by date, most recent first).
-
-6. **Reporting:** Emit progress: `"发现关联提交: {N} 条 (来自 {M} 个项目, 耗时 {T}s)"`
+If no modification context is available, continue in description-only mode and rely on AOSP source search to identify likely original context.
 
 #### 2b: Build keyword set
 
 1. From description text: extract noun phrases, domain terms, subsystem names
-2. Merge with keywords extracted from links/commits (if any)
-3. If discovery ran: merge additional keywords from discovered commit messages (noun phrases, identifiers)
-4. Deduplicate all keywords, cap at 10-15
-5. Group into 3 keyword groups by implementation concern (e.g., user-facing entry, framework/service path, native/HAL dependency), not by broad subsystem area alone
+2. Merge with keywords extracted from vendor modification context (if any)
+3. Deduplicate all keywords, cap at 10-15
+4. Group into 3 keyword groups by implementation concern (e.g., user-facing entry, framework/service path, native/HAL dependency), not by broad subsystem area alone
 
 ### Step 2c: Scope Granularity Check
 
@@ -120,11 +75,10 @@ Before spawning investigators, decide whether the requested feature is concrete 
 - The description names a broad module or domain (`Settings customization`, `Connectivity customization`, `Audio routing`) rather than a concrete user-visible behavior, API behavior, or vendor hook.
 
 **If the input is too broad:**
-1. Derive 2-6 candidate sub-features from the description, GitLab diff paths, class/method names, and modification summaries.
-2. Present the candidates to the user and ask which one should be exported now.
-3. After the user confirms one candidate, continue the protocol using that sub-feature as `<description>` and keep the original broad request as background context only.
-4. Export exactly one confirmed sub-feature report.
-5. At the end, tell the user which candidate was exported and that remaining candidates require separate runs.
+1. Derive 2-6 concrete sub-features from the description, known changed paths, class/method names, and modification summaries.
+2. Present the sub-feature list with a brief description and likely search anchors for each item.
+3. Stop without exporting a report.
+4. Tell the user to run the skill again with one selected sub-feature.
 
 ### Step 3: Phase 1 — Implementation Context Discovery
 
@@ -137,8 +91,8 @@ Agent(
   
   This is a third-party/vendor customization, NOT an AOSP built-in feature. The vendor has modified or extended AOSP code to implement this feature.
   
-  Vendor modification points (from GitLab diffs):
-  <changed file paths, class names, method names, and diff summaries from Step 2>
+  Vendor modification context (if available):
+  <known changed file paths, class names, method names, settings/config keys, and behavior summaries from Step 2>
   
   Your mission: Search AOSP to find the ORIGINAL context code that explains how this confirmed vendor sub-feature is implemented.
   - Search for the original AOSP classes/interfaces that the vendor code modifies, extends, or calls
@@ -226,10 +180,8 @@ The orchestrator's only heavy-lifting phase — merge investigator reports into 
    - If no AIDL/HIDL interfaces found, omit "关键接口" and mention relevant APIs inside implementation steps.
    - If only 1 AOSP project discovered, omit a separate project summary table unless it clarifies the implementation.
    - If no cross-project dependencies are required to explain the solution, omit "依赖关系".
-   - If `discovered_commits[]` is empty (no project context or no matches), omit "发现的关联提交".
    - **Always include:** Overview, Vendor Problem and Solution, Implementation Method, Key Context Code, Verification Method, Investigation Log
-7. **Construct commit URLs:** For each input link's project, build browsable commit URLs using format `https://{host}/{project_path}/-/commit/{sha}`. If the input was an MR, use the MR's source commits. Include these URLs in the output under "Vendor-Related Commits".
-8. Build the canonical output document **in English** using the template below
+7. Build the canonical output document **in English** using the template below
 
 ### Step 5b: Existing Export Context
 
@@ -259,15 +211,12 @@ If `.granada/aosp-exports/<slug>.md` already exists for the confirmed sub-featur
 1. Generate slug from description: lowercase, replace spaces/special chars with hyphens, max 50 chars
 2. Create `.granada/aosp-exports/` directory if it doesn't exist
 3. Write the English canonical output to `.granada/aosp-exports/<slug>.md`
-4. The plugin `PostToolUse` hook will best-effort generate `.granada/aosp-exports/<slug>_zh.md` after the canonical file is written. Translation failures warn but do not invalidate or modify the English canonical export.
-5. Call `Bash: rm -f .granada/aosp-feature-export-state.json`
-6. Confirm to user: `Feature export saved to .granada/aosp-exports/<slug>.md`; if the hook succeeded, also mention `.granada/aosp-exports/<slug>_zh.md`.
+4. Confirm to user: `Feature export saved to .granada/aosp-exports/<slug>.md`.
 
 ### Error Recovery
 
-On any unrecoverable error after Step 0:
-- If agent data has been collected, write partial results to `.granada/aosp-exports/<slug>-partial.md` (partial files are not translated by the hook)
-- Call `Bash: rm -f .granada/aosp-feature-export-state.json`
+On any unrecoverable error:
+- If agent data has been collected, write partial results to `.granada/aosp-exports/<slug>-partial.md`
 - Report the error to the user
 
 Skill is idempotent — re-running with the same inputs overwrites the output file.
@@ -284,13 +233,11 @@ Skill is idempotent — re-running with the same inputs overwrites the output fi
 - **Scope granularity:** {single purpose / split from broad scope / user-confirmed sub-feature}
 - **AOSP project:** {project_name from .granada/aosp-config.json, or "not configured"}
 - **Export date:** {date}
-- **Input links:** {url_list or "none"}
-- **Input commits:** {commit_list or "none"}
+- **Vendor modification context:** {known paths/classes/methods/config keys or "description-only"}
 - **Extracted keywords:** {keyword_list}
 - **Search rounds:** {n}/5
 - **Discovered AOSP project count:** {count}
 - **Convergence:** {converged at round X / reached max rounds}
-- **Related commit discovery:** {enabled/disabled} {if enabled: "found N commits in Xs" / "tool unavailable, skipped" / "timed out, partial results"}
 
 ## Vendor Problem and Solution
 
@@ -301,7 +248,7 @@ Skill is idempotent — re-running with the same inputs overwrites the output fi
 
 ## Vendor Modification Summary
 
-{Summarize the vendor change from the GitLab diff. Explain which files were changed, what logic was added, and where the modified entry point is. Keep only changes directly related to the confirmed sub-feature.}
+{Summarize the known vendor modification context. Explain which paths, classes, methods, settings, resources, or behaviors are known to be changed. If no concrete modification context is available, state that the export is based on the feature description only.}
 
 ## Implementation Method
 
@@ -351,21 +298,6 @@ Skill is idempotent — re-running with the same inputs overwrites the output fi
 
 {Only describe architecture relationships required to understand the implementation method. Avoid expanding this into a full AOSP module overview.}
 
-## Vendor-Related Commits
-
-- [{commit_message}]({https://gitlab.host/project_path/-/commit/full_sha}) ({date})
-
-## Discovered Related Commits
-
-> These commits were discovered automatically, not directly provided by the user. They are filtered by project time window and keyword matching.
-
-| Project | SHA | Commit message | Date | Link |
-|---------|-----|----------------|------|------|
-| {project_path} | {short_sha} | {title} | {date} | [View]({web_url}) |
-| ... | ... | ... | ... | ... |
-
-**Discovery parameters:** time window {since} ~ {until}, matched {keyword_count} keywords, scanned {project_count} projects
-
 ## Investigation Log
 
 | Round | Query/focus | New prefixes | Total prefixes | Total files |
@@ -392,33 +324,11 @@ Skill is idempotent — re-running with the same inputs overwrites the output fi
 ## Configuration
 
 - Output directory: `.granada/aosp-exports/` (fixed)
-- Chinese sibling output: `.granada/aosp-exports/<slug>_zh.md` (best-effort hook-derived translation, overwritten atomically on success)
-- Translation hook configuration:
-  - Skill frontmatter keeps `translate-dirs: [.granada/aosp-exports]` to limit eligible Markdown writes
-  - `GRANADA_TRANSLATE_COMMAND` defines the local translation command; default is `claude -p --model sonnet`
-  - For `claude`, only `claude -p` and `claude -p --model <model>` are accepted
-  - Optional `translate-timeout-ms` can be set in skill frontmatter (default 300000)
-  - `TRANSLATE_MD_ZH_ALLOWED_COMMANDS` (optional comma-separated executable allowlist, default `claude`; tests may set `claude,node`)
-- Debugging:
-  - `GRANADA_DEBUG` controls stderr log threshold without affecting hook stdout JSON
-  - Levels: `V` (verbose), `D` (debug), `I` (info), `W` (warn), `E` (error)
-  - `1` / `true` / `yes` / `on` are treated as `D`
-  - Current events: skip reasons log at `D`; translation start/success log at `I`; translation failures log at `E`
-- Test-only hook override:
-  - `TRANSLATE_MD_ZH_MOCK_TEXT` returns fixed translated text without invoking `translate-command`
 - Max iteration rounds: 5
 - Max total agent spawns: 15
 - Convergence threshold: < 3 new second-level prefixes per round
-- State mode: `aosp-feature-export`
-- Discovery call cap: 30 (1 verify + 29 queries)
-- Discovery timeout: 30s
-- Discovery time window: earliest commit − 30 days to latest commit + 7 days
-- Discovery max results: 20 commits (sorted by date desc)
-- Discovery keyword filter: Step 2b keyword set (10-15 terms)
 
-## Known Limitations (关联提交发现 V1)
+## Known Limitations
 
-- **Multi-project:** Only searches within projects discovered from confirmed GitLab context. No cross-project or group-level discovery. (Future: GitLab group-level commit search or cross-reference via MR links.)
-- **Precision:** Project-scoped (not path-filtered). Keyword filtering reduces noise but may miss semantically related commits with different terminology. (Future: path-level filtering for higher precision.)
-- **Tool dependency:** Requires `mcp__gitlab__list_commits` from the GitLab MCP server. Silently skipped if unavailable.
+- **Description-only mode:** If no concrete vendor modification context is available, the export may describe the most likely AOSP implementation context rather than confirmed vendor touch points.
 - **Existing export interaction:** Previously exported findings are used for comparison and deduplication when an export with the same slug already exists.

@@ -45,7 +45,6 @@ Report the total anomaly count at the end of your response."
 
 After the agent completes, check that `<TEMP_DIR>timeline.md` and `<TEMP_DIR>anomalies.md` exist. If not, abort with "Log parsing failed — timeline or anomalies output missing."
 
-Update state: `current_phase: "parsed"`, `anomaly_count: <N>` (from the agent's summary).
 
 ---
 
@@ -114,7 +113,6 @@ Report for each target:
 - This file feeds into both hypothesis investigation (Phase 5) and the final report (Section 4)
 - If AOSP search returns no results for a target, note it as a gap — do not silently omit
 
-Update state: `current_phase: "aosp-searched"`.
 
 ---
 
@@ -237,7 +235,6 @@ Report format:
 - Parse each agent's findings into structured format
 - Save to `<TEMP_DIR>investigation-<N>.md`
 - If an agent fails or times out, mark that hypothesis as "investigation incomplete" — do not fail the entire skill
-- Update state: `current_phase: "investigated"`, `hypothesis_count: <N>`
 
 ---
 
@@ -331,10 +328,7 @@ Report format:
 2. {action}
 ```
 
-4. **Finalize state and cleanup**:
-   - On success: `rm state file(mode="<MODE_NAME>")` — terminal exit
-   - On error-abort: `Write {"active": false, "current_phase": "error"} to .granada/<MODE_NAME>-state.json` — preserves state for debugging
-   - Announce report location to user
+4. Announce report location to the user.
 
 <!-- MODE-GATE: jira-analyze only — post report as JIRA comment -->
 5. **Post report as JIRA comment**: `jira_add_comment(issue_key=<KEY>, body=<redacted_report_content>)` — post the redacted report content as a comment on the JIRA issue. If this fails, warn but do not abort (the local report file is still available).

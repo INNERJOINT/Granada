@@ -66,13 +66,8 @@ Subagent `tools:` frontmatter should grant access via the wildcard `mcp__plugin_
 | `aosp-log-collector` | Android log collector (JIRA/local logs, extraction, classification) |
 | `aosp-log-parser` | Android log parser (logcat, tombstone, ANR, kernel) |
 
-## State Management
+## Configuration
 
-This plugin uses native file operations for state persistence (no MCP state tools required):
-
-- **Write state**: `Write` tool → `.granada/<skill>-state.json`
-- **Read state**: `Read` tool → `.granada/<skill>-state.json`
-- **Clear state**: `Bash: rm -f .granada/<skill>-state.json`
 - **AOSP project config**: `.granada/aosp-config.json`
 
 ## Dependencies
