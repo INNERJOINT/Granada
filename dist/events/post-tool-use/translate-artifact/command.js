@@ -47,15 +47,12 @@ export function parseCommand(command) {
     }
     return tokens;
 }
-export function translateWithCommand(markdown, config, { cwd, env = {}, spawn }) {
-    if (env.TRANSLATE_MD_ZH_MOCK_TEXT !== undefined) {
-        return Promise.resolve(env.TRANSLATE_MD_ZH_MOCK_TEXT);
-    }
-    const timeoutMs = Number.isFinite(config.timeoutMs) && config.timeoutMs > 0 ? config.timeoutMs : 300000;
-    const prompt = buildPrompt(markdown);
-    const [command, ...args] = parseCommand(config.command);
-    if (!spawn)
-        throw new Error('missing spawn dependency');
+const TRANSLATION_RETRY_COUNT = 3;
+const TRANSLATION_RETRY_DELAY_MS = 5000;
+function wait(ms) {
+    return new Promise(resolve => { setTimeout(resolve, ms); });
+}
+function runTranslationAttempt(prompt, command, args, timeoutMs, { cwd, env = {}, spawn }) {
     return new Promise((resolve, reject) => {
         const childEnv = { ...env };
         delete childEnv.NODE_OPTIONS;
@@ -108,4 +105,29 @@ export function translateWithCommand(markdown, config, { cwd, env = {}, spawn })
         });
         child.stdin.end(prompt);
     });
+}
+export async function translateWithCommand(markdown, config, { cwd, env = {}, spawn }) {
+    if (env.TRANSLATE_MD_ZH_MOCK_TEXT !== undefined) {
+        return env.TRANSLATE_MD_ZH_MOCK_TEXT;
+    }
+    const timeoutMs = Number.isFinite(config.timeoutMs) && config.timeoutMs > 0 ? config.timeoutMs : 300000;
+    const prompt = buildPrompt(markdown);
+    const [command, ...args] = parseCommand(config.command);
+    if (!spawn)
+        throw new Error('missing spawn dependency');
+    const maxAttempts = TRANSLATION_RETRY_COUNT + 1;
+    let lastError;
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+        try {
+            return await runTranslationAttempt(prompt, command, args, timeoutMs, { cwd, env, spawn });
+        }
+        catch (error) {
+            lastError = error;
+            if (attempt === maxAttempts)
+                break;
+            await wait(TRANSLATION_RETRY_DELAY_MS);
+        }
+    }
+    const message = lastError instanceof Error ? lastError.message : String(lastError || 'translation command failed');
+    throw new Error(`${message} after ${maxAttempts} attempts`);
 }

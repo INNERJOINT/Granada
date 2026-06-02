@@ -1,7 +1,9 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+import { EventEmitter } from 'node:events';
 import { mkdtempSync, mkdirSync, readdirSync, readFileSync, writeFileSync, existsSync, renameSync, unlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { PassThrough } from 'node:stream';
 import { pathToFileURL } from 'node:url';
 import { runHook, baseInput } from './helper.js';
 
@@ -126,6 +128,43 @@ describe('aosp-feature-export translation hook', () => {
     expect(existsSync(join(cwd, '.granada', 'aosp-exports', 'feature_zh.md'))).toBe(false);
   });
 
+  it('retries translation command failures three times before succeeding', async () => {
+    vi.useFakeTimers();
+    try {
+      const cwd = makeProject();
+      const commandUrl = pathToFileURL(resolve(import.meta.dirname, '../../../../dist/events/post-tool-use/translate-artifact/command.js')).href;
+      const { translateWithCommand } = await import(commandUrl);
+      let spawnCalls = 0;
+      const spawn = () => {
+        spawnCalls += 1;
+        const child = new EventEmitter();
+        child.stdin = new PassThrough();
+        child.stdout = new PassThrough();
+        child.stderr = new PassThrough();
+        child.kill = () => {};
+        queueMicrotask(() => {
+          if (spawnCalls === 4) child.stdout.write('# 中文');
+          child.stdout.end();
+          child.stderr.end();
+          child.emit('close', spawnCalls === 4 ? 0 : 1);
+        });
+        return child;
+      };
+
+      const result = translateWithCommand('# English', { dirs: ['.granada/aosp-exports'], command: 'claude -p', timeoutMs: 1000 }, {
+        cwd,
+        env: {},
+        spawn,
+      });
+      await vi.advanceTimersByTimeAsync(15000);
+
+      await expect(result).resolves.toBe('# 中文');
+      expect(spawnCalls).toBe(4);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('exports only handleTranslateArtifactHook from the translation slice', async () => {
     const sliceUrl = pathToFileURL(resolve(import.meta.dirname, '../../../../dist/events/post-tool-use/translate-artifact/index.js')).href;
     const slice = await import(sliceUrl);
@@ -209,7 +248,7 @@ describe('aosp-feature-export translation hook', () => {
     const error = await runTranslationHook(cwd, makeExportInput(cwd, '.granada/aosp-exports/feature.md'), {
       env: {
         GRANADA_DEBUG: 'E',
-        GRANADA_TRANSLATE_COMMAND: 'node -e "process.exit(1)"',
+        GRANADA_TRANSLATE_COMMAND: 'claude -p; echo unsafe',
       },
     });
 
