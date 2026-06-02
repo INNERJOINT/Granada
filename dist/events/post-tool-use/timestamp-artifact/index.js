@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { sanitizeLogMessage } from '../../../shared/logger.js';
+import { getZhSiblingPath, stripLeadingTimestamp } from '../../../shared/artifact-paths.js';
 import { getCandidateReason, getWrittenFilePath, isInside } from '../translate-artifact/path-policy.js';
-const TIMESTAMP_PREFIX = /^\d{8}-\d{6}-/;
 function warningOutput(message) {
     return {
         hookSpecificOutput: {
@@ -37,14 +37,6 @@ function formatEast8Prefix(epochMs) {
     const mi = String(date.getUTCMinutes()).padStart(2, '0');
     const ss = String(date.getUTCSeconds()).padStart(2, '0');
     return `${yyyy}${mm}${dd}-${hh}${mi}${ss}-`;
-}
-function stripLeadingTimestamp(basename) {
-    return basename.replace(TIMESTAMP_PREFIX, '');
-}
-function getZhSiblingPath(sourcePath) {
-    const basename = path.basename(sourcePath);
-    const stem = basename.slice(0, -3);
-    return path.join(path.dirname(sourcePath), `${stem}_zh.md`);
 }
 function getDestinationPath(sourcePath, prefix) {
     return path.join(path.dirname(sourcePath), `${prefix}${stripLeadingTimestamp(path.basename(sourcePath))}`);

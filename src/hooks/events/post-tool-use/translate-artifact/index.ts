@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { sanitizeLogMessage } from '../../../shared/logger.js';
 import type { HookDeps, HookInput, HookObjectOutput } from '../../../types/hook.js';
+import { getZhSiblingPath, stripLeadingTimestamp } from '../../../shared/artifact-paths.js';
 import { readTranslationConfig } from './config.js';
 import { translateWithCommand } from './command.js';
 import { getCandidateReason, getWrittenFilePath, resolveArtifactPaths } from './path-policy.js';
@@ -14,8 +15,6 @@ function warningOutput(message: unknown): HookObjectOutput {
   };
 }
 
-const TIMESTAMP_PREFIX = /^\d{8}-\d{6}-/;
-
 function cleanupTemp(fs: HookDeps['fs'], tempPath: string | undefined): void {
   if (!fs || !tempPath) return;
   try {
@@ -25,15 +24,6 @@ function cleanupTemp(fs: HookDeps['fs'], tempPath: string | undefined): void {
 
 function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function stripLeadingTimestamp(basename: string): string {
-  return basename.replace(TIMESTAMP_PREFIX, '');
-}
-
-function getZhSiblingPath(sourcePath: string): string {
-  const basename = path.basename(sourcePath);
-  return path.join(path.dirname(sourcePath), `${basename.slice(0, -3)}_zh.md`);
 }
 
 function findTimestampedSourcePath(sourcePath: string, fs: HookDeps['fs']): string | null {

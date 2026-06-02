@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { sanitizeLogMessage } from '../../../shared/logger.js';
+import { getZhSiblingPath, stripLeadingTimestamp } from '../../../shared/artifact-paths.js';
 import { readTranslationConfig } from './config.js';
 import { translateWithCommand } from './command.js';
 import { getCandidateReason, getWrittenFilePath, resolveArtifactPaths } from './path-policy.js';
@@ -11,7 +12,6 @@ function warningOutput(message) {
         },
     };
 }
-const TIMESTAMP_PREFIX = /^\d{8}-\d{6}-/;
 function cleanupTemp(fs, tempPath) {
     if (!fs || !tempPath)
         return;
@@ -23,13 +23,6 @@ function cleanupTemp(fs, tempPath) {
 }
 function escapeRegex(value) {
     return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-function stripLeadingTimestamp(basename) {
-    return basename.replace(TIMESTAMP_PREFIX, '');
-}
-function getZhSiblingPath(sourcePath) {
-    const basename = path.basename(sourcePath);
-    return path.join(path.dirname(sourcePath), `${basename.slice(0, -3)}_zh.md`);
 }
 function findTimestampedSourcePath(sourcePath, fs) {
     if (!fs)
