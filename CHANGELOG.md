@@ -1,3 +1,9 @@
+## [2.14.0](https://github.com/INNERJOINT/Granada/compare/v2.13.0...v2.14.0) (2026-06-02)
+
+### Features
+
+* **hooks:** add timestamp artifact hook ([fb515a0](https://github.com/INNERJOINT/Granada/commit/fb515a0fdeb194ae3aeff26d7ceb97c6d49d2d8b))
+
 ## [2.13.0](https://github.com/INNERJOINT/Granada/compare/v2.12.0...v2.13.0) (2026-05-31)
 
 ### Features
