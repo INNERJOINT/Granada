@@ -6,6 +6,7 @@ import type { HookInput, HookObjectOutput, HookRuntime } from '../types/hook.js'
 const ROUTES = Object.freeze({
   PostToolUse: Object.freeze({
     'translate-artifact': '../handlers/post-tool-use/translate-artifact.js',
+    'timestamp-artifact': '../handlers/post-tool-use/timestamp-artifact.js',
   }),
 });
 

@@ -11,6 +11,13 @@
             "command": "node",
             "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/hooks/adapters/claude-entry.cjs", "translate-artifact"],
             "timeout": 360
+          },
+          {
+            "type": "command",
+            "if": "Write(*/.granada/*.md)",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/hooks/adapters/claude-entry.cjs", "timestamp-artifact"],
+            "timeout": 360
           }
         ]
       }

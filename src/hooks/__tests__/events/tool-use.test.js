@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, renameSync, unlinkSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readdirSync, readFileSync, writeFileSync, existsSync, renameSync, unlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -11,18 +11,23 @@ describe('plugin PostToolUse hook manifest', () => {
     return new RegExp(`^${escaped.replace(/\*/g, '.*')}$`, 's').test(value);
   }
 
-  it('registers the translate-artifact hook with the generic adapter path', () => {
+  it('registers translate-artifact and timestamp-artifact hooks with the generic adapter path', () => {
     const manifestPath = resolve(import.meta.dirname, '../../../../hooks/hooks.json');
     const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
     const entry = manifest.hooks.PostToolUse[0];
-    const hook = entry.hooks[0];
+    const [translateHook, timestampHook] = entry.hooks;
 
+    expect(entry.hooks).toHaveLength(2);
     expect(entry.matcher).toBe('Write');
-    expect(hook.type).toBe('command');
-    expect(hook.if).toBe('Write(*/.granada/*.md)');
-    expect(hook.command).toBe('node');
-    expect(hook.args).toEqual(['${CLAUDE_PLUGIN_ROOT}/scripts/hooks/adapters/claude-entry.cjs', 'translate-artifact']);
-    expect(hook.timeout).toBe(360);
+    for (const hook of entry.hooks) {
+      expect(hook.type).toBe('command');
+      expect(hook.if).toBe('Write(*/.granada/*.md)');
+      expect(hook.command).toBe('node');
+      expect(hook.args[0]).toBe('${CLAUDE_PLUGIN_ROOT}/scripts/hooks/adapters/claude-entry.cjs');
+      expect(hook.timeout).toBe(360);
+    }
+    expect(translateHook.args[1]).toBe('translate-artifact');
+    expect(timestampHook.args[1]).toBe('timestamp-artifact');
     expect(existsSync(resolve(import.meta.dirname, '../../../../scripts/hooks/adapters/claude-entry.cjs'))).toBe(true);
   });
 
@@ -67,9 +72,9 @@ describe('aosp-feature-export translation hook', () => {
     });
   }
 
-  function translationDeps(cwd, env = {}) {
+  function translationDeps(cwd, env = {}, fsOverrides = {}) {
     return {
-      fs: { readFileSync, writeFileSync, existsSync, renameSync, unlinkSync },
+      fs: { readFileSync, writeFileSync, existsSync, renameSync, unlinkSync, readdirSync, ...fsOverrides },
       env,
       cwd,
       skillPathArg: 'skills/translate-md-zh/SKILL.md',
@@ -141,6 +146,53 @@ describe('aosp-feature-export translation hook', () => {
     expect(exitCode).toBe(0);
     expect(stderr).toBe('');
     expect(readFileSync(join(cwd, '.granada', 'aosp-exports', 'feature_zh.md'), 'utf8')).toBe('# 中文\n\n你好');
+  });
+
+  it('direct ESM handler writes timestamped zh when timestamp runs before translate', async () => {
+    const cwd = makeProject();
+    const exportsDir = join(cwd, '.granada', 'aosp-exports');
+    const timestampedSource = join(exportsDir, '20260602-110405-feature.md');
+    writeFileSync(timestampedSource, '# English\n\nHello', 'utf8');
+    const sliceUrl = pathToFileURL(resolve(import.meta.dirname, '../../../../dist/events/post-tool-use/translate-artifact/index.js')).href;
+    const { handleTranslateArtifactHook } = await import(sliceUrl);
+
+    const output = await handleTranslateArtifactHook(
+      makeExportInput(cwd, '.granada/aosp-exports/feature.md'),
+      translationDeps(cwd, { TRANSLATE_MD_ZH_MOCK_TEXT: '# 中文' }),
+    );
+
+    expect(output).toBeNull();
+    expect(readFileSync(timestampedSource, 'utf8')).toBe('# English\n\nHello');
+    expect(readFileSync(join(exportsDir, '20260602-110405-feature_zh.md'), 'utf8')).toBe('# 中文');
+    expect(existsSync(join(exportsDir, 'feature.md'))).toBe(false);
+    expect(existsSync(join(exportsDir, 'feature_zh.md'))).toBe(false);
+  });
+
+  it('direct ESM handler compensates zh when timestamp runs during translate', async () => {
+    const cwd = makeProject();
+    const exportsDir = join(cwd, '.granada', 'aosp-exports');
+    const source = join(exportsDir, 'feature.md');
+    const timestampedSource = join(exportsDir, '20260602-110405-feature.md');
+    writeFileSync(source, '# English\n\nHello', 'utf8');
+    const sliceUrl = pathToFileURL(resolve(import.meta.dirname, '../../../../dist/events/post-tool-use/translate-artifact/index.js')).href;
+    const { handleTranslateArtifactHook } = await import(sliceUrl);
+    const fsOverrides = {
+      writeFileSync(filePath, content, encoding) {
+        writeFileSync(filePath, content, encoding);
+        if (existsSync(source)) renameSync(source, timestampedSource);
+      },
+    };
+
+    const output = await handleTranslateArtifactHook(
+      makeExportInput(cwd, '.granada/aosp-exports/feature.md'),
+      translationDeps(cwd, { TRANSLATE_MD_ZH_MOCK_TEXT: '# 中文' }, fsOverrides),
+    );
+
+    expect(output).toBeNull();
+    expect(readFileSync(timestampedSource, 'utf8')).toBe('# English\n\nHello');
+    expect(readFileSync(join(exportsDir, '20260602-110405-feature_zh.md'), 'utf8')).toBe('# 中文');
+    expect(existsSync(source)).toBe(false);
+    expect(existsSync(join(exportsDir, 'feature_zh.md'))).toBe(false);
   });
 
   it('writes GRANADA_DEBUG logs to stderr with level thresholds', async () => {
@@ -298,5 +350,173 @@ describe('aosp-feature-export translation hook', () => {
     expect(malformed.exitCode).toBe(0);
     expect(malformed.stdout).toBe('');
     expect(malformed.stderr).toBe('');
+  });
+
+  function makeTimestampDeps(cwd, epochMs = Date.UTC(2026, 5, 2, 3, 4, 5), env = {}) {
+    let nowCalls = 0;
+    return {
+      deps: {
+        fs: { readFileSync, writeFileSync, existsSync, renameSync, unlinkSync, readdirSync },
+        env,
+        cwd,
+        skillPathArg: 'skills/translate-md-zh/SKILL.md',
+        pid: 123,
+        now: () => {
+          nowCalls += 1;
+          return epochMs;
+        },
+        logger: { log() {} },
+      },
+      getNowCalls: () => nowCalls,
+    };
+  }
+
+  async function importTimestampHook() {
+    const url = pathToFileURL(resolve(import.meta.dirname, '../../../../dist/events/post-tool-use/timestamp-artifact/index.js')).href;
+    return import(url);
+  }
+
+  it('generic adapter resolves the timestamp-artifact route', async () => {
+    const cwd = makeProject();
+    const exportsDir = join(cwd, '.granada', 'aosp-exports');
+    writeFileSync(join(exportsDir, 'feature.md'), '# English', 'utf8');
+
+    const timestamp = await runHook('../adapters/claude-entry.cjs', makeExportInput(cwd, '.granada/aosp-exports/feature.md'), {
+      cwd,
+      args: ['timestamp-artifact'],
+    });
+
+    expect(timestamp.exitCode).toBe(0);
+    expect(timestamp.stderr).toBe('');
+    expect(readdirSync(exportsDir).some(file => /^\d{8}-\d{6}-feature\.md$/.test(file))).toBe(true);
+  });
+
+  it('direct timestamp renames a source and zh sibling with one UTC+8 prefix', async () => {
+    const cwd = makeProject();
+    const exportsDir = join(cwd, '.granada', 'aosp-exports');
+    writeFileSync(join(exportsDir, 'feature.md'), '# English', 'utf8');
+    writeFileSync(join(exportsDir, 'feature_zh.md'), '# 中文', 'utf8');
+    const { handleTimestampArtifactHook } = await importTimestampHook();
+    const { deps, getNowCalls } = makeTimestampDeps(cwd);
+
+    const output = handleTimestampArtifactHook(makeExportInput(cwd, '.granada/aosp-exports/feature.md'), deps);
+
+    expect(output).toBeNull();
+    expect(readFileSync(join(exportsDir, '20260602-110405-feature.md'), 'utf8')).toBe('# English');
+    expect(readFileSync(join(exportsDir, '20260602-110405-feature_zh.md'), 'utf8')).toBe('# 中文');
+    expect(existsSync(join(exportsDir, 'feature.md'))).toBe(false);
+    expect(existsSync(join(exportsDir, 'feature_zh.md'))).toBe(false);
+    expect(getNowCalls()).toBe(1);
+  });
+
+  it('direct timestamp succeeds when no zh sibling exists', async () => {
+    const cwd = makeProject();
+    const exportsDir = join(cwd, '.granada', 'aosp-exports');
+    writeFileSync(join(exportsDir, 'source-only.md'), '# English', 'utf8');
+    const { handleTimestampArtifactHook } = await importTimestampHook();
+    const { deps } = makeTimestampDeps(cwd);
+
+    const output = handleTimestampArtifactHook(makeExportInput(cwd, '.granada/aosp-exports/source-only.md'), deps);
+
+    expect(output).toBeNull();
+    expect(readFileSync(join(exportsDir, '20260602-110405-source-only.md'), 'utf8')).toBe('# English');
+    expect(existsSync(join(exportsDir, 'source-only.md'))).toBe(false);
+  });
+
+  it('direct timestamp replaces only leading timestamp prefixes', async () => {
+    const cwd = makeProject();
+    const exportsDir = join(cwd, '.granada', 'aosp-exports');
+    writeFileSync(join(exportsDir, '20250101-120000-feature.md'), 'leading', 'utf8');
+    writeFileSync(join(exportsDir, 'feature-20250101-120000.md'), 'middle', 'utf8');
+    const { handleTimestampArtifactHook } = await importTimestampHook();
+    const first = makeTimestampDeps(cwd);
+    const second = makeTimestampDeps(cwd);
+
+    handleTimestampArtifactHook(makeExportInput(cwd, '.granada/aosp-exports/20250101-120000-feature.md'), first.deps);
+    handleTimestampArtifactHook(makeExportInput(cwd, '.granada/aosp-exports/feature-20250101-120000.md'), second.deps);
+
+    expect(readFileSync(join(exportsDir, '20260602-110405-feature.md'), 'utf8')).toBe('leading');
+    expect(readFileSync(join(exportsDir, '20260602-110405-feature-20250101-120000.md'), 'utf8')).toBe('middle');
+    expect(existsSync(join(exportsDir, '20260602-110405-20250101-120000-feature.md'))).toBe(false);
+  });
+
+  it('direct timestamp skips non-candidate primary inputs without consuming the clock', async () => {
+    const cwd = makeProject();
+    mkdirSync(join(cwd, 'not.granada'), { recursive: true });
+    const external = mkdtempSync(join(tmpdir(), 'granada-hook-external-'));
+    mkdirSync(join(external, '.granada'), { recursive: true });
+    const externalPath = join(external, '.granada', 'feature.md');
+    writeFileSync(join(cwd, 'not.granada', 'feature.md'), 'outside', 'utf8');
+    writeFileSync(externalPath, 'external', 'utf8');
+    writeFileSync(join(cwd, '.granada', 'aosp-exports', 'feature_zh.md'), 'zh', 'utf8');
+    writeFileSync(join(cwd, '.granada', 'aosp-exports', 'feature-partial.md'), 'partial', 'utf8');
+    const { handleTimestampArtifactHook } = await importTimestampHook();
+    const { deps, getNowCalls } = makeTimestampDeps(cwd);
+
+    expect(handleTimestampArtifactHook(makeExportInput(cwd, 'not.granada/feature.md'), deps)).toBeNull();
+    expect(handleTimestampArtifactHook(makeExportInput(cwd, externalPath), deps)).toBeNull();
+    expect(handleTimestampArtifactHook(makeExportInput(cwd, '.granada/aosp-exports/feature_zh.md'), deps)).toBeNull();
+    expect(handleTimestampArtifactHook(makeExportInput(cwd, '.granada/aosp-exports/feature-partial.md'), deps)).toBeNull();
+
+    expect(readFileSync(join(cwd, 'not.granada', 'feature.md'), 'utf8')).toBe('outside');
+    expect(readFileSync(externalPath, 'utf8')).toBe('external');
+    expect(existsSync(join(external, '.granada', '20260602-110405-feature.md'))).toBe(false);
+    expect(readFileSync(join(cwd, '.granada', 'aosp-exports', 'feature_zh.md'), 'utf8')).toBe('zh');
+    expect(readFileSync(join(cwd, '.granada', 'aosp-exports', 'feature-partial.md'), 'utf8')).toBe('partial');
+    expect(getNowCalls()).toBe(0);
+  });
+
+  it('direct timestamp honors tool_response.filePath before tool_input.file_path', async () => {
+    const cwd = makeProject();
+    const exportsDir = join(cwd, '.granada', 'aosp-exports');
+    const responsePath = join(exportsDir, 'response.md');
+    writeFileSync(join(exportsDir, 'input.md'), 'input', 'utf8');
+    writeFileSync(responsePath, 'response', 'utf8');
+    const { handleTimestampArtifactHook } = await importTimestampHook();
+    const { deps } = makeTimestampDeps(cwd);
+
+    const output = handleTimestampArtifactHook(makeExportInput(cwd, '.granada/aosp-exports/input.md', { filePath: responsePath }), deps);
+
+    expect(output).toBeNull();
+    expect(readFileSync(join(exportsDir, 'input.md'), 'utf8')).toBe('input');
+    expect(readFileSync(join(exportsDir, '20260602-110405-response.md'), 'utf8')).toBe('response');
+  });
+
+  it('direct timestamp source destination collision renames nothing', async () => {
+    const cwd = makeProject();
+    const exportsDir = join(cwd, '.granada', 'aosp-exports');
+    writeFileSync(join(exportsDir, 'feature.md'), 'source', 'utf8');
+    writeFileSync(join(exportsDir, 'feature_zh.md'), 'sibling', 'utf8');
+    writeFileSync(join(exportsDir, '20260602-110405-feature.md'), 'existing', 'utf8');
+    const { handleTimestampArtifactHook } = await importTimestampHook();
+    const { deps } = makeTimestampDeps(cwd);
+
+    const output = handleTimestampArtifactHook(makeExportInput(cwd, '.granada/aosp-exports/feature.md'), deps);
+
+    expect(output.hookSpecificOutput.additionalContext).toContain('destination already exists');
+    expect(output.hookSpecificOutput.additionalContext).toContain('feature.md');
+    expect(readFileSync(join(exportsDir, 'feature.md'), 'utf8')).toBe('source');
+    expect(readFileSync(join(exportsDir, 'feature_zh.md'), 'utf8')).toBe('sibling');
+    expect(readFileSync(join(exportsDir, '20260602-110405-feature.md'), 'utf8')).toBe('existing');
+    expect(existsSync(join(exportsDir, '20260602-110405-feature_zh.md'))).toBe(false);
+  });
+
+  it('direct timestamp sibling destination collision renames nothing', async () => {
+    const cwd = makeProject();
+    const exportsDir = join(cwd, '.granada', 'aosp-exports');
+    writeFileSync(join(exportsDir, 'feature.md'), 'source', 'utf8');
+    writeFileSync(join(exportsDir, 'feature_zh.md'), 'sibling', 'utf8');
+    writeFileSync(join(exportsDir, '20260602-110405-feature_zh.md'), 'existing sibling', 'utf8');
+    const { handleTimestampArtifactHook } = await importTimestampHook();
+    const { deps } = makeTimestampDeps(cwd);
+
+    const output = handleTimestampArtifactHook(makeExportInput(cwd, '.granada/aosp-exports/feature.md'), deps);
+
+    expect(output.hookSpecificOutput.additionalContext).toContain('destination already exists');
+    expect(output.hookSpecificOutput.additionalContext).toContain('feature_zh.md');
+    expect(readFileSync(join(exportsDir, 'feature.md'), 'utf8')).toBe('source');
+    expect(readFileSync(join(exportsDir, 'feature_zh.md'), 'utf8')).toBe('sibling');
+    expect(existsSync(join(exportsDir, '20260602-110405-feature.md'))).toBe(false);
+    expect(readFileSync(join(exportsDir, '20260602-110405-feature_zh.md'), 'utf8')).toBe('existing sibling');
   });
 });

@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { sanitizeLogMessage } from '../../../shared/logger.js';
 import { readTranslationConfig } from './config.js';
 import { translateWithCommand } from './command.js';
@@ -10,6 +11,7 @@ function warningOutput(message) {
         },
     };
 }
+const TIMESTAMP_PREFIX = /^\d{8}-\d{6}-/;
 function cleanupTemp(fs, tempPath) {
     if (!fs || !tempPath)
         return;
@@ -18,6 +20,43 @@ function cleanupTemp(fs, tempPath) {
             fs.unlinkSync(tempPath);
     }
     catch { }
+}
+function escapeRegex(value) {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+function stripLeadingTimestamp(basename) {
+    return basename.replace(TIMESTAMP_PREFIX, '');
+}
+function getZhSiblingPath(sourcePath) {
+    const basename = path.basename(sourcePath);
+    return path.join(path.dirname(sourcePath), `${basename.slice(0, -3)}_zh.md`);
+}
+function findTimestampedSourcePath(sourcePath, fs) {
+    if (!fs)
+        return null;
+    const sourceDir = path.dirname(sourcePath);
+    const sourceBase = stripLeadingTimestamp(path.basename(sourcePath));
+    const pattern = new RegExp(`^\\d{8}-\\d{6}-${escapeRegex(sourceBase)}$`);
+    const candidates = fs.readdirSync(sourceDir)
+        .filter(name => pattern.test(name))
+        .sort()
+        .reverse();
+    return candidates[0] ? path.join(sourceDir, candidates[0]) : null;
+}
+function maybeCompensateTimestampedTarget(sourcePath, targetPath, deps) {
+    if (!deps.fs || deps.fs.existsSync(sourcePath) || !deps.fs.existsSync(targetPath))
+        return targetPath;
+    const timestampedSourcePath = findTimestampedSourcePath(sourcePath, deps.fs);
+    if (!timestampedSourcePath)
+        return targetPath;
+    const timestampedTargetPath = getZhSiblingPath(timestampedSourcePath);
+    if (timestampedTargetPath === targetPath)
+        return targetPath;
+    if (deps.fs.existsSync(timestampedTargetPath)) {
+        throw new Error(`timestamp compensation destination already exists: ${timestampedTargetPath}`);
+    }
+    deps.fs.renameSync(targetPath, timestampedTargetPath);
+    return timestampedTargetPath;
 }
 export async function handleTranslateArtifactHook(input, deps) {
     const logger = deps.logger || { log() { } };
@@ -47,14 +86,26 @@ export async function handleTranslateArtifactHook(input, deps) {
         ({ sourcePath, targetPath } = paths);
         if (!targetPath)
             return null;
+        let readSourcePath = sourcePath;
+        let writeTargetPath = targetPath;
+        if (!deps.fs.existsSync(readSourcePath)) {
+            const timestampedSourcePath = findTimestampedSourcePath(sourcePath, deps.fs);
+            if (timestampedSourcePath) {
+                readSourcePath = timestampedSourcePath;
+                writeTargetPath = getZhSiblingPath(timestampedSourcePath);
+            }
+        }
         const stamp = typeof deps.now === 'function' ? deps.now() : Date.now();
-        tempPath = `${targetPath}.${deps.pid || 'process'}.${stamp}.tmp`;
-        logger.log('I', `translate start source=${sourcePath} target=${targetPath}`);
-        const source = deps.fs.readFileSync(sourcePath, 'utf8');
+        tempPath = `${writeTargetPath}.${deps.pid || 'process'}.${stamp}.tmp`;
+        logger.log('I', `translate start source=${readSourcePath} target=${writeTargetPath}`);
+        const source = deps.fs.readFileSync(readSourcePath, 'utf8');
         const translated = await translateWithCommand(source, config, deps);
         deps.fs.writeFileSync(tempPath, translated, 'utf8');
-        deps.fs.renameSync(tempPath, targetPath);
-        logger.log('I', `translate success source=${sourcePath} target=${targetPath}`);
+        deps.fs.renameSync(tempPath, writeTargetPath);
+        const completedTargetPath = writeTargetPath === targetPath
+            ? maybeCompensateTimestampedTarget(sourcePath, targetPath, deps)
+            : writeTargetPath;
+        logger.log('I', `translate success source=${readSourcePath} target=${completedTargetPath}`);
         return null;
     }
     catch (error) {
