@@ -1,3 +1,9 @@
+## [2.14.1](https://github.com/INNERJOINT/Granada/compare/v2.14.0...v2.14.1) (2026-06-02)
+
+### Bug Fixes
+
+* **hooks:** retry artifact translation command ([e083a60](https://github.com/INNERJOINT/Granada/commit/e083a6091796343450f42bf9e3b5f7a889b2f650))
+
 ## [2.14.0](https://github.com/INNERJOINT/Granada/compare/v2.13.0...v2.14.0) (2026-06-02)
 
 ### Features
