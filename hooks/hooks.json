@@ -3,20 +3,24 @@
   "hooks": {
     "PostToolUse": [
       {
-        "matcher": "Write",
+        "matcher": "Write|Edit",
         "hooks": [
           {
             "type": "command",
-            "if": "Write(*/.granada/*.md)",
             "command": "node",
-            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/hooks/adapters/claude-entry.cjs", "timestamp-artifact"],
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/hooks/adapters/claude-entry.cjs", "enqueue-artifact"],
             "timeout": 360
-          },
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
           {
             "type": "command",
-            "if": "Write(*/.granada/*.md)",
             "command": "node",
-            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/hooks/adapters/claude-entry.cjs", "translate-artifact"],
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/hooks/adapters/claude-entry.cjs", "drain-artifacts"],
             "timeout": 360
           }
         ]

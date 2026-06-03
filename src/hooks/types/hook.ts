@@ -8,7 +8,7 @@ export interface Logger {
   log(level: LogLevel, message: string): void;
 }
 
-export type FileSystem = Pick<typeof fsModule, 'readFileSync' | 'writeFileSync' | 'existsSync' | 'copyFileSync' | 'renameSync' | 'unlinkSync' | 'readdirSync'>;
+export type FileSystem = Pick<typeof fsModule, 'readFileSync' | 'writeFileSync' | 'existsSync' | 'copyFileSync' | 'renameSync' | 'unlinkSync' | 'readdirSync' | 'mkdirSync' | 'statSync' | 'lstatSync' | 'rmSync' | 'rmdirSync' | 'openSync' | 'closeSync'>;
 export type Spawn = typeof nodeSpawn;
 
 export interface HookInput {

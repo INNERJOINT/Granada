@@ -6,6 +6,8 @@
 
 Use `npm run typecheck:hooks`, `npm run build:hooks`, `npm test`, and `npm run verify:hooks-package` before release. The package verification command packs the plugin, extracts it, executes the packed manifest-facing hook entrypoint, and verifies transitive `dist/**` imports work outside the repository tree. Malformed hook input and unknown routes intentionally exit quietly to avoid noisy Claude Code hook warnings.
 
+`.granada/**/*.md` artifact processing is intentionally deferred: `PostToolUse` only enqueues `Write|Edit` candidates into `.granada/.hooks/artifact-queue/**`, and `Stop` drains the queue once per session to timestamp and translate final source content. This avoids repeated timestamp/translation when Claude edits the same Markdown file multiple times in one session. The runtime queue uses append-only JSON entries, collision-safe creation, an atomic drain lock, and stale cleanup defaults of 24h for journal/failure entries and 15m for drain locks. Legacy direct `timestamp-artifact` / `translate-artifact` routes remain available for compatibility/debugging; direct `translate-artifact` continues to honor `translate-dirs`, while the Stop drain path uses the `.granada` runtime artifact policy.
+
 本 README 用于验收：每个 hook event 是否在该文档中**覆盖了事件专属输入字段（input）**以及**控制/输出方式（control/output）**。
 
 说明：

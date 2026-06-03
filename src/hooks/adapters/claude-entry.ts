@@ -5,8 +5,12 @@ import type { HookInput, HookObjectOutput, HookRuntime } from '../types/hook.js'
 
 const ROUTES = Object.freeze({
   PostToolUse: Object.freeze({
+    'enqueue-artifact': '../handlers/post-tool-use/enqueue-artifact.js',
     'translate-artifact': '../handlers/post-tool-use/translate-artifact.js',
     'timestamp-artifact': '../handlers/post-tool-use/timestamp-artifact.js',
+  }),
+  Stop: Object.freeze({
+    'drain-artifacts': '../handlers/stop/drain-artifacts.js',
   }),
 });
 
@@ -54,7 +58,7 @@ function sanitizeWarning(message: unknown): string {
 function warningOutput(eventName: string | undefined, message: unknown): HookObjectOutput {
   return {
     hookSpecificOutput: {
-      hookEventName: eventName || 'PostToolUse',
+      hookEventName: eventName || 'Unknown',
       additionalContext: `hook warning: ${sanitizeWarning(message)}`,
     },
   };
@@ -78,28 +82,32 @@ async function run(runtime: HookRuntime): Promise<void> {
   const route = resolveRoute(input.hook_event_name, handlerName);
   if (!route) return;
 
-  const [{ createLogger }, handlerModule] = await Promise.all([
-    import('../shared/logger.js'),
-    import(route) as Promise<HandlerModule>,
-  ]);
+  try {
+    const [{ createLogger }, handlerModule] = await Promise.all([
+      import('../shared/logger.js'),
+      import(route) as Promise<HandlerModule>,
+    ]);
 
-  const output = await handlerModule.handle(input, {
-    fs: runtime.fs,
-    spawn: runtime.spawn,
-    env: runtime.env,
-    cwd: runtime.cwd,
-    pluginRoot: runtime.pluginRoot,
-    skillPathArg: runtime.argv[3],
-    pid: runtime.pid,
-    now: runtime.now,
-    logger: createLogger({
+    const output = await handlerModule.handle(input, {
+      fs: runtime.fs,
+      spawn: runtime.spawn,
       env: runtime.env,
-      stderr: runtime.stderr,
-      prefix: `granada:${input.hook_event_name}:${handlerName || 'index'}`,
-    }),
-  });
+      cwd: runtime.cwd,
+      pluginRoot: runtime.pluginRoot,
+      skillPathArg: runtime.argv[3],
+      pid: runtime.pid,
+      now: runtime.now,
+      logger: createLogger({
+        env: runtime.env,
+        stderr: runtime.stderr,
+        prefix: `granada:${input.hook_event_name}:${handlerName || 'index'}`,
+      }),
+    });
 
-  if (output !== null && output !== undefined) writeJson(runtime, output);
+    if (output !== null && output !== undefined) writeJson(runtime, output);
+  } catch (error) {
+    writeJson(runtime, warningOutput(input.hook_event_name, error instanceof Error ? error.message : String(error)));
+  }
 }
 
 export async function main(runtime: Partial<HookRuntime> = {}): Promise<void> {
@@ -120,6 +128,6 @@ export async function main(runtime: Partial<HookRuntime> = {}): Promise<void> {
   try {
     await run(resolvedRuntime);
   } catch (error) {
-    writeJson(resolvedRuntime, warningOutput('PostToolUse', error instanceof Error ? error.message : String(error)));
+    writeJson(resolvedRuntime, warningOutput(undefined, error instanceof Error ? error.message : String(error)));
   }
 }

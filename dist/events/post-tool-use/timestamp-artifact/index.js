@@ -1,32 +1,14 @@
 import path from 'node:path';
 import { sanitizeLogMessage } from '../../../shared/logger.js';
 import { getZhSiblingPath, stripLeadingTimestamp } from '../../../shared/artifact-paths.js';
-import { getCandidateReason, getWrittenFilePath, isInside } from '../translate-artifact/path-policy.js';
-function warningOutput(message) {
+import { getPostToolUseCandidateReason, getToolFilePath, resolveGranadaArtifactSource } from '../../../shared/artifact-source-policy.js';
+function warningOutput(message, hookEventName = 'PostToolUse') {
     return {
         hookSpecificOutput: {
-            hookEventName: 'PostToolUse',
+            hookEventName,
             additionalContext: `markdown timestamp warning: ${sanitizeLogMessage(message, 'timestamp failed')}`,
         },
     };
-}
-function hasGranadaSegment(filePath) {
-    return filePath.split(path.sep).includes('.granada');
-}
-function resolveSourcePath(cwd, filePath) {
-    const root = path.resolve(cwd);
-    const granadaRoot = path.join(root, '.granada');
-    const sourcePath = path.resolve(root, filePath);
-    const basename = path.basename(sourcePath);
-    if (!hasGranadaSegment(sourcePath) || !isInside(granadaRoot, sourcePath))
-        return { sourcePath, skipped: true, reason: 'outside-granada' };
-    if (!basename.endsWith('.md'))
-        return { sourcePath, skipped: true, reason: 'not-markdown' };
-    if (basename.endsWith('_zh.md'))
-        return { sourcePath, skipped: true, reason: 'already-zh' };
-    if (basename.endsWith('-partial.md'))
-        return { sourcePath, skipped: true, reason: 'partial-markdown' };
-    return { sourcePath };
 }
 function formatEast8Prefix(epochMs) {
     const date = new Date(epochMs + 8 * 60 * 60 * 1000);
@@ -56,9 +38,29 @@ function detectCollision(pairs, fs) {
     }
     return null;
 }
+export function processTimestampArtifact(sourcePath, deps) {
+    const logger = deps.logger || { log() { } };
+    if (!deps.fs)
+        throw new Error('missing fs dependency');
+    const prefix = formatEast8Prefix(typeof deps.now === 'function' ? deps.now() : Date.now());
+    const pairs = getPlannedCopies(path.resolve(sourcePath), prefix, deps.fs);
+    const collision = detectCollision(pairs, deps.fs);
+    if (collision) {
+        throw new Error(`destination already exists; source=${collision.source} destination=${collision.destination}`);
+    }
+    const copied = [];
+    for (const pair of pairs) {
+        if (pair.source === pair.destination)
+            continue;
+        logger.log('I', `timestamp copy source=${pair.source} destination=${pair.destination}`);
+        deps.fs.copyFileSync(pair.source, pair.destination);
+        copied.push(pair);
+    }
+    return { prefix, copied };
+}
 export function handleTimestampArtifactHook(input, deps) {
     const logger = deps.logger || { log() { } };
-    const candidateReason = getCandidateReason(input);
+    const candidateReason = getPostToolUseCandidateReason(input);
     if (candidateReason) {
         logger.log('D', `skip reason=${candidateReason}`);
         return null;
@@ -68,27 +70,21 @@ export function handleTimestampArtifactHook(input, deps) {
     const cwd = typeof input.cwd === 'string' && input.cwd ? input.cwd : deps.cwd;
     if (!cwd)
         throw new Error('missing cwd');
-    const filePath = getWrittenFilePath(input);
+    const filePath = getToolFilePath(input);
     if (!filePath)
         return null;
-    const resolved = resolveSourcePath(cwd, filePath);
-    if (resolved.skipped) {
-        logger.log('D', `skip reason=${resolved.reason || 'unknown'} source=${resolved.sourcePath}`);
+    const resolved = resolveGranadaArtifactSource(cwd, filePath, { rejectTimestampedDerivative: false });
+    if ('skipped' in resolved) {
+        logger.log('D', `skip reason=${resolved.reason || 'unknown'} source=${resolved.sourcePath || filePath}`);
         return null;
     }
-    const prefix = formatEast8Prefix(typeof deps.now === 'function' ? deps.now() : Date.now());
-    const pairs = getPlannedCopies(resolved.sourcePath, prefix, deps.fs);
-    const collision = detectCollision(pairs, deps.fs);
-    if (collision) {
-        const message = `destination already exists; source=${collision.source} destination=${collision.destination}`;
+    try {
+        processTimestampArtifact(resolved.sourcePath, deps);
+    }
+    catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
         logger.log('W', message);
         return warningOutput(message);
-    }
-    for (const pair of pairs) {
-        if (pair.source === pair.destination)
-            continue;
-        logger.log('I', `timestamp copy source=${pair.source} destination=${pair.destination}`);
-        deps.fs.copyFileSync(pair.source, pair.destination);
     }
     return null;
 }

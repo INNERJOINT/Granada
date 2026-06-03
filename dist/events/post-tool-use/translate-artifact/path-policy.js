@@ -1,26 +1,8 @@
 import path from 'node:path';
-export function isInside(parent, candidate) {
-    const relative = path.relative(parent, candidate);
-    return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
-}
-export function getWrittenFilePath(input) {
-    const response = input.tool_response;
-    const responsePath = response && typeof response === 'object' ? response.filePath : null;
-    if (typeof responsePath === 'string' && responsePath)
-        return responsePath;
-    const inputPath = input.tool_input?.file_path;
-    return typeof inputPath === 'string' && inputPath ? inputPath : null;
-}
+import { getPostToolUseCandidateReason, getToolFilePath, isInside } from '../../../shared/artifact-source-policy.js';
+export { getToolFilePath as getWrittenFilePath, isInside };
 export function getCandidateReason(input) {
-    if (!input)
-        return 'invalid-input';
-    if (input.hook_event_name !== 'PostToolUse')
-        return `event-${input.hook_event_name || 'unknown'}`;
-    if (input.tool_name !== 'Write')
-        return `tool-${input.tool_name || 'unknown'}`;
-    if (!getWrittenFilePath(input))
-        return 'missing-file-path';
-    return null;
+    return getPostToolUseCandidateReason(input);
 }
 export function resolveArtifactPaths(cwd, filePath, config) {
     const root = path.resolve(cwd);

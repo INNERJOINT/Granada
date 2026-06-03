@@ -6,10 +6,16 @@ import { readTranslationConfig } from './config.js';
 import { translateWithCommand } from './command.js';
 import { getCandidateReason, getWrittenFilePath, resolveArtifactPaths } from './path-policy.js';
 
-function warningOutput(message: unknown): HookObjectOutput {
+export type TranslateArtifactResult = {
+  sourcePath: string;
+  targetPath: string;
+  readSourcePath: string;
+};
+
+function warningOutput(message: unknown, hookEventName = 'PostToolUse'): HookObjectOutput {
   return {
     hookSpecificOutput: {
-      hookEventName: 'PostToolUse',
+      hookEventName,
       additionalContext: `markdown translation warning: ${sanitizeLogMessage(message, 'translation failed')}`,
     },
   };
@@ -52,36 +58,31 @@ function maybeCompensateTimestampedTarget(sourcePath: string, targetPath: string
   return timestampedTargetPath;
 }
 
-export async function handleTranslateArtifactHook(input: HookInput, deps: HookDeps): Promise<HookObjectOutput | null> {
+export async function processTranslateArtifact(sourcePath: string, deps: HookDeps, options: { enforceTranslateDirs?: boolean } = {}): Promise<TranslateArtifactResult> {
   const logger = deps.logger || { log() {} };
-  const candidateReason = getCandidateReason(input);
-  if (candidateReason) {
-    logger.log('D', `skip reason=${candidateReason}`);
-    return null;
-  }
   if (!deps.fs) throw new Error('missing fs dependency');
-
-  const cwd = typeof input.cwd === 'string' && input.cwd ? input.cwd : deps.cwd;
+  const cwd = deps.cwd;
   if (!cwd) throw new Error('missing cwd');
-  const filePath = getWrittenFilePath(input);
-  if (!filePath) return null;
-  let sourcePath: string | undefined;
+
   let targetPath: string | undefined;
   let tempPath: string | undefined;
 
   try {
     const config = readTranslationConfig(cwd, deps);
-    const paths = resolveArtifactPaths(cwd, filePath, config);
-    if (!paths || paths.skipped) {
-      logger.log('D', `skip reason=${paths ? paths.reason : 'unknown'} source=${paths && paths.sourcePath ? paths.sourcePath : filePath}`);
-      return null;
+    const resolvedSourcePath = path.resolve(cwd, sourcePath);
+    if (options.enforceTranslateDirs !== false) {
+      const paths = resolveArtifactPaths(cwd, resolvedSourcePath, config);
+      if (!paths || paths.skipped || !paths.targetPath) {
+        throw new Error(`source is not eligible for translation: ${paths ? paths.reason : 'unknown'}`);
+      }
+      targetPath = paths.targetPath;
+    } else {
+      targetPath = getZhSiblingPath(resolvedSourcePath);
     }
 
-    ({ sourcePath, targetPath } = paths);
-    if (!targetPath) return null;
-    let readSourcePath = sourcePath;
+    let readSourcePath = resolvedSourcePath;
     let writeTargetPath = targetPath;
-    const timestampedSourcePath = findTimestampedSourcePath(sourcePath, deps.fs);
+    const timestampedSourcePath = findTimestampedSourcePath(resolvedSourcePath, deps.fs);
     if (timestampedSourcePath) {
       readSourcePath = timestampedSourcePath;
       writeTargetPath = getZhSiblingPath(timestampedSourcePath);
@@ -95,16 +96,44 @@ export async function handleTranslateArtifactHook(input: HookInput, deps: HookDe
     deps.fs.writeFileSync(tempPath, translated, 'utf8');
     deps.fs.renameSync(tempPath, writeTargetPath);
     const completedTargetPath = writeTargetPath === targetPath
-      ? maybeCompensateTimestampedTarget(sourcePath, targetPath, deps)
+      ? maybeCompensateTimestampedTarget(resolvedSourcePath, targetPath, deps)
       : writeTargetPath;
     logger.log('I', `translate success source=${readSourcePath} target=${completedTargetPath}`);
-    return null;
+    return { sourcePath: resolvedSourcePath, targetPath: completedTargetPath, readSourcePath };
   } catch (error) {
     cleanupTemp(deps.fs, tempPath);
     const message = error instanceof Error ? error.message : String(error);
-    if (sourcePath && targetPath) {
+    if (targetPath) {
       logger.log('E', `translate failed source=${sourcePath} target=${targetPath} error=${sanitizeLogMessage(message)}`);
     }
-    return warningOutput(message);
+    throw error;
+  }
+}
+
+export async function handleTranslateArtifactHook(input: HookInput, deps: HookDeps): Promise<HookObjectOutput | null> {
+  const logger = deps.logger || { log() {} };
+  const candidateReason = getCandidateReason(input);
+  if (candidateReason) {
+    logger.log('D', `skip reason=${candidateReason}`);
+    return null;
+  }
+  if (!deps.fs) throw new Error('missing fs dependency');
+
+  const cwd = typeof input.cwd === 'string' && input.cwd ? input.cwd : deps.cwd;
+  if (!cwd) throw new Error('missing cwd');
+  const filePath = getWrittenFilePath(input);
+  if (!filePath) return null;
+
+  try {
+    const config = readTranslationConfig(cwd, deps);
+    const paths = resolveArtifactPaths(cwd, filePath, config);
+    if (!paths || paths.skipped) {
+      logger.log('D', `skip reason=${paths ? paths.reason : 'unknown'} source=${paths && paths.sourcePath ? paths.sourcePath : filePath}`);
+      return null;
+    }
+    await processTranslateArtifact(paths.sourcePath, { ...deps, cwd });
+    return null;
+  } catch (error) {
+    return warningOutput(error instanceof Error ? error.message : String(error));
   }
 }

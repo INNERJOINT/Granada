@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
-import { copyFileSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, writeFileSync, existsSync, renameSync, unlinkSync } from 'node:fs';
+import { closeSync, copyFileSync, lstatSync, mkdtempSync, mkdirSync, openSync, readdirSync, readFileSync, writeFileSync, existsSync, renameSync, rmSync, rmdirSync, statSync, unlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { PassThrough } from 'node:stream';
@@ -13,23 +13,32 @@ describe('plugin PostToolUse hook manifest', () => {
     return new RegExp(`^${escaped.replace(/\*/g, '.*')}$`, 's').test(value);
   }
 
-  it('registers timestamp-artifact before translate-artifact with the generic adapter path', () => {
+  it('registers artifact enqueue and Stop drain with the generic adapter path', () => {
     const manifestPath = resolve(import.meta.dirname, '../../../../hooks/hooks.json');
     const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
     const entry = manifest.hooks.PostToolUse[0];
-    const [timestampHook, translateHook] = entry.hooks;
+    const enqueueHook = entry.hooks[0];
+    const stopEntry = manifest.hooks.Stop[0];
+    const drainHook = stopEntry.hooks[0];
 
-    expect(entry.hooks).toHaveLength(2);
-    expect(entry.matcher).toBe('Write');
-    for (const hook of entry.hooks) {
-      expect(hook.type).toBe('command');
-      expect(hook.if).toBe('Write(*/.granada/*.md)');
-      expect(hook.command).toBe('node');
-      expect(hook.args[0]).toBe('${CLAUDE_PLUGIN_ROOT}/scripts/hooks/adapters/claude-entry.cjs');
-      expect(hook.timeout).toBe(360);
-    }
-    expect(timestampHook.args[1]).toBe('timestamp-artifact');
-    expect(translateHook.args[1]).toBe('translate-artifact');
+    expect(entry.hooks).toHaveLength(1);
+    expect(entry.matcher).toBe('Write|Edit');
+    expect(entry.matcher).not.toContain('Update');
+    expect(enqueueHook.type).toBe('command');
+    expect(enqueueHook.if).toBeUndefined();
+    expect(enqueueHook.command).toBe('node');
+    expect(enqueueHook.args[0]).toBe('${CLAUDE_PLUGIN_ROOT}/scripts/hooks/adapters/claude-entry.cjs');
+    expect(enqueueHook.args[1]).toBe('enqueue-artifact');
+    expect(enqueueHook.timeout).toBe(360);
+
+    expect(stopEntry.matcher).toBeUndefined();
+    expect(drainHook.type).toBe('command');
+    expect(drainHook.command).toBe('node');
+    expect(drainHook.args[0]).toBe('${CLAUDE_PLUGIN_ROOT}/scripts/hooks/adapters/claude-entry.cjs');
+    expect(drainHook.args[1]).toBe('drain-artifacts');
+    expect(drainHook.timeout).toBe(360);
+    expect(JSON.stringify(entry.hooks)).not.toContain('timestamp-artifact');
+    expect(JSON.stringify(entry.hooks)).not.toContain('translate-artifact');
     expect(existsSync(resolve(import.meta.dirname, '../../../../scripts/hooks/adapters/claude-entry.cjs'))).toBe(true);
   });
 
@@ -89,7 +98,7 @@ describe('aosp-feature-export translation hook', () => {
 
   function translationDeps(cwd, env = {}, fsOverrides = {}) {
     return {
-      fs: { readFileSync, writeFileSync, existsSync, copyFileSync, renameSync, unlinkSync, readdirSync, ...fsOverrides },
+      fs: { readFileSync, writeFileSync, existsSync, copyFileSync, renameSync, unlinkSync, readdirSync, mkdirSync, statSync, lstatSync, rmSync, rmdirSync, openSync, closeSync, ...fsOverrides },
       env,
       cwd,
       skillPathArg: 'skills/translate-md-zh/SKILL.md',
@@ -197,7 +206,7 @@ describe('aosp-feature-export translation hook', () => {
     const sliceUrl = pathToFileURL(resolve(import.meta.dirname, '../../../../dist/events/post-tool-use/translate-artifact/index.js')).href;
     const slice = await import(sliceUrl);
     const exported = Object.keys(slice).filter((k) => k !== 'default');
-    expect(exported).toEqual(['handleTranslateArtifactHook']);
+    expect(exported.sort()).toEqual(['handleTranslateArtifactHook', 'processTranslateArtifact'].sort());
     expect(slice.default).toBeUndefined();
   });
 
@@ -280,6 +289,108 @@ describe('aosp-feature-export translation hook', () => {
     expect(translate.exitCode).toBe(0);
     expect(readFileSync(join(exportsDir, timestampedSource.replace(/\.md$/, '_zh.md')), 'utf8')).toBe('# 中文');
     expect(existsSync(join(exportsDir, 'feature_zh.md'))).toBe(false);
+  });
+
+  it('generic adapter queues repeated writes and drains once on Stop', async () => {
+    const cwd = makeProject();
+    const exportsDir = join(cwd, '.granada', 'aosp-exports');
+    const source = join(exportsDir, 'feature.md');
+    writeFileSync(source, '# English\n\nDraft', 'utf8');
+
+    const first = await runHook('../adapters/claude-entry.cjs', makeExportInput(cwd, '.granada/aosp-exports/feature.md'), {
+      cwd,
+      args: ['enqueue-artifact'],
+    });
+    writeFileSync(source, '# English\n\nFinal', 'utf8');
+    const second = await runHook('../adapters/claude-entry.cjs', {
+      ...makeExportInput(cwd, '.granada/aosp-exports/feature.md'),
+      tool_name: 'Edit',
+      tool_use_id: 'tu_edit_final',
+    }, {
+      cwd,
+      args: ['enqueue-artifact'],
+    });
+    const stop = await runHook('../adapters/claude-entry.cjs', baseInput('Stop', { cwd }), {
+      cwd,
+      args: ['drain-artifacts'],
+      env: { TRANSLATE_MD_ZH_MOCK_TEXT: '# 中文\n\n最终' },
+    });
+
+    expect(first.exitCode).toBe(0);
+    expect(second.exitCode).toBe(0);
+    expect(stop.exitCode).toBe(0);
+    expect(stop.stdout).toBe('');
+    const outputFiles = readdirSync(exportsDir);
+    const timestampedSources = outputFiles.filter(file => /^\d{8}-\d{6}-feature\.md$/.test(file));
+    const timestampedTargets = outputFiles.filter(file => /^\d{8}-\d{6}-feature_zh\.md$/.test(file));
+    expect(timestampedSources).toHaveLength(1);
+    expect(timestampedTargets).toHaveLength(1);
+    expect(readFileSync(join(exportsDir, timestampedSources[0]), 'utf8')).toBe('# English\n\nFinal');
+    expect(readFileSync(join(exportsDir, timestampedTargets[0]), 'utf8')).toBe('# 中文\n\n最终');
+    expect(existsSync(join(exportsDir, 'feature_zh.md'))).toBe(false);
+  });
+
+  async function importQueueAndDrainHooks() {
+    const enqueueUrl = pathToFileURL(resolve(import.meta.dirname, '../../../../dist/events/post-tool-use/enqueue-artifact/index.js')).href;
+    const drainUrl = pathToFileURL(resolve(import.meta.dirname, '../../../../dist/events/stop/drain-artifacts/index.js')).href;
+    const [enqueue, drain] = await Promise.all([import(enqueueUrl), import(drainUrl)]);
+    return { enqueue, drain };
+  }
+
+  function drainDeps(cwd, env = {}, times = [Date.UTC(2026, 5, 2, 3, 4, 5)]) {
+    let index = 0;
+    return {
+      fs: { readFileSync, writeFileSync, existsSync, copyFileSync, renameSync, unlinkSync, readdirSync, mkdirSync, statSync, lstatSync, rmSync, rmdirSync, openSync, closeSync },
+      env,
+      cwd,
+      skillPathArg: 'skills/translate-md-zh/SKILL.md',
+      pid: 123,
+      now: () => times[Math.min(index++, times.length - 1)],
+      logger: { log() {} },
+    };
+  }
+
+  it('Stop drain translates any queued .granada markdown without legacy translate-dirs narrowing', async () => {
+    const cwd = makeProject('translate-dirs: [.granada/aosp-exports]');
+    const docsDir = join(cwd, '.granada', 'other');
+    mkdirSync(docsDir, { recursive: true });
+    writeFileSync(join(docsDir, 'note.md'), '# English\n\nRuntime only', 'utf8');
+    const { enqueue, drain } = await importQueueAndDrainHooks();
+
+    enqueue.handleEnqueueArtifactHook(makeExportInput(cwd, '.granada/other/note.md'), drainDeps(cwd));
+    const output = await drain.handleDrainArtifactsHook(baseInput('Stop', { cwd }), drainDeps(cwd, { TRANSLATE_MD_ZH_MOCK_TEXT: '# 中文\n\n运行时' }));
+
+    expect(output).toBeNull();
+    expect(readFileSync(join(docsDir, '20260602-110405-note.md'), 'utf8')).toContain('Runtime only');
+    expect(readFileSync(join(docsDir, '20260602-110405-note_zh.md'), 'utf8')).toBe('# 中文\n\n运行时');
+    expect(existsSync(join(docsDir, 'note_zh.md'))).toBe(false);
+  });
+
+  it('Stop drain timestamps new source content after a prior translation failure', async () => {
+    const cwd = makeProject();
+    const exportsDir = join(cwd, '.granada', 'aosp-exports');
+    const source = join(exportsDir, 'feature.md');
+    writeFileSync(source, '# English\n\nOld', 'utf8');
+    const { enqueue, drain } = await importQueueAndDrainHooks();
+
+    enqueue.handleEnqueueArtifactHook(makeExportInput(cwd, '.granada/aosp-exports/feature.md'), drainDeps(cwd));
+    const failed = await drain.handleDrainArtifactsHook(
+      baseInput('Stop', { cwd }),
+      drainDeps(cwd, { GRANADA_TRANSLATE_COMMAND: 'claude -p; echo unsafe' }, [Date.UTC(2026, 5, 2, 3, 4, 5), Date.UTC(2026, 5, 2, 3, 4, 5)]),
+    );
+    expect(failed.hookSpecificOutput.additionalContext).toContain('unsafe shell metacharacters');
+    expect(readFileSync(join(exportsDir, '20260602-110405-feature.md'), 'utf8')).toContain('Old');
+
+    writeFileSync(source, '# English\n\nNew', 'utf8');
+    enqueue.handleEnqueueArtifactHook({ ...makeExportInput(cwd, '.granada/aosp-exports/feature.md'), tool_name: 'Edit', tool_use_id: 'tu_after_failure' }, drainDeps(cwd));
+    const succeeded = await drain.handleDrainArtifactsHook(
+      baseInput('Stop', { cwd }),
+      drainDeps(cwd, { TRANSLATE_MD_ZH_MOCK_TEXT: '# 中文\n\n新的' }, [Date.UTC(2026, 5, 2, 3, 4, 6), Date.UTC(2026, 5, 2, 3, 4, 6)]),
+    );
+
+    expect(succeeded).toBeNull();
+    expect(readFileSync(join(exportsDir, '20260602-110406-feature.md'), 'utf8')).toContain('New');
+    expect(readFileSync(join(exportsDir, '20260602-110406-feature_zh.md'), 'utf8')).toBe('# 中文\n\n新的');
   });
 
   it('writes GRANADA_DEBUG logs to stderr with level thresholds', async () => {
@@ -444,7 +555,7 @@ describe('aosp-feature-export translation hook', () => {
     let nowCalls = 0;
     return {
       deps: {
-        fs: { readFileSync, writeFileSync, existsSync, copyFileSync, renameSync, unlinkSync, readdirSync },
+        fs: { readFileSync, writeFileSync, existsSync, copyFileSync, renameSync, unlinkSync, readdirSync, mkdirSync, statSync, lstatSync, rmSync, rmdirSync, openSync, closeSync },
         env,
         cwd,
         skillPathArg: 'skills/translate-md-zh/SKILL.md',

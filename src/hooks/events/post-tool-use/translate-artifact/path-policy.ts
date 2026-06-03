@@ -1,27 +1,12 @@
 import path from 'node:path';
 import type { HookInput } from '../../../types/hook.js';
 import type { TranslationConfig } from './config.js';
+import { getPostToolUseCandidateReason, getToolFilePath, isInside } from '../../../shared/artifact-source-policy.js';
 
-export function isInside(parent: string, candidate: string): boolean {
-  const relative = path.relative(parent, candidate);
-  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
-}
-
-export function getWrittenFilePath(input: HookInput): string | null {
-  const response = input.tool_response;
-  const responsePath = response && typeof response === 'object' ? response.filePath : null;
-  if (typeof responsePath === 'string' && responsePath) return responsePath;
-
-  const inputPath = input.tool_input?.file_path;
-  return typeof inputPath === 'string' && inputPath ? inputPath : null;
-}
+export { getToolFilePath as getWrittenFilePath, isInside };
 
 export function getCandidateReason(input: HookInput): string | null {
-  if (!input) return 'invalid-input';
-  if (input.hook_event_name !== 'PostToolUse') return `event-${input.hook_event_name || 'unknown'}`;
-  if (input.tool_name !== 'Write') return `tool-${input.tool_name || 'unknown'}`;
-  if (!getWrittenFilePath(input)) return 'missing-file-path';
-  return null;
+  return getPostToolUseCandidateReason(input);
 }
 
 export function resolveArtifactPaths(cwd: string, filePath: string, config: TranslationConfig): { sourcePath: string; targetPath?: string; skipped?: boolean; reason?: string } {
