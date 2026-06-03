@@ -12,7 +12,7 @@ Documents vendor/third-party features added on top of AOSP. Takes a concrete ven
 
 **Key distinction:** The feature being documented is NOT an AOSP built-in feature. It is a vendor customization — code added or modified by the third-party vendor on top of AOSP. The AOSP search phase finds the original context that the vendor code interacts with.
 
-**Scope principle:** One export should describe one concrete vendor feature slice, such as `AIUD 在 Settings 中的定制功能`, not a broad module-level topic like `Settings 定制` or `Connectivity 定制`. If the input is too broad, first run bounded coarse exploration, then list concrete sub-feature candidates with evidence, stop without exporting a report, and tell the user to run the skill again with one selected sub-feature.
+**Scope principle:** One export should describe one concrete vendor feature slice, such as `AIUD 在 Settings 中的定制功能`, not a broad module-level topic like `Settings 定制` or `Connectivity 定制`. If the input is too broad, first run bounded coarse exploration, save the split-candidate result to `.granada/aosp-exports/<slug>-split.md`, list concrete sub-feature candidates with evidence, stop without exporting a full report, and tell the user to run the skill again with one selected sub-feature.
 
 ## Usage
 
@@ -74,7 +74,7 @@ Before spawning investigators, decide whether the requested feature is concrete 
 - Different parts may change for different reasons (AOSP API change, business rule change, UI change, device/HAL change), following Parnas' separation principle.
 - The description names a broad module or domain (`Settings customization`, `Connectivity customization`, `Audio routing`) rather than a concrete user-visible behavior, API behavior, or vendor hook.
 
-**If the input is too broad: run bounded coarse exploration.** This branch runs after the Step 2c granularity decision and before Step 3 Phase 1 discovery. It is not a full export, must not write `.granada/aosp-exports/<slug>.md`, and must not continue into Step 3 after listing candidates.
+**If the input is too broad: run bounded coarse exploration.** This branch runs after the Step 2c granularity decision and before Step 3 Phase 1 discovery. It is not a full export, must not write `.granada/aosp-exports/<slug>.md`, must write the split-candidate result to `.granada/aosp-exports/<slug>-split.md`, and must not continue into Step 3 after listing candidates.
 
 1. Run coarse exploration with a **2 rounds adaptive** budget:
    - **Round 1:** spawn 2 `zaku:aosp-investigator` agents in parallel.
@@ -117,9 +117,16 @@ Agent(
    - **Confidence / evidence strength:** high, medium, or low
    - **Known gaps:** what still needs deep investigation in the next run
 
-4. If evidence is insufficient, output conservative low-confidence candidates with explicit evidence gaps rather than presenting them as confirmed.
+4. Save the split-candidate result:
+   - Generate slug from the original broad description using the same slug rules as Step 6
+   - Create `.granada/aosp-exports/` if it does not exist
+   - Write the split result to `.granada/aosp-exports/<slug>-split.md`
+   - Include the original broad input, AOSP project, export date, keyword groups, coarse exploration rounds, partial-failure warnings, all candidate fields above, and exact rerun commands for each candidate
+   - Mark the document as `Split candidate result only — not a complete vendor feature export`
 
-5. Stop without exporting a report, without writing `.granada/aosp-exports/<slug>.md`, and without continuing to Step 3. Tell the user to run `/zaku:aosp-feature-export` again with one selected candidate.
+5. If evidence is insufficient, output conservative low-confidence candidates with explicit evidence gaps rather than presenting them as confirmed.
+
+6. Stop without exporting a full feature report, without writing `.granada/aosp-exports/<slug>.md`, and without continuing to Step 3. Confirm the split result path and tell the user to run `/zaku:aosp-feature-export` again with one selected candidate.
 
 ### Step 3: Phase 1 — Implementation Context Discovery
 
@@ -365,6 +372,8 @@ Skill is idempotent — re-running with the same inputs overwrites the output fi
 ## Configuration
 
 - Output directory: `.granada/aosp-exports/` (fixed)
+- Full export path: `.granada/aosp-exports/<slug>.md`
+- Broad-scope split result path: `.granada/aosp-exports/<slug>-split.md`
 - Max iteration rounds: 5
 - Max total agent spawns: 15
 - Convergence threshold: < 3 new second-level prefixes per round
@@ -372,4 +381,5 @@ Skill is idempotent — re-running with the same inputs overwrites the output fi
 ## Known Limitations
 
 - **Description-only mode:** If no concrete vendor modification context is available, the export may describe the most likely AOSP implementation context rather than confirmed vendor touch points.
+- **Broad-scope split output:** Split results are saved as candidate lists only; they are not complete vendor feature exports and must be rerun with one selected candidate for full documentation.
 - **Existing export interaction:** Previously exported findings are used for comparison and deduplication when an export with the same slug already exists.
