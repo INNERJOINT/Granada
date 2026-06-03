@@ -12,7 +12,7 @@ Documents vendor/third-party features added on top of AOSP. Takes a concrete ven
 
 **Key distinction:** The feature being documented is NOT an AOSP built-in feature. It is a vendor customization — code added or modified by the third-party vendor on top of AOSP. The AOSP search phase finds the original context that the vendor code interacts with.
 
-**Scope principle:** One export should describe one concrete vendor feature slice, such as `AIUD 在 Settings 中的定制功能`, not a broad module-level topic like `Settings 定制` or `Connectivity 定制`. If the input is too broad, split it into a list of concrete sub-features, then stop without exporting a report and tell the user to run the skill again with one selected sub-feature.
+**Scope principle:** One export should describe one concrete vendor feature slice, such as `AIUD 在 Settings 中的定制功能`, not a broad module-level topic like `Settings 定制` or `Connectivity 定制`. If the input is too broad, first run bounded coarse exploration, then list concrete sub-feature candidates with evidence, stop without exporting a report, and tell the user to run the skill again with one selected sub-feature.
 
 ## Usage
 
@@ -74,11 +74,52 @@ Before spawning investigators, decide whether the requested feature is concrete 
 - Different parts may change for different reasons (AOSP API change, business rule change, UI change, device/HAL change), following Parnas' separation principle.
 - The description names a broad module or domain (`Settings customization`, `Connectivity customization`, `Audio routing`) rather than a concrete user-visible behavior, API behavior, or vendor hook.
 
-**If the input is too broad:**
-1. Derive 2-6 concrete sub-features from the description, known changed paths, class/method names, and modification summaries.
-2. Present the sub-feature list with a brief description and likely search anchors for each item.
-3. Stop without exporting a report.
-4. Tell the user to run the skill again with one selected sub-feature.
+**If the input is too broad: run bounded coarse exploration.** This branch runs after the Step 2c granularity decision and before Step 3 Phase 1 discovery. It is not a full export, must not write `.granada/aosp-exports/<slug>.md`, and must not continue into Step 3 after listing candidates.
+
+1. Run coarse exploration with a **2 rounds adaptive** budget:
+   - **Round 1:** spawn 2 `zaku:aosp-investigator` agents in parallel.
+   - **Round 2:** only if Round 1 finds fewer than 2 actionable candidates, evidence is weak, or the results cannot be bounded into 2-6 single-purpose sub-features. Spawn 1-2 additional `zaku:aosp-investigator` agents focused on candidate boundaries and evidence gaps, not full implementation tracing.
+   - **Total cap:** at most 4 coarse-exploration agents. Failed agents are not retried.
+   - **Partial failure:** if more than 50% of agents fail in any round, stop coarse exploration and output partial candidates from the collected material with a warning.
+   - Investigators may read small key file snippets, but must not perform formal export-level dependency tracing.
+
+2. Use a breadth-first investigator prompt:
+
+```
+Agent(
+  subagent_type="zaku:aosp-investigator",
+  prompt="Coarsely explore AOSP for a BROAD vendor customization description: '<description>'.
+
+  This is a third-party/vendor customization, NOT an AOSP built-in feature, and NOT yet a confirmed single feature slice.
+
+  Vendor modification context (if available):
+  <known changed file paths, class names, method names, settings/config keys, and behavior summaries from Step 2>
+
+  Previously discovered prefixes, anchors, and candidate areas to avoid in this round (Round 2 only):
+  <prefixes, anchors, and candidate areas already covered>
+
+  Your mission: discover likely concrete sub-feature slices that could each be exported separately later.
+  - Prefer breadth over depth: identify candidate behavior boundaries, entry points, key AOSP paths, class/interface/settings anchors, resources, and evidence snippets
+  - Do not produce a full implementation report or trace the complete dependency chain
+  - Avoid re-searching already discovered prefixes, anchors, or candidate areas in Round 2
+  - Report candidate sub-features with evidence, uncertainty, and known gaps
+
+  For each candidate, include: candidate name, one-sentence description, why it is independently exportable, evidence discovered, likely search anchors, confidence/evidence strength, and known gaps."
+)
+```
+
+3. Synthesize 2-6 candidate sub-features. For each candidate, present:
+   - **Candidate name:** concrete enough to rerun as `/zaku:aosp-feature-export "..."`
+   - **Description:** one-sentence single-purpose behavior, API behavior, or vendor hook
+   - **Why independent:** which split rule it satisfies, such as single purpose, separate UI/API/HAL concern, independent change reason, or reusable AOSP primitive
+   - **Evidence discovered:** AOSP paths, classes, methods, settings keys, resources, or snippets found during coarse exploration
+   - **Search anchors:** exact terms likely useful for the next run
+   - **Confidence / evidence strength:** high, medium, or low
+   - **Known gaps:** what still needs deep investigation in the next run
+
+4. If evidence is insufficient, output conservative low-confidence candidates with explicit evidence gaps rather than presenting them as confirmed.
+
+5. Stop without exporting a report, without writing `.granada/aosp-exports/<slug>.md`, and without continuing to Step 3. Tell the user to run `/zaku:aosp-feature-export` again with one selected candidate.
 
 ### Step 3: Phase 1 — Implementation Context Discovery
 
