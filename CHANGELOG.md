@@ -1,3 +1,9 @@
+## [2.18.1](https://github.com/INNERJOINT/Granada/compare/v2.18.0...v2.18.1) (2026-06-03)
+
+### Bug Fixes
+
+* **hooks:** translate latest timestamped markdown artifact ([8c1da4c](https://github.com/INNERJOINT/Granada/commit/8c1da4c45407e2d98f49aea278894be5326a99f1))
+
 ## [2.18.0](https://github.com/INNERJOINT/Granada/compare/v2.17.1...v2.18.0) (2026-06-03)
 
 ### Features
