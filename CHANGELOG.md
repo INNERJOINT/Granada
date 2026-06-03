@@ -1,3 +1,13 @@
+## [2.18.0](https://github.com/INNERJOINT/Granada/compare/v2.17.1...v2.18.0) (2026-06-03)
+
+### Features
+
+* **skills:** enable translations for AOSP outputs ([585b8ca](https://github.com/INNERJOINT/Granada/commit/585b8cab73850a9ca06775ea69693c1cd524223a))
+
+### Bug Fixes
+
+* **hooks:** preserve markdown artifacts when timestamping ([e1e1207](https://github.com/INNERJOINT/Granada/commit/e1e1207f498633a912a8e29603b10dd30a0cdbcc))
+
 ## [2.17.1](https://github.com/INNERJOINT/Granada/compare/v2.17.0...v2.17.1) (2026-06-03)
 
 ### Bug Fixes
