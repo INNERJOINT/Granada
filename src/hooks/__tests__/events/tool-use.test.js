@@ -13,11 +13,11 @@ describe('plugin PostToolUse hook manifest', () => {
     return new RegExp(`^${escaped.replace(/\*/g, '.*')}$`, 's').test(value);
   }
 
-  it('registers translate-artifact and timestamp-artifact hooks with the generic adapter path', () => {
+  it('registers timestamp-artifact before translate-artifact with the generic adapter path', () => {
     const manifestPath = resolve(import.meta.dirname, '../../../../hooks/hooks.json');
     const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
     const entry = manifest.hooks.PostToolUse[0];
-    const [translateHook, timestampHook] = entry.hooks;
+    const [timestampHook, translateHook] = entry.hooks;
 
     expect(entry.hooks).toHaveLength(2);
     expect(entry.matcher).toBe('Write');
@@ -28,8 +28,8 @@ describe('plugin PostToolUse hook manifest', () => {
       expect(hook.args[0]).toBe('${CLAUDE_PLUGIN_ROOT}/scripts/hooks/adapters/claude-entry.cjs');
       expect(hook.timeout).toBe(360);
     }
-    expect(translateHook.args[1]).toBe('translate-artifact');
     expect(timestampHook.args[1]).toBe('timestamp-artifact');
+    expect(translateHook.args[1]).toBe('translate-artifact');
     expect(existsSync(resolve(import.meta.dirname, '../../../../scripts/hooks/adapters/claude-entry.cjs'))).toBe(true);
   });
 
@@ -229,53 +229,57 @@ describe('aosp-feature-export translation hook', () => {
     expect(readFileSync(join(cwd, '.granada', 'aosp-exports', 'feature_zh.md'), 'utf8')).toBe('# 中文\n\n你好');
   });
 
-  it('direct ESM handler writes untimestamped zh when timestamp copy already exists', async () => {
+  it('direct ESM handler writes zh for the latest timestamped source when timestamp copies already exist', async () => {
     const cwd = makeProject();
     const exportsDir = join(cwd, '.granada', 'aosp-exports');
     const source = join(exportsDir, 'feature.md');
-    const timestampedSource = join(exportsDir, '20260602-110405-feature.md');
-    writeFileSync(source, '# English\n\nHello', 'utf8');
-    writeFileSync(timestampedSource, '# English\n\nHello', 'utf8');
+    const olderTimestampedSource = join(exportsDir, '20260602-110405-feature.md');
+    const latestTimestampedSource = join(exportsDir, '20260602-110406-feature.md');
+    const logs = [];
+    writeFileSync(source, '# English\n\nOriginal', 'utf8');
+    writeFileSync(olderTimestampedSource, '# English\n\nOlder', 'utf8');
+    writeFileSync(latestTimestampedSource, '# English\n\nLatest', 'utf8');
     const sliceUrl = pathToFileURL(resolve(import.meta.dirname, '../../../../dist/events/post-tool-use/translate-artifact/index.js')).href;
     const { handleTranslateArtifactHook } = await import(sliceUrl);
 
     const output = await handleTranslateArtifactHook(
       makeExportInput(cwd, '.granada/aosp-exports/feature.md'),
-      translationDeps(cwd, { TRANSLATE_MD_ZH_MOCK_TEXT: '# 中文' }),
+      {
+        ...translationDeps(cwd, { TRANSLATE_MD_ZH_MOCK_TEXT: '# 中文' }),
+        logger: { log(level, message) { logs.push(`${level}:${message}`); } },
+      },
     );
 
     expect(output).toBeNull();
-    expect(readFileSync(source, 'utf8')).toBe('# English\n\nHello');
-    expect(readFileSync(timestampedSource, 'utf8')).toBe('# English\n\nHello');
-    expect(readFileSync(join(exportsDir, 'feature_zh.md'), 'utf8')).toBe('# 中文');
+    expect(readFileSync(source, 'utf8')).toBe('# English\n\nOriginal');
+    expect(readFileSync(olderTimestampedSource, 'utf8')).toBe('# English\n\nOlder');
+    expect(readFileSync(latestTimestampedSource, 'utf8')).toBe('# English\n\nLatest');
+    expect(readFileSync(join(exportsDir, '20260602-110406-feature_zh.md'), 'utf8')).toBe('# 中文');
+    expect(existsSync(join(exportsDir, 'feature_zh.md'))).toBe(false);
     expect(existsSync(join(exportsDir, '20260602-110405-feature_zh.md'))).toBe(false);
+    expect(logs.some(log => log.includes(`source=${latestTimestampedSource}`))).toBe(true);
   });
 
-  it('direct ESM handler keeps untimestamped zh when timestamp copies during translate', async () => {
+  it('generic adapter translates the timestamped source after timestamp hook runs', async () => {
     const cwd = makeProject();
     const exportsDir = join(cwd, '.granada', 'aosp-exports');
-    const source = join(exportsDir, 'feature.md');
-    const timestampedSource = join(exportsDir, '20260602-110405-feature.md');
-    writeFileSync(source, '# English\n\nHello', 'utf8');
-    const sliceUrl = pathToFileURL(resolve(import.meta.dirname, '../../../../dist/events/post-tool-use/translate-artifact/index.js')).href;
-    const { handleTranslateArtifactHook } = await import(sliceUrl);
-    const fsOverrides = {
-      writeFileSync(filePath, content, encoding) {
-        writeFileSync(filePath, content, encoding);
-        if (!existsSync(timestampedSource)) copyFileSync(source, timestampedSource);
-      },
-    };
+    writeFileSync(join(exportsDir, 'feature.md'), '# English\n\nHello', 'utf8');
 
-    const output = await handleTranslateArtifactHook(
-      makeExportInput(cwd, '.granada/aosp-exports/feature.md'),
-      translationDeps(cwd, { TRANSLATE_MD_ZH_MOCK_TEXT: '# 中文' }, fsOverrides),
-    );
+    const timestamp = await runHook('../adapters/claude-entry.cjs', makeExportInput(cwd, '.granada/aosp-exports/feature.md'), {
+      cwd,
+      args: ['timestamp-artifact'],
+    });
+    expect(timestamp.exitCode).toBe(0);
+    const timestampedSource = readdirSync(exportsDir).find(file => /^\d{8}-\d{6}-feature\.md$/.test(file));
+    expect(timestampedSource).toBeTruthy();
 
-    expect(output).toBeNull();
-    expect(readFileSync(source, 'utf8')).toBe('# English\n\nHello');
-    expect(readFileSync(timestampedSource, 'utf8')).toBe('# English\n\nHello');
-    expect(readFileSync(join(exportsDir, 'feature_zh.md'), 'utf8')).toBe('# 中文');
-    expect(existsSync(join(exportsDir, '20260602-110405-feature_zh.md'))).toBe(false);
+    const translate = await runTranslationHook(cwd, makeExportInput(cwd, '.granada/aosp-exports/feature.md'), {
+      env: { TRANSLATE_MD_ZH_MOCK_TEXT: '# 中文' },
+    });
+
+    expect(translate.exitCode).toBe(0);
+    expect(readFileSync(join(exportsDir, timestampedSource.replace(/\.md$/, '_zh.md')), 'utf8')).toBe('# 中文');
+    expect(existsSync(join(exportsDir, 'feature_zh.md'))).toBe(false);
   });
 
   it('writes GRANADA_DEBUG logs to stderr with level thresholds', async () => {
@@ -367,10 +371,10 @@ describe('aosp-feature-export translation hook', () => {
     expect(readFileSync(target, 'utf8')).toBe('new');
   });
 
-  it('ignores zh, partial, outside, and non-md writes', async () => {
+  it('ignores zh, timestamped zh, partial, outside, and non-md writes', async () => {
     const cwd = makeProject();
     const exportsDir = join(cwd, '.granada', 'aosp-exports');
-    for (const file of ['feature_zh.md', 'feature-partial.md', 'feature.txt']) {
+    for (const file of ['feature_zh.md', '20260602-110405-feature_zh.md', 'feature-partial.md', 'feature.txt']) {
       writeFileSync(join(exportsDir, file), 'source', 'utf8');
       await runTranslationHook(cwd, makeExportInput(cwd, `.granada/aosp-exports/${file}`), {
         env: { TRANSLATE_MD_ZH_MOCK_TEXT: 'translated' },
@@ -382,6 +386,7 @@ describe('aosp-feature-export translation hook', () => {
     });
 
     expect(existsSync(join(exportsDir, 'feature_zh_zh.md'))).toBe(false);
+    expect(existsSync(join(exportsDir, '20260602-110405-feature_zh_zh.md'))).toBe(false);
     expect(existsSync(join(exportsDir, 'feature-partial_zh.md'))).toBe(false);
     expect(existsSync(join(exportsDir, 'feature_zh.txt'))).toBe(false);
     expect(existsSync(join(cwd, 'README_zh.md'))).toBe(false);

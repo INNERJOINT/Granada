@@ -30,9 +30,10 @@ function findTimestampedSourcePath(sourcePath: string, fs: HookDeps['fs']): stri
   if (!fs) return null;
   const sourceDir = path.dirname(sourcePath);
   const sourceBase = stripLeadingTimestamp(path.basename(sourcePath));
+  if (sourceBase.endsWith('_zh.md')) return null;
   const pattern = new RegExp(`^\\d{8}-\\d{6}-${escapeRegex(sourceBase)}$`);
   const candidates = fs.readdirSync(sourceDir)
-    .filter(name => pattern.test(name))
+    .filter(name => pattern.test(name) && !name.endsWith('_zh.md'))
     .sort()
     .reverse();
   return candidates[0] ? path.join(sourceDir, candidates[0]) : null;
@@ -80,12 +81,10 @@ export async function handleTranslateArtifactHook(input: HookInput, deps: HookDe
     if (!targetPath) return null;
     let readSourcePath = sourcePath;
     let writeTargetPath = targetPath;
-    if (!deps.fs.existsSync(readSourcePath)) {
-      const timestampedSourcePath = findTimestampedSourcePath(sourcePath, deps.fs);
-      if (timestampedSourcePath) {
-        readSourcePath = timestampedSourcePath;
-        writeTargetPath = getZhSiblingPath(timestampedSourcePath);
-      }
+    const timestampedSourcePath = findTimestampedSourcePath(sourcePath, deps.fs);
+    if (timestampedSourcePath) {
+      readSourcePath = timestampedSourcePath;
+      writeTargetPath = getZhSiblingPath(timestampedSourcePath);
     }
     const stamp = typeof deps.now === 'function' ? deps.now() : Date.now();
     tempPath = `${writeTargetPath}.${deps.pid || 'process'}.${stamp}.tmp`;

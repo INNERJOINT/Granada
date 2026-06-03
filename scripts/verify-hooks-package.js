@@ -73,6 +73,7 @@ for (const hook of hooks) {
 }
 if (!translateHook) throw new Error('manifest missing translate-artifact hook');
 if (!timestampHook) throw new Error('manifest missing timestamp-artifact hook');
+if (hooks[0] !== timestampHook || hooks[1] !== translateHook) throw new Error('timestamp-artifact hook should run before translate-artifact hook');
 if (translateHook.args.length !== 2) throw new Error('translate-artifact hook should use packaged default SKILL.md config');
 
 mkdirSync(join(projectDir, '.granada', 'aosp-exports'), { recursive: true });
@@ -95,19 +96,6 @@ if (!matchesClaudeWildcard('*/.granada/*.md', sourcePath)) {
   throw new Error('representative path does not match hook wildcard');
 }
 
-const translateRun = run('node', [adapterPath, 'translate-artifact'], {
-  cwd: projectDir,
-  input: JSON.stringify(input),
-  env: { ...process.env, TRANSLATE_MD_ZH_MOCK_TEXT: '# 中文\n\n你好' },
-});
-if (translateRun.stdout.trim()) throw new Error(`expected no stdout for successful translation hook output, got ${translateRun.stdout}`);
-if (translateRun.stderr.trim()) throw new Error(`expected no stderr without GRANADA_DEBUG, got ${translateRun.stderr}`);
-
-const targetPath = join(projectDir, '.granada', 'aosp-exports', 'feature_zh.md');
-if (readFileSync(targetPath, 'utf8') !== '# 中文\n\n你好') {
-  throw new Error('packed translate hook did not write expected zh sibling');
-}
-
 const timestampRun = run('node', [adapterPath, 'timestamp-artifact'], {
   cwd: projectDir,
   input: JSON.stringify(input),
@@ -116,25 +104,34 @@ const timestampRun = run('node', [adapterPath, 'timestamp-artifact'], {
 if (timestampRun.stdout.trim()) throw new Error(`expected no stdout for successful timestamp hook output, got ${timestampRun.stdout}`);
 if (timestampRun.stderr.trim()) throw new Error(`expected no stderr without GRANADA_DEBUG, got ${timestampRun.stderr}`);
 
-const outputFiles = readdirSync(join(projectDir, '.granada', 'aosp-exports'));
+let outputFiles = readdirSync(join(projectDir, '.granada', 'aosp-exports'));
 const timestampedSource = outputFiles.find(file => /^\d{8}-\d{6}-feature\.md$/.test(file));
-const timestampedTarget = outputFiles.find(file => /^\d{8}-\d{6}-feature_zh\.md$/.test(file));
 if (!timestampedSource) {
   throw new Error(`packed timestamp hook did not timestamp source filename; files=${outputFiles.join(',')}`);
 }
-if (!timestampedTarget) {
-  throw new Error(`packed timestamp hook did not timestamp zh filename; files=${outputFiles.join(',')}`);
+if (!existsSync(sourcePath)) {
+  throw new Error('packed timestamp hook should preserve untimestamped source');
 }
-const sourcePrefix = timestampedSource.slice(0, 'YYYYMMDD-HHMMSS-'.length);
-const targetPrefix = timestampedTarget.slice(0, 'YYYYMMDD-HHMMSS-'.length);
-if (sourcePrefix !== targetPrefix) {
-  throw new Error(`packed timestamp hook used different source and zh prefixes: ${timestampedSource} ${timestampedTarget}`);
+
+const translateRun = run('node', [adapterPath, 'translate-artifact'], {
+  cwd: projectDir,
+  input: JSON.stringify(input),
+  env: { ...process.env, TRANSLATE_MD_ZH_MOCK_TEXT: '# 中文\n\n你好' },
+});
+if (translateRun.stdout.trim()) throw new Error(`expected no stdout for successful translation hook output, got ${translateRun.stdout}`);
+if (translateRun.stderr.trim()) throw new Error(`expected no stderr without GRANADA_DEBUG, got ${translateRun.stderr}`);
+
+outputFiles = readdirSync(join(projectDir, '.granada', 'aosp-exports'));
+const timestampedTarget = timestampedSource.replace(/\.md$/, '_zh.md');
+const targetPath = join(projectDir, '.granada', 'aosp-exports', timestampedTarget);
+if (!outputFiles.includes(timestampedTarget)) {
+  throw new Error(`packed translate hook did not write timestamped zh filename; files=${outputFiles.join(',')}`);
 }
-if (readFileSync(join(projectDir, '.granada', 'aosp-exports', timestampedTarget), 'utf8') !== '# 中文\n\n你好') {
-  throw new Error('packed timestamp hook did not preserve expected zh sibling');
+if (readFileSync(targetPath, 'utf8') !== '# 中文\n\n你好') {
+  throw new Error('packed translate hook did not write expected timestamped zh sibling');
 }
-if (!existsSync(sourcePath) || !existsSync(targetPath)) {
-  throw new Error('packed timestamp hook should preserve untimestamped source and zh sibling');
+if (existsSync(join(projectDir, '.granada', 'aosp-exports', 'feature_zh.md'))) {
+  throw new Error('packed translate hook should not write untimestamped zh when timestamped source exists');
 }
 
 const failureSourcePath = join(projectDir, '.granada', 'aosp-exports', 'failure.md');
