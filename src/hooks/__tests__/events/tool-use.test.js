@@ -56,9 +56,14 @@ describe('aosp-feature-export translation hook', () => {
     });
   }
 
-  function makeProject(frontmatter = 'translate-dirs: [.granada/aosp-exports]') {
+  function makeBareProject() {
     const cwd = mkdtempSync(join(tmpdir(), 'granada-hook-'));
     mkdirSync(join(cwd, '.granada', 'aosp-exports'), { recursive: true });
+    return cwd;
+  }
+
+  function makeProject(frontmatter = 'translate-dirs: [.granada/aosp-exports]') {
+    const cwd = makeBareProject();
     mkdirSync(join(cwd, 'skills', 'translate-md-zh'), { recursive: true });
     mkdirSync(join(cwd, 'skills', 'aosp-feature-export'), { recursive: true });
     writeFileSync(join(cwd, 'skills', 'translate-md-zh', 'SKILL.md'), `---\n${frontmatter}\n---\n\n# Translate\n`, 'utf8');
@@ -70,6 +75,14 @@ describe('aosp-feature-export translation hook', () => {
     return runHook('../adapters/claude-entry.cjs', input, {
       cwd,
       args: ['translate-artifact', 'skills/translate-md-zh/SKILL.md'],
+      ...options,
+    });
+  }
+
+  function runDefaultTranslationHook(cwd, input, options = {}) {
+    return runHook('../adapters/claude-entry.cjs', input, {
+      cwd,
+      args: ['translate-artifact'],
       ...options,
     });
   }
@@ -94,6 +107,21 @@ describe('aosp-feature-export translation hook', () => {
     const config = readTranslationConfig(cwd, translationDeps(cwd));
 
     expect(config.command).toBe('claude -p --model sonnet --no-session-persistence');
+  });
+
+  it('loads default translation config from the plugin root', async () => {
+    const cwd = makeBareProject();
+    const pluginRoot = resolve(import.meta.dirname, '../../../..');
+    const configUrl = pathToFileURL(resolve(import.meta.dirname, '../../../../dist/events/post-tool-use/translate-artifact/config.js')).href;
+    const { readTranslationConfig } = await import(configUrl);
+
+    const config = readTranslationConfig(cwd, {
+      ...translationDeps(cwd),
+      pluginRoot,
+      skillPathArg: undefined,
+    });
+
+    expect(config.dirs).toEqual(['.granada/aosp-exports']);
   });
 
   it('direct ESM handler writes zh sibling for eligible export writes', async () => {
@@ -179,6 +207,20 @@ describe('aosp-feature-export translation hook', () => {
     writeFileSync(source, '# English\n\nHello', 'utf8');
 
     const { exitCode, stderr } = await runTranslationHook(cwd, makeExportInput(cwd, '.granada/aosp-exports/feature.md'), {
+      env: { TRANSLATE_MD_ZH_MOCK_TEXT: '# 中文\n\n你好' },
+    });
+
+    expect(exitCode).toBe(0);
+    expect(stderr).toBe('');
+    expect(readFileSync(join(cwd, '.granada', 'aosp-exports', 'feature_zh.md'), 'utf8')).toBe('# 中文\n\n你好');
+  });
+
+  it('generic adapter uses packaged skill config when no SKILL.md arg is passed', async () => {
+    const cwd = makeBareProject();
+    const source = join(cwd, '.granada', 'aosp-exports', 'feature.md');
+    writeFileSync(source, '# English\n\nHello', 'utf8');
+
+    const { exitCode, stderr } = await runDefaultTranslationHook(cwd, makeExportInput(cwd, '.granada/aosp-exports/feature.md'), {
       env: { TRANSLATE_MD_ZH_MOCK_TEXT: '# 中文\n\n你好' },
     });
 

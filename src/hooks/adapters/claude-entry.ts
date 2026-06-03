@@ -20,6 +20,7 @@ type HookRuntimeDeps = {
   spawn: typeof nodeSpawn;
   env: NodeJS.ProcessEnv;
   cwd: string;
+  pluginRoot?: string;
   skillPathArg?: string;
   pid: number;
   now: () => number;
@@ -87,6 +88,7 @@ async function run(runtime: HookRuntime): Promise<void> {
     spawn: runtime.spawn,
     env: runtime.env,
     cwd: runtime.cwd,
+    pluginRoot: runtime.pluginRoot,
     skillPathArg: runtime.argv[3],
     pid: runtime.pid,
     now: runtime.now,
@@ -108,6 +110,7 @@ export async function main(runtime: Partial<HookRuntime> = {}): Promise<void> {
     stderr: runtime.stderr || process.stderr,
     env: runtime.env || process.env,
     cwd: runtime.cwd || process.cwd(),
+    pluginRoot: runtime.pluginRoot,
     pid: runtime.pid || process.pid,
     now: runtime.now || Date.now,
     spawn: runtime.spawn || nodeSpawn,

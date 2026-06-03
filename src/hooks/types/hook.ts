@@ -38,6 +38,7 @@ export interface HookDeps {
   spawn?: Spawn;
   env?: NodeJS.ProcessEnv;
   cwd?: string;
+  pluginRoot?: string;
   skillPathArg?: string;
   pid?: number;
   now?: () => number;
@@ -61,6 +62,7 @@ export interface HookContext {
   deps: HookDeps & {
     env: NodeJS.ProcessEnv;
     cwd?: string;
+    pluginRoot?: string;
     now: () => number;
     logger: Logger;
   };
@@ -81,6 +83,7 @@ export interface HookRuntime {
   stderr: Writable;
   env: NodeJS.ProcessEnv;
   cwd: string;
+  pluginRoot?: string;
   pid: number;
   now: () => number;
   spawn: Spawn;

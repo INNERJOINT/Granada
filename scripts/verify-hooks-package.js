@@ -73,12 +73,11 @@ for (const hook of hooks) {
 }
 if (!translateHook) throw new Error('manifest missing translate-artifact hook');
 if (!timestampHook) throw new Error('manifest missing timestamp-artifact hook');
+if (translateHook.args.length !== 2) throw new Error('translate-artifact hook should use packaged default SKILL.md config');
 
 mkdirSync(join(projectDir, '.granada', 'aosp-exports'), { recursive: true });
-mkdirSync(join(projectDir, 'skills', 'translate-md-zh'), { recursive: true });
 const sourcePath = join(projectDir, '.granada', 'aosp-exports', 'feature.md');
 writeFileSync(sourcePath, '# English\n\nHello', 'utf8');
-writeFileSync(join(projectDir, 'skills', 'translate-md-zh', 'SKILL.md'), '---\ntranslate-dirs: [.granada/aosp-exports]\n---\n\n# Translate\n', 'utf8');
 
 const input = {
   session_id: 'verify-hooks-package',
@@ -96,7 +95,7 @@ if (!matchesClaudeWildcard('*/.granada/*.md', sourcePath)) {
   throw new Error('representative path does not match hook wildcard');
 }
 
-const translateRun = run('node', [adapterPath, 'translate-artifact', 'skills/translate-md-zh/SKILL.md'], {
+const translateRun = run('node', [adapterPath, 'translate-artifact'], {
   cwd: projectDir,
   input: JSON.stringify(input),
   env: { ...process.env, TRANSLATE_MD_ZH_MOCK_TEXT: '# 中文\n\n你好' },
@@ -146,7 +145,7 @@ const failureInput = {
   tool_response: { filePath: failureSourcePath, content: '# English' },
   tool_use_id: 'verify_failure',
 };
-const warningRun = run('node', [adapterPath, 'translate-artifact', 'skills/translate-md-zh/SKILL.md'], {
+const warningRun = run('node', [adapterPath, 'translate-artifact'], {
   cwd: projectDir,
   input: JSON.stringify(failureInput),
   env: { ...process.env, GRANADA_TRANSLATE_COMMAND: 'claude -p; echo unsafe' },

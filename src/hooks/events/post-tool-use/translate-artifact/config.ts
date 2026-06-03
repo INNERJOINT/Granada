@@ -66,11 +66,12 @@ export function parseList(value: unknown): string[] {
     .filter(Boolean);
 }
 
-export function readTranslationConfig(cwd: string, { fs, env = {}, skillPathArg }: HookDeps): TranslationConfig {
+export function readTranslationConfig(cwd: string, { fs, env = {}, pluginRoot, skillPathArg }: HookDeps): TranslationConfig {
   if (!fs) throw new Error('missing fs dependency');
   const root = path.resolve(cwd);
-  const skillPath = path.resolve(root, skillPathArg || 'skills/aosp-feature-export/SKILL.md');
-  if (!isInside(root, skillPath) || path.basename(skillPath) !== 'SKILL.md') {
+  const configRoot = skillPathArg ? root : path.resolve(pluginRoot || root);
+  const skillPath = path.resolve(configRoot, skillPathArg || 'skills/aosp-feature-export/SKILL.md');
+  if (!isInside(configRoot, skillPath) || path.basename(skillPath) !== 'SKILL.md') {
     throw new Error('invalid SKILL.md path argument');
   }
 

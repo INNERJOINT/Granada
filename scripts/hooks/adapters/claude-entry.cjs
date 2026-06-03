@@ -3,6 +3,7 @@
 
 const { spawn } = require('child_process');
 const fs = require('fs');
+const path = require('path');
 
 function sanitizeWarning(message) {
   return String(message || 'hook failed')
@@ -27,6 +28,7 @@ import('../../../dist/adapters/claude-entry.js')
     stderr: process.stderr,
     env: process.env,
     cwd: process.cwd(),
+    pluginRoot: path.resolve(__dirname, '../../..'),
     pid: process.pid,
     now: Date.now,
     spawn,
