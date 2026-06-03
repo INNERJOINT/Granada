@@ -41,7 +41,7 @@ function formatEast8Prefix(epochMs) {
 function getDestinationPath(sourcePath, prefix) {
     return path.join(path.dirname(sourcePath), `${prefix}${stripLeadingTimestamp(path.basename(sourcePath))}`);
 }
-function getPlannedRenames(sourcePath, prefix, fs) {
+function getPlannedCopies(sourcePath, prefix, fs) {
     const pairs = [{ source: sourcePath, destination: getDestinationPath(sourcePath, prefix) }];
     const siblingPath = getZhSiblingPath(sourcePath);
     if (fs?.existsSync(siblingPath)) {
@@ -77,7 +77,7 @@ export function handleTimestampArtifactHook(input, deps) {
         return null;
     }
     const prefix = formatEast8Prefix(typeof deps.now === 'function' ? deps.now() : Date.now());
-    const pairs = getPlannedRenames(resolved.sourcePath, prefix, deps.fs);
+    const pairs = getPlannedCopies(resolved.sourcePath, prefix, deps.fs);
     const collision = detectCollision(pairs, deps.fs);
     if (collision) {
         const message = `destination already exists; source=${collision.source} destination=${collision.destination}`;
@@ -87,8 +87,8 @@ export function handleTimestampArtifactHook(input, deps) {
     for (const pair of pairs) {
         if (pair.source === pair.destination)
             continue;
-        logger.log('I', `timestamp rename source=${pair.source} destination=${pair.destination}`);
-        deps.fs.renameSync(pair.source, pair.destination);
+        logger.log('I', `timestamp copy source=${pair.source} destination=${pair.destination}`);
+        deps.fs.copyFileSync(pair.source, pair.destination);
     }
     return null;
 }

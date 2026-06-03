@@ -4,7 +4,7 @@ import type { HookDeps, HookInput, HookObjectOutput } from '../../../types/hook.
 import { getZhSiblingPath, stripLeadingTimestamp } from '../../../shared/artifact-paths.js';
 import { getCandidateReason, getWrittenFilePath, isInside } from '../translate-artifact/path-policy.js';
 
-type RenamePair = {
+type CopyPair = {
   source: string;
   destination: string;
 };
@@ -50,8 +50,8 @@ function getDestinationPath(sourcePath: string, prefix: string): string {
   return path.join(path.dirname(sourcePath), `${prefix}${stripLeadingTimestamp(path.basename(sourcePath))}`);
 }
 
-function getPlannedRenames(sourcePath: string, prefix: string, fs: HookDeps['fs']): RenamePair[] {
-  const pairs: RenamePair[] = [{ source: sourcePath, destination: getDestinationPath(sourcePath, prefix) }];
+function getPlannedCopies(sourcePath: string, prefix: string, fs: HookDeps['fs']): CopyPair[] {
+  const pairs: CopyPair[] = [{ source: sourcePath, destination: getDestinationPath(sourcePath, prefix) }];
   const siblingPath = getZhSiblingPath(sourcePath);
   if (fs?.existsSync(siblingPath)) {
     pairs.push({ source: siblingPath, destination: getDestinationPath(siblingPath, prefix) });
@@ -59,7 +59,7 @@ function getPlannedRenames(sourcePath: string, prefix: string, fs: HookDeps['fs'
   return pairs;
 }
 
-function detectCollision(pairs: RenamePair[], fs: HookDeps['fs']): RenamePair | null {
+function detectCollision(pairs: CopyPair[], fs: HookDeps['fs']): CopyPair | null {
   for (const pair of pairs) {
     if (pair.source !== pair.destination && fs?.existsSync(pair.destination)) return pair;
   }
@@ -87,7 +87,7 @@ export function handleTimestampArtifactHook(input: HookInput, deps: HookDeps): H
   }
 
   const prefix = formatEast8Prefix(typeof deps.now === 'function' ? deps.now() : Date.now());
-  const pairs = getPlannedRenames(resolved.sourcePath, prefix, deps.fs);
+  const pairs = getPlannedCopies(resolved.sourcePath, prefix, deps.fs);
   const collision = detectCollision(pairs, deps.fs);
   if (collision) {
     const message = `destination already exists; source=${collision.source} destination=${collision.destination}`;
@@ -97,8 +97,8 @@ export function handleTimestampArtifactHook(input: HookInput, deps: HookDeps): H
 
   for (const pair of pairs) {
     if (pair.source === pair.destination) continue;
-    logger.log('I', `timestamp rename source=${pair.source} destination=${pair.destination}`);
-    deps.fs.renameSync(pair.source, pair.destination);
+    logger.log('I', `timestamp copy source=${pair.source} destination=${pair.destination}`);
+    deps.fs.copyFileSync(pair.source, pair.destination);
   }
 
   return null;

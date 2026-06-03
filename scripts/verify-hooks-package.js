@@ -133,8 +133,8 @@ if (sourcePrefix !== targetPrefix) {
 if (readFileSync(join(projectDir, '.granada', 'aosp-exports', timestampedTarget), 'utf8') !== '# 中文\n\n你好') {
   throw new Error('packed timestamp hook did not preserve expected zh sibling');
 }
-if (existsSync(sourcePath) || existsSync(targetPath)) {
-  throw new Error('packed timestamp hook left untimestamped source or zh sibling behind');
+if (!existsSync(sourcePath) || !existsSync(targetPath)) {
+  throw new Error('packed timestamp hook should preserve untimestamped source and zh sibling');
 }
 
 const failureSourcePath = join(projectDir, '.granada', 'aosp-exports', 'failure.md');

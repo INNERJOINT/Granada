@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
-import { mkdtempSync, mkdirSync, readdirSync, readFileSync, writeFileSync, existsSync, renameSync, unlinkSync } from 'node:fs';
+import { copyFileSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, writeFileSync, existsSync, renameSync, unlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { PassThrough } from 'node:stream';
@@ -89,7 +89,7 @@ describe('aosp-feature-export translation hook', () => {
 
   function translationDeps(cwd, env = {}, fsOverrides = {}) {
     return {
-      fs: { readFileSync, writeFileSync, existsSync, renameSync, unlinkSync, readdirSync, ...fsOverrides },
+      fs: { readFileSync, writeFileSync, existsSync, copyFileSync, renameSync, unlinkSync, readdirSync, ...fsOverrides },
       env,
       cwd,
       skillPathArg: 'skills/translate-md-zh/SKILL.md',
@@ -229,10 +229,12 @@ describe('aosp-feature-export translation hook', () => {
     expect(readFileSync(join(cwd, '.granada', 'aosp-exports', 'feature_zh.md'), 'utf8')).toBe('# 中文\n\n你好');
   });
 
-  it('direct ESM handler writes timestamped zh when timestamp runs before translate', async () => {
+  it('direct ESM handler writes untimestamped zh when timestamp copy already exists', async () => {
     const cwd = makeProject();
     const exportsDir = join(cwd, '.granada', 'aosp-exports');
+    const source = join(exportsDir, 'feature.md');
     const timestampedSource = join(exportsDir, '20260602-110405-feature.md');
+    writeFileSync(source, '# English\n\nHello', 'utf8');
     writeFileSync(timestampedSource, '# English\n\nHello', 'utf8');
     const sliceUrl = pathToFileURL(resolve(import.meta.dirname, '../../../../dist/events/post-tool-use/translate-artifact/index.js')).href;
     const { handleTranslateArtifactHook } = await import(sliceUrl);
@@ -243,13 +245,13 @@ describe('aosp-feature-export translation hook', () => {
     );
 
     expect(output).toBeNull();
+    expect(readFileSync(source, 'utf8')).toBe('# English\n\nHello');
     expect(readFileSync(timestampedSource, 'utf8')).toBe('# English\n\nHello');
-    expect(readFileSync(join(exportsDir, '20260602-110405-feature_zh.md'), 'utf8')).toBe('# 中文');
-    expect(existsSync(join(exportsDir, 'feature.md'))).toBe(false);
-    expect(existsSync(join(exportsDir, 'feature_zh.md'))).toBe(false);
+    expect(readFileSync(join(exportsDir, 'feature_zh.md'), 'utf8')).toBe('# 中文');
+    expect(existsSync(join(exportsDir, '20260602-110405-feature_zh.md'))).toBe(false);
   });
 
-  it('direct ESM handler compensates zh when timestamp runs during translate', async () => {
+  it('direct ESM handler keeps untimestamped zh when timestamp copies during translate', async () => {
     const cwd = makeProject();
     const exportsDir = join(cwd, '.granada', 'aosp-exports');
     const source = join(exportsDir, 'feature.md');
@@ -260,7 +262,7 @@ describe('aosp-feature-export translation hook', () => {
     const fsOverrides = {
       writeFileSync(filePath, content, encoding) {
         writeFileSync(filePath, content, encoding);
-        if (existsSync(source)) renameSync(source, timestampedSource);
+        if (!existsSync(timestampedSource)) copyFileSync(source, timestampedSource);
       },
     };
 
@@ -270,10 +272,10 @@ describe('aosp-feature-export translation hook', () => {
     );
 
     expect(output).toBeNull();
+    expect(readFileSync(source, 'utf8')).toBe('# English\n\nHello');
     expect(readFileSync(timestampedSource, 'utf8')).toBe('# English\n\nHello');
-    expect(readFileSync(join(exportsDir, '20260602-110405-feature_zh.md'), 'utf8')).toBe('# 中文');
-    expect(existsSync(source)).toBe(false);
-    expect(existsSync(join(exportsDir, 'feature_zh.md'))).toBe(false);
+    expect(readFileSync(join(exportsDir, 'feature_zh.md'), 'utf8')).toBe('# 中文');
+    expect(existsSync(join(exportsDir, '20260602-110405-feature_zh.md'))).toBe(false);
   });
 
   it('writes GRANADA_DEBUG logs to stderr with level thresholds', async () => {
@@ -437,7 +439,7 @@ describe('aosp-feature-export translation hook', () => {
     let nowCalls = 0;
     return {
       deps: {
-        fs: { readFileSync, writeFileSync, existsSync, renameSync, unlinkSync, readdirSync },
+        fs: { readFileSync, writeFileSync, existsSync, copyFileSync, renameSync, unlinkSync, readdirSync },
         env,
         cwd,
         skillPathArg: 'skills/translate-md-zh/SKILL.md',
@@ -472,7 +474,7 @@ describe('aosp-feature-export translation hook', () => {
     expect(readdirSync(exportsDir).some(file => /^\d{8}-\d{6}-feature\.md$/.test(file))).toBe(true);
   });
 
-  it('direct timestamp renames a source and zh sibling with one UTC+8 prefix', async () => {
+  it('direct timestamp copies a source and zh sibling with one UTC+8 prefix', async () => {
     const cwd = makeProject();
     const exportsDir = join(cwd, '.granada', 'aosp-exports');
     writeFileSync(join(exportsDir, 'feature.md'), '# English', 'utf8');
@@ -485,8 +487,8 @@ describe('aosp-feature-export translation hook', () => {
     expect(output).toBeNull();
     expect(readFileSync(join(exportsDir, '20260602-110405-feature.md'), 'utf8')).toBe('# English');
     expect(readFileSync(join(exportsDir, '20260602-110405-feature_zh.md'), 'utf8')).toBe('# 中文');
-    expect(existsSync(join(exportsDir, 'feature.md'))).toBe(false);
-    expect(existsSync(join(exportsDir, 'feature_zh.md'))).toBe(false);
+    expect(readFileSync(join(exportsDir, 'feature.md'), 'utf8')).toBe('# English');
+    expect(readFileSync(join(exportsDir, 'feature_zh.md'), 'utf8')).toBe('# 中文');
     expect(getNowCalls()).toBe(1);
   });
 
@@ -501,7 +503,7 @@ describe('aosp-feature-export translation hook', () => {
 
     expect(output).toBeNull();
     expect(readFileSync(join(exportsDir, '20260602-110405-source-only.md'), 'utf8')).toBe('# English');
-    expect(existsSync(join(exportsDir, 'source-only.md'))).toBe(false);
+    expect(readFileSync(join(exportsDir, 'source-only.md'), 'utf8')).toBe('# English');
   });
 
   it('direct timestamp replaces only leading timestamp prefixes', async () => {
@@ -560,10 +562,11 @@ describe('aosp-feature-export translation hook', () => {
 
     expect(output).toBeNull();
     expect(readFileSync(join(exportsDir, 'input.md'), 'utf8')).toBe('input');
+    expect(readFileSync(responsePath, 'utf8')).toBe('response');
     expect(readFileSync(join(exportsDir, '20260602-110405-response.md'), 'utf8')).toBe('response');
   });
 
-  it('direct timestamp source destination collision renames nothing', async () => {
+  it('direct timestamp source destination collision copies nothing', async () => {
     const cwd = makeProject();
     const exportsDir = join(cwd, '.granada', 'aosp-exports');
     writeFileSync(join(exportsDir, 'feature.md'), 'source', 'utf8');
@@ -582,7 +585,7 @@ describe('aosp-feature-export translation hook', () => {
     expect(existsSync(join(exportsDir, '20260602-110405-feature_zh.md'))).toBe(false);
   });
 
-  it('direct timestamp sibling destination collision renames nothing', async () => {
+  it('direct timestamp sibling destination collision copies nothing', async () => {
     const cwd = makeProject();
     const exportsDir = join(cwd, '.granada', 'aosp-exports');
     writeFileSync(join(exportsDir, 'feature.md'), 'source', 'utf8');
