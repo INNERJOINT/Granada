@@ -1,3 +1,9 @@
+## [2.16.0](https://github.com/INNERJOINT/Granada/compare/v2.15.0...v2.16.0) (2026-06-03)
+
+### Features
+
+* **skills:** add broad-scope coarse exploration ([b078ad2](https://github.com/INNERJOINT/Granada/commit/b078ad2c689f67217907308f00d1a0dc7fa5f419))
+
 ## [2.15.0](https://github.com/INNERJOINT/Granada/compare/v2.14.1...v2.15.0) (2026-06-02)
 
 ### Features
