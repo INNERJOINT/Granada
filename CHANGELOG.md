@@ -1,3 +1,9 @@
+## [2.19.0](https://github.com/INNERJOINT/Granada/compare/v2.18.1...v2.19.0) (2026-06-03)
+
+### Features
+
+* **hooks:** defer artifact processing until stop ([29e875a](https://github.com/INNERJOINT/Granada/commit/29e875aeef717f83bceafe23c03466f18d037c75))
+
 ## [2.18.1](https://github.com/INNERJOINT/Granada/compare/v2.18.0...v2.18.1) (2026-06-03)
 
 ### Bug Fixes
