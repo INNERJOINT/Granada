@@ -1,3 +1,9 @@
+## [2.17.0](https://github.com/INNERJOINT/Granada/compare/v2.16.0...v2.17.0) (2026-06-03)
+
+### Features
+
+* **skills:** persist feature split candidates ([3affa14](https://github.com/INNERJOINT/Granada/commit/3affa14a5bb198bc9856311475283dbfa0de5444))
+
 ## [2.16.0](https://github.com/INNERJOINT/Granada/compare/v2.15.0...v2.16.0) (2026-06-03)
 
 ### Features
