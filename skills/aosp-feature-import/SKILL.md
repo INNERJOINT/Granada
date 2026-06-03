@@ -4,6 +4,7 @@ argument-hint: '"<path-to-export-report>" [--target <project>] [--depth shallow|
 model: opus
 pipeline: [aosp-feature-import, aosp-plan]
 level: 3
+translate-dirs: [.granada/aosp-imports]
 ---
 
 # AOSP Feature Import Skill

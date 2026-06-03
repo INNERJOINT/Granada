@@ -6,6 +6,7 @@ pipeline: [aosp-plan, aosp-autopilot]
 next-skill: aosp-autopilot
 handoff: .granada/plans/aosp-*.md
 level: 4
+translate-dirs: [.granada/plans]
 ---
 
 # AOSP Plan Skill

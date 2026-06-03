@@ -5,6 +5,7 @@ model: opus
 pipeline: [aosp-plan, aosp-autopilot]
 handoff: .granada/plans/aosp-*.md
 level: 4
+translate-dirs: [.granada/aosp-autopilot-report]
 ---
 
 # AOSP Autopilot 技能
