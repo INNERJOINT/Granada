@@ -1,3 +1,10 @@
+## [2.20.0](https://github.com/INNERJOINT/Granada/compare/v2.19.0...v2.20.0) (2026-06-04)
+
+### Features
+
+* **hooks:** configure artifact translation ([2e6320a](https://github.com/INNERJOINT/Granada/commit/2e6320aa501bd5bf6060dac3bc40eb048b79028c))
+* **hooks:** keep latest artifact queue entry ([d1c4f1b](https://github.com/INNERJOINT/Granada/commit/d1c4f1ba4557b14576039c7f847ed94ec258c3a3))
+
 ## [2.19.0](https://github.com/INNERJOINT/Granada/compare/v2.18.1...v2.19.0) (2026-06-03)
 
 ### Features
