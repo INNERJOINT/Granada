@@ -2,8 +2,6 @@
 description: Import an exported AOSP feature element report into a different AOSP project, mapping source code locations to target and producing an import guide for explicit aosp-plan planning
 argument-hint: '"<path-to-export-report>" [--target <project>] [--depth shallow|deep]'
 model: opus
-pipeline: [aosp-feature-import, aosp-plan]
-level: 3
 translate-dirs: [.granada/aosp-imports]
 ---
 

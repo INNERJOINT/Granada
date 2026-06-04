@@ -2,10 +2,6 @@
 description: AOSP investigation-driven planning with consensus review
 argument-hint: <AOSP investigation query>
 model: opus
-pipeline: [aosp-plan, aosp-autopilot]
-next-skill: aosp-autopilot
-handoff: .granada/plans/aosp-*.md
-level: 4
 translate-dirs: [.granada/plans]
 ---
 

@@ -2,7 +2,6 @@
 description: Export documentation for vendor-modified or vendor-added AOSP features by summarizing implementation methods from related context code
 argument-hint: '"<vendor feature description>"'
 model: opus
-level: 3
 translate-dirs: [.granada/aosp-exports]
 ---
 

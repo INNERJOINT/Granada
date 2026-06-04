@@ -2,12 +2,6 @@
 description: List and select the active AOSP project and local .repo path for sourcepilot-based skills
 argument-hint: '[list | set <project-name> | detect-repo]'
 model: haiku
-triggers:
-  - "aosp project"
-  - "aosp_project"
-  - "set aosp project"
-  - "选择aosp项目"
-level: 1
 ---
 
 # AOSP Project Selection Skill

@@ -2,14 +2,6 @@
 description: Convert technical jira-analyze RCA reports into customer-friendly aftersales scripts in Chinese. Posted as JIRA comment for customer service agents.
 argument-hint: <JIRA URL or issue key>
 model: opus
-triggers:
-  - "jira aftersales"
-  - "jira_aftersales"
-  - "aftersales jira"
-  - "售后话术"
-  - "jira 售后"
-handoff: .granada/specs/jira-aftersales-{issue_key}.md
-level: 3
 ---
 
 <Purpose>

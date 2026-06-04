@@ -2,14 +2,6 @@
 description: Android crash/issue root-cause analysis via AOSP source search, with optional local log files for evidence-driven analysis. Outputs structured Chinese RCA reports. For crash, restart, ANR, tombstone, or log-based debugging — use this skill.
 argument-hint: '[<log directory path>] [--project <name>] --title <description>'
 model: opus
-triggers:
-  - "aosp rca"
-  - "aosp-rca"
-  - "aosp_rca"
-  - "analyze logs"
-  - "crash analyze"
-handoff: .granada/specs/aosp-rca-{slug}.md
-level: 3
 ---
 
 <Purpose>

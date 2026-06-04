@@ -2,9 +2,6 @@
 description: AOSP 多仓库自动执行引擎，解析 aosp-plan 产出的跨仓库修改计划并并行执行
 argument-hint: <aosp-plan 计划文件路径或查询>
 model: opus
-pipeline: [aosp-plan, aosp-autopilot]
-handoff: .granada/plans/aosp-*.md
-level: 4
 translate-dirs: [.granada/aosp-autopilot-report]
 ---
 

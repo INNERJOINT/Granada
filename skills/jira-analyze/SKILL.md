@@ -2,13 +2,6 @@
 description: Android bug root-cause analysis via JIRA logs, AOSP source search, and parallel hypothesis investigation. Report in Chinese, posted as JIRA comment.
 argument-hint: <JIRA URL or issue key> [--project <name>]
 model: opus
-triggers:
-  - "jira analyze"
-  - "jira_analyze"
-  - "jira rca"
-  - "analyze jira"
-handoff: .granada/specs/jira-analyze-{issue_key}.md
-level: 3
 ---
 
 <Purpose>
