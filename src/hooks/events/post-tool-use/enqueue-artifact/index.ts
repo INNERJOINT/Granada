@@ -7,7 +7,7 @@ export function handleEnqueueArtifactHook(input: HookInput, deps: HookDeps): nul
   const cwd = typeof input.cwd === 'string' && input.cwd ? input.cwd : deps.cwd;
   if (!cwd) throw new Error('missing cwd');
 
-  const candidate = getGranadaArtifactCandidate(input, cwd);
+  const candidate = getGranadaArtifactCandidate(input, cwd, deps.env);
   if ('skipped' in candidate) {
     logger.log('D', `skip reason=${candidate.reason}${candidate.sourcePath ? ` source=${candidate.sourcePath}` : ''}`);
     return null;

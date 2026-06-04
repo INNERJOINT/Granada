@@ -17,7 +17,7 @@ export function runHook(hookFile, input, options = {}) {
       stdio: ['pipe', 'pipe', 'pipe'],
       timeout,
       cwd,
-      env: { ...process.env, ...env },
+      env: { ...process.env, GRANADA_TRANSLATE_LANG: 'zh', ...env },
     });
 
     let stdout = '';

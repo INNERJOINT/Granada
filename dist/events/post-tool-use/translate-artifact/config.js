@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { getTranslationLang } from '../../../shared/artifact-paths.js';
 import { isInside } from './path-policy.js';
 function stripOptionalQuotes(value) {
     const trimmed = String(value || '').trim();
@@ -52,6 +53,26 @@ export function parseList(value) {
         .map(item => stripOptionalQuotes(item))
         .filter(Boolean);
 }
+function isTranslationEnabled(value) {
+    const normalized = String(value ?? 'true').trim().toLowerCase();
+    return !['0', 'false', 'no', 'off', 'disabled'].includes(normalized);
+}
+function getTargetLanguage(lang) {
+    const names = {
+        zh: 'Simplified Chinese',
+        'zh-cn': 'Simplified Chinese',
+        'zh-tw': 'Traditional Chinese',
+        en: 'English',
+        ja: 'Japanese',
+        ko: 'Korean',
+        fr: 'French',
+        de: 'German',
+        es: 'Spanish',
+        pt: 'Portuguese',
+        'pt-br': 'Brazilian Portuguese',
+    };
+    return names[lang] || lang;
+}
 export function readTranslationConfig(cwd, { fs, env = {}, pluginRoot, skillPathArg }) {
     if (!fs)
         throw new Error('missing fs dependency');
@@ -66,9 +87,13 @@ export function readTranslationConfig(cwd, { fs, env = {}, pluginRoot, skillPath
     if (dirs.length === 0) {
         throw new Error(`missing translate-dirs in ${skillPath}`);
     }
+    const lang = getTranslationLang(env);
     return {
         dirs,
-        command: env.GRANADA_TRANSLATE_COMMAND || 'claude -p --model sonnet --no-session-persistence',
+        command: env.GRANADA_TRANSLATE_COMMAND || 'claude -p --model haiku --no-session-persistence',
         timeoutMs: Number.parseInt(metadata['translate-timeout-ms'] || env.TRANSLATE_MD_ZH_TIMEOUT_MS || '300000', 10),
+        lang,
+        targetLanguage: getTargetLanguage(lang),
+        enabled: isTranslationEnabled(env.GRANADA_TRANSLATE_ENABLE),
     };
 }

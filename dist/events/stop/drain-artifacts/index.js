@@ -1,4 +1,5 @@
 import { sanitizeLogMessage } from '../../../shared/logger.js';
+import { getTranslationLang } from '../../../shared/artifact-paths.js';
 import { resolveGranadaArtifactSource } from '../../../shared/artifact-source-policy.js';
 import { processTimestampArtifact } from '../../post-tool-use/timestamp-artifact/index.js';
 import { processTranslateArtifact } from '../../post-tool-use/translate-artifact/index.js';
@@ -35,7 +36,7 @@ export async function handleDrainArtifactsHook(input, deps) {
         logger.log('I', `drain start session=${sessionKey} count=${sources.length}`);
         for (const sourcePath of sources) {
             const records = recordsBySource.get(sourcePath) || [];
-            const candidate = resolveGranadaArtifactSource(cwd, sourcePath);
+            const candidate = resolveGranadaArtifactSource(cwd, sourcePath, { lang: getTranslationLang(deps.env) });
             if ('skipped' in candidate) {
                 logger.log('W', `drain remove source=${sourcePath} reason=${candidate.reason}`);
                 removeJournalRecords(cwd, records, deps);

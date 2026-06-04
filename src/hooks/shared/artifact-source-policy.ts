@@ -1,6 +1,6 @@
 import path from 'node:path';
 import type { HookInput } from '../types/hook.js';
-import { stripLeadingTimestamp } from './artifact-paths.js';
+import { getTranslationLang, hasTranslationSuffix, stripLeadingTimestamp } from './artifact-paths.js';
 
 export type ArtifactCandidate = {
   sourcePath: string;
@@ -42,7 +42,7 @@ function isTimestampedDerivative(basename: string): boolean {
   return stripLeadingTimestamp(basename) !== basename;
 }
 
-export function resolveGranadaArtifactSource(cwd: string, filePath: string, options: { rejectTimestampedDerivative?: boolean } = {}): ArtifactCandidateResult {
+export function resolveGranadaArtifactSource(cwd: string, filePath: string, options: { rejectTimestampedDerivative?: boolean; lang?: string } = {}): ArtifactCandidateResult {
   const root = path.resolve(cwd);
   const sourcePath = path.resolve(root, filePath);
   const granadaRoot = path.join(root, '.granada');
@@ -53,17 +53,17 @@ export function resolveGranadaArtifactSource(cwd: string, filePath: string, opti
   if (!isInside(granadaRoot, sourcePath)) return { skipped: true, sourcePath, reason: 'outside-granada' };
   if (relativePath.split(path.sep).includes('.hooks')) return { skipped: true, sourcePath, reason: 'state-path' };
   if (!basename.endsWith('.md')) return { skipped: true, sourcePath, reason: 'not-markdown' };
-  if (basename.endsWith('_zh.md')) return { skipped: true, sourcePath, reason: 'already-zh' };
+  if (hasTranslationSuffix(basename, options.lang || 'zh')) return { skipped: true, sourcePath, reason: 'already-translated' };
   if (basename.endsWith('-partial.md')) return { skipped: true, sourcePath, reason: 'partial-markdown' };
   if (rejectTimestampedDerivative && isTimestampedDerivative(basename)) return { skipped: true, sourcePath, reason: 'timestamp-derivative' };
 
   return { sourcePath, relativePath };
 }
 
-export function getGranadaArtifactCandidate(input: HookInput, cwd: string): ArtifactCandidateResult {
+export function getGranadaArtifactCandidate(input: HookInput, cwd: string, env: NodeJS.ProcessEnv = {}): ArtifactCandidateResult {
   const reason = getPostToolUseCandidateReason(input);
   if (reason) return { skipped: true, reason };
   const filePath = getToolFilePath(input);
   if (!filePath) return { skipped: true, reason: 'missing-file-path' };
-  return resolveGranadaArtifactSource(cwd, filePath);
+  return resolveGranadaArtifactSource(cwd, filePath, { lang: getTranslationLang(env) });
 }

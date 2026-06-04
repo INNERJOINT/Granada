@@ -97,7 +97,7 @@ const input = {
 const enqueueRun = run('node', [adapterPath, 'enqueue-artifact'], {
   cwd: projectDir,
   input: JSON.stringify(input),
-  env: process.env,
+  env: { ...process.env, GRANADA_TRANSLATE_LANG: 'ja' },
 });
 if (enqueueRun.stdout.trim()) throw new Error(`expected no stdout for successful enqueue hook output, got ${enqueueRun.stdout}`);
 if (enqueueRun.stderr.trim()) throw new Error(`expected no stderr without GRANADA_DEBUG, got ${enqueueRun.stderr}`);
@@ -113,7 +113,7 @@ const updateInput = {
 const enqueueUpdateRun = run('node', [adapterPath, 'enqueue-artifact'], {
   cwd: projectDir,
   input: JSON.stringify(updateInput),
-  env: process.env,
+  env: { ...process.env, GRANADA_TRANSLATE_LANG: 'ja' },
 });
 if (enqueueUpdateRun.stdout.trim()) throw new Error(`expected no stdout for second enqueue hook output, got ${enqueueUpdateRun.stdout}`);
 if (enqueueUpdateRun.stderr.trim()) throw new Error(`expected no stderr for second enqueue, got ${enqueueUpdateRun.stderr}`);
@@ -136,24 +136,24 @@ const stopInput = {
 const drainRun = run('node', [adapterPath, 'drain-artifacts'], {
   cwd: projectDir,
   input: JSON.stringify(stopInput),
-  env: { ...process.env, TRANSLATE_MD_ZH_MOCK_TEXT: '# 中文\n\n你好' },
+  env: { ...process.env, GRANADA_TRANSLATE_LANG: 'ja', TRANSLATE_MD_ZH_MOCK_TEXT: '# 日本語\n\nこんにちは' },
 });
 if (drainRun.stdout.trim()) throw new Error(`expected no stdout for successful drain hook output, got ${drainRun.stdout}`);
 if (drainRun.stderr.trim()) throw new Error(`expected no stderr for successful drain, got ${drainRun.stderr}`);
 
 let outputFiles = readdirSync(join(projectDir, '.granada', 'aosp-exports'));
 const timestampedSources = outputFiles.filter(file => /^\d{8}-\d{6}-feature\.md$/.test(file));
-const timestampedTargets = outputFiles.filter(file => /^\d{8}-\d{6}-feature_zh\.md$/.test(file));
+const timestampedTargets = outputFiles.filter(file => /^\d{8}-\d{6}-feature_ja\.md$/.test(file));
 if (timestampedSources.length !== 1) throw new Error(`expected one timestamped source, files=${outputFiles.join(',')}`);
 if (timestampedTargets.length !== 1) throw new Error(`expected one timestamped translation, files=${outputFiles.join(',')}`);
 if (readFileSync(join(projectDir, '.granada', 'aosp-exports', timestampedSources[0]), 'utf8') !== '# English\n\nFinal') {
   throw new Error('drain did not timestamp final source content');
 }
-if (readFileSync(join(projectDir, '.granada', 'aosp-exports', timestampedTargets[0]), 'utf8') !== '# 中文\n\n你好') {
-  throw new Error('drain did not write expected timestamped zh sibling');
+if (readFileSync(join(projectDir, '.granada', 'aosp-exports', timestampedTargets[0]), 'utf8') !== '# 日本語\n\nこんにちは') {
+  throw new Error('drain did not write expected timestamped ja sibling');
 }
-if (existsSync(join(projectDir, '.granada', 'aosp-exports', 'feature_zh.md'))) {
-  throw new Error('drain should not write untimestamped zh when timestamped source exists');
+if (existsSync(join(projectDir, '.granada', 'aosp-exports', 'feature_ja.md'))) {
+  throw new Error('drain should not write untimestamped ja when timestamped source exists');
 }
 
 const legacyPath = join(projectDir, '.granada', 'aosp-exports', 'legacy.md');
@@ -167,18 +167,36 @@ const legacyInput = {
 const legacyTimestamp = run('node', [adapterPath, 'timestamp-artifact'], {
   cwd: projectDir,
   input: JSON.stringify(legacyInput),
-  env: process.env,
+  env: { ...process.env, GRANADA_TRANSLATE_LANG: 'zh' },
 });
 if (legacyTimestamp.stdout.trim()) throw new Error(`expected no stdout for legacy timestamp hook, got ${legacyTimestamp.stdout}`);
 const legacyTranslate = run('node', [adapterPath, 'translate-artifact'], {
   cwd: projectDir,
   input: JSON.stringify(legacyInput),
-  env: { ...process.env, TRANSLATE_MD_ZH_MOCK_TEXT: '# 旧版' },
+  env: { ...process.env, GRANADA_TRANSLATE_LANG: 'zh', TRANSLATE_MD_ZH_MOCK_TEXT: '# 旧版' },
 });
 if (legacyTranslate.stdout.trim()) throw new Error(`expected no stdout for legacy translate hook, got ${legacyTranslate.stdout}`);
 outputFiles = readdirSync(join(projectDir, '.granada', 'aosp-exports'));
 if (!outputFiles.some(file => /^\d{8}-\d{6}-legacy_zh\.md$/.test(file))) {
   throw new Error(`legacy direct routes did not produce timestamped translation; files=${outputFiles.join(',')}`);
+}
+
+const disabledPath = join(projectDir, '.granada', 'aosp-exports', 'disabled.md');
+writeFileSync(disabledPath, '# English', 'utf8');
+const disabledInput = {
+  ...input,
+  tool_input: { file_path: '.granada/aosp-exports/disabled.md', content: '# English' },
+  tool_response: { filePath: disabledPath, content: '# English' },
+  tool_use_id: 'verify_disabled',
+};
+const disabledRun = run('node', [adapterPath, 'translate-artifact'], {
+  cwd: projectDir,
+  input: JSON.stringify(disabledInput),
+  env: { ...process.env, GRANADA_TRANSLATE_ENABLE: 'false', TRANSLATE_MD_ZH_MOCK_TEXT: '# 禁用' },
+});
+if (disabledRun.stdout.trim()) throw new Error(`expected no stdout for disabled translate hook, got ${disabledRun.stdout}`);
+if (existsSync(join(projectDir, '.granada', 'aosp-exports', 'disabled_zh.md'))) {
+  throw new Error('packed translate hook wrote zh sibling while translation disabled');
 }
 
 const failureSourcePath = join(projectDir, '.granada', 'aosp-exports', 'failure.md');
@@ -192,7 +210,7 @@ const failureInput = {
 const warningRun = run('node', [adapterPath, 'translate-artifact'], {
   cwd: projectDir,
   input: JSON.stringify(failureInput),
-  env: { ...process.env, GRANADA_TRANSLATE_COMMAND: 'claude -p; echo unsafe' },
+  env: { ...process.env, GRANADA_TRANSLATE_LANG: 'zh', GRANADA_TRANSLATE_COMMAND: 'claude -p; echo unsafe' },
 });
 const warningOutput = JSON.parse(warningRun.stdout.trim());
 if (!warningOutput.hookSpecificOutput?.additionalContext?.includes('unsafe shell metacharacters')) {

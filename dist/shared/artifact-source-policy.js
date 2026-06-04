@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { stripLeadingTimestamp } from './artifact-paths.js';
+import { getTranslationLang, hasTranslationSuffix, stripLeadingTimestamp } from './artifact-paths.js';
 const TIMESTAMPED_MARKDOWN = /^\d{8}-\d{6}-.+\.md$/;
 export function isInside(parent, candidate) {
     const relative = path.relative(parent, candidate);
@@ -42,20 +42,20 @@ export function resolveGranadaArtifactSource(cwd, filePath, options = {}) {
         return { skipped: true, sourcePath, reason: 'state-path' };
     if (!basename.endsWith('.md'))
         return { skipped: true, sourcePath, reason: 'not-markdown' };
-    if (basename.endsWith('_zh.md'))
-        return { skipped: true, sourcePath, reason: 'already-zh' };
+    if (hasTranslationSuffix(basename, options.lang || 'zh'))
+        return { skipped: true, sourcePath, reason: 'already-translated' };
     if (basename.endsWith('-partial.md'))
         return { skipped: true, sourcePath, reason: 'partial-markdown' };
     if (rejectTimestampedDerivative && isTimestampedDerivative(basename))
         return { skipped: true, sourcePath, reason: 'timestamp-derivative' };
     return { sourcePath, relativePath };
 }
-export function getGranadaArtifactCandidate(input, cwd) {
+export function getGranadaArtifactCandidate(input, cwd, env = {}) {
     const reason = getPostToolUseCandidateReason(input);
     if (reason)
         return { skipped: true, reason };
     const filePath = getToolFilePath(input);
     if (!filePath)
         return { skipped: true, reason: 'missing-file-path' };
-    return resolveGranadaArtifactSource(cwd, filePath);
+    return resolveGranadaArtifactSource(cwd, filePath, { lang: getTranslationLang(env) });
 }

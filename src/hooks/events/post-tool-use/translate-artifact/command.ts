@@ -1,9 +1,9 @@
 import type { HookDeps } from '../../../types/hook.js';
 import type { TranslationConfig } from './config.js';
 
-function buildPrompt(markdown: string): string {
+function buildPrompt(markdown: string, targetLanguage: string): string {
   return [
-    'Translate the following Markdown document to Simplified Chinese.',
+    `Translate the following Markdown document to ${targetLanguage}.`,
     'Preserve Markdown structure exactly.',
     'Preserve code blocks, inline code, file paths, URLs, commands, symbols, identifiers, log tags, stack traces, and raw code exactly unless the text is explanatory prose.',
     'Return only the translated Markdown, with no preface or commentary.',
@@ -125,7 +125,7 @@ export async function translateWithCommand(markdown: string, config: Translation
   }
 
   const timeoutMs = Number.isFinite(config.timeoutMs) && config.timeoutMs > 0 ? config.timeoutMs : 300000;
-  const prompt = buildPrompt(markdown);
+  const prompt = buildPrompt(markdown, config.targetLanguage);
   const [command, ...args] = parseCommand(config.command);
   if (!spawn) throw new Error('missing spawn dependency');
 

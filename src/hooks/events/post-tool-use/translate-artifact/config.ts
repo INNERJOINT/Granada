@@ -1,11 +1,15 @@
 import path from 'node:path';
 import type { HookDeps } from '../../../types/hook.js';
+import { getTranslationLang } from '../../../shared/artifact-paths.js';
 import { isInside } from './path-policy.js';
 
 export interface TranslationConfig {
   dirs: string[];
   command: string;
   timeoutMs: number;
+  lang: string;
+  targetLanguage: string;
+  enabled: boolean;
 }
 
 function stripOptionalQuotes(value: unknown): string {
@@ -66,6 +70,28 @@ export function parseList(value: unknown): string[] {
     .filter(Boolean);
 }
 
+function isTranslationEnabled(value: unknown): boolean {
+  const normalized = String(value ?? 'true').trim().toLowerCase();
+  return !['0', 'false', 'no', 'off', 'disabled'].includes(normalized);
+}
+
+function getTargetLanguage(lang: string): string {
+  const names: Record<string, string> = {
+    zh: 'Simplified Chinese',
+    'zh-cn': 'Simplified Chinese',
+    'zh-tw': 'Traditional Chinese',
+    en: 'English',
+    ja: 'Japanese',
+    ko: 'Korean',
+    fr: 'French',
+    de: 'German',
+    es: 'Spanish',
+    pt: 'Portuguese',
+    'pt-br': 'Brazilian Portuguese',
+  };
+  return names[lang] || lang;
+}
+
 export function readTranslationConfig(cwd: string, { fs, env = {}, pluginRoot, skillPathArg }: HookDeps): TranslationConfig {
   if (!fs) throw new Error('missing fs dependency');
   const root = path.resolve(cwd);
@@ -81,9 +107,13 @@ export function readTranslationConfig(cwd: string, { fs, env = {}, pluginRoot, s
     throw new Error(`missing translate-dirs in ${skillPath}`);
   }
 
+  const lang = getTranslationLang(env);
   return {
     dirs,
-    command: env.GRANADA_TRANSLATE_COMMAND || 'claude -p --model sonnet --no-session-persistence',
+    command: env.GRANADA_TRANSLATE_COMMAND || 'claude -p --model haiku --no-session-persistence',
     timeoutMs: Number.parseInt(metadata['translate-timeout-ms'] || env.TRANSLATE_MD_ZH_TIMEOUT_MS || '300000', 10),
+    lang,
+    targetLanguage: getTargetLanguage(lang),
+    enabled: isTranslationEnabled(env.GRANADA_TRANSLATE_ENABLE),
   };
 }

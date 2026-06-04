@@ -1,6 +1,7 @@
 import path from 'node:path';
 import type { HookInput } from '../../../types/hook.js';
 import type { TranslationConfig } from './config.js';
+import { getTranslatedSiblingPath, hasTranslationSuffix } from '../../../shared/artifact-paths.js';
 import { getPostToolUseCandidateReason, getToolFilePath, isInside } from '../../../shared/artifact-source-policy.js';
 
 export { getToolFilePath as getWrittenFilePath, isInside };
@@ -21,13 +22,13 @@ export function resolveArtifactPaths(cwd: string, filePath: string, config: Tran
   if (!basename.endsWith('.md')) {
     return { skipped: true, reason: 'not-markdown', sourcePath };
   }
-  if (basename.endsWith('_zh.md')) {
-    return { skipped: true, reason: 'already-zh', sourcePath };
+  if (hasTranslationSuffix(basename, config.lang)) {
+    return { skipped: true, reason: 'already-translated', sourcePath };
   }
   if (basename.endsWith('-partial.md')) {
     return { skipped: true, reason: 'partial-markdown', sourcePath };
   }
 
-  const targetPath = path.join(path.dirname(sourcePath), `${basename.slice(0, -3)}_zh.md`);
+  const targetPath = getTranslatedSiblingPath(sourcePath, config.lang);
   return { sourcePath, targetPath };
 }

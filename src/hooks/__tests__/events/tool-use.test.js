@@ -98,7 +98,7 @@ describe('aosp-feature-export translation hook', () => {
   function translationDeps(cwd, env = {}, fsOverrides = {}) {
     return {
       fs: { readFileSync, writeFileSync, existsSync, copyFileSync, renameSync, unlinkSync, readdirSync, mkdirSync, statSync, lstatSync, rmSync, rmdirSync, openSync, closeSync, ...fsOverrides },
-      env,
+      env: { GRANADA_TRANSLATE_LANG: 'zh', ...env },
       cwd,
       skillPathArg: 'skills/translate-md-zh/SKILL.md',
       pid: 123,
@@ -114,7 +114,7 @@ describe('aosp-feature-export translation hook', () => {
 
     const config = readTranslationConfig(cwd, translationDeps(cwd));
 
-    expect(config.command).toBe('claude -p --model sonnet --no-session-persistence');
+    expect(config.command).toBe('claude -p --model haiku --no-session-persistence');
   });
 
   it('loads default translation config from the plugin root', async () => {
@@ -132,7 +132,7 @@ describe('aosp-feature-export translation hook', () => {
     expect(config.dirs).toEqual(['.granada/aosp-exports']);
   });
 
-  it('direct ESM handler writes zh sibling for eligible export writes', async () => {
+  it('direct ESM handler writes translated sibling for the configured language', async () => {
     const cwd = makeProject();
     const source = join(cwd, '.granada', 'aosp-exports', 'feature.md');
     writeFileSync(source, '# English\n\nHello', 'utf8');
@@ -141,11 +141,27 @@ describe('aosp-feature-export translation hook', () => {
 
     const output = await handleTranslateArtifactHook(
       makeExportInput(cwd, '.granada/aosp-exports/feature.md'),
-      translationDeps(cwd, { TRANSLATE_MD_ZH_MOCK_TEXT: '# 中文' }),
+      translationDeps(cwd, { GRANADA_TRANSLATE_LANG: 'ja', TRANSLATE_MD_ZH_MOCK_TEXT: '# 日本語' }),
     );
 
     expect(output).toBeNull();
-    expect(readFileSync(join(cwd, '.granada', 'aosp-exports', 'feature_zh.md'), 'utf8')).toBe('# 中文');
+    expect(readFileSync(join(cwd, '.granada', 'aosp-exports', 'feature_ja.md'), 'utf8')).toBe('# 日本語');
+    expect(existsSync(join(cwd, '.granada', 'aosp-exports', 'feature_zh.md'))).toBe(false);
+  });
+
+  it('direct ESM handler skips translation when disabled', async () => {
+    const cwd = makeProject();
+    writeFileSync(join(cwd, '.granada', 'aosp-exports', 'feature.md'), '# English', 'utf8');
+    const sliceUrl = pathToFileURL(resolve(import.meta.dirname, '../../../../dist/events/post-tool-use/translate-artifact/index.js')).href;
+    const { handleTranslateArtifactHook } = await import(sliceUrl);
+
+    const output = await handleTranslateArtifactHook(
+      makeExportInput(cwd, '.granada/aosp-exports/feature.md'),
+      translationDeps(cwd, { GRANADA_TRANSLATE_ENABLE: 'false', TRANSLATE_MD_ZH_MOCK_TEXT: '# 中文' }),
+    );
+
+    expect(output).toBeNull();
+    expect(existsSync(join(cwd, '.granada', 'aosp-exports', 'feature_zh.md'))).toBe(false);
   });
 
   it('direct ESM handler returns a warning output for translation failures', async () => {
@@ -171,10 +187,12 @@ describe('aosp-feature-export translation hook', () => {
       const commandUrl = pathToFileURL(resolve(import.meta.dirname, '../../../../dist/events/post-tool-use/translate-artifact/command.js')).href;
       const { translateWithCommand } = await import(commandUrl);
       let spawnCalls = 0;
+      let prompt = '';
       const spawn = () => {
         spawnCalls += 1;
         const child = new EventEmitter();
         child.stdin = new PassThrough();
+        child.stdin.on('data', chunk => { prompt += chunk.toString(); });
         child.stdout = new PassThrough();
         child.stderr = new PassThrough();
         child.kill = () => {};
@@ -187,7 +205,7 @@ describe('aosp-feature-export translation hook', () => {
         return child;
       };
 
-      const result = translateWithCommand('# English', { dirs: ['.granada/aosp-exports'], command: 'claude -p', timeoutMs: 1000 }, {
+      const result = translateWithCommand('# English', { dirs: ['.granada/aosp-exports'], command: 'claude -p', timeoutMs: 1000, lang: 'ja', targetLanguage: 'Japanese', enabled: true }, {
         cwd,
         env: {},
         spawn,
@@ -196,6 +214,7 @@ describe('aosp-feature-export translation hook', () => {
 
       await expect(result).resolves.toBe('# 中文');
       expect(spawnCalls).toBe(4);
+      expect(prompt).toContain('Translate the following Markdown document to Japanese.');
     } finally {
       vi.useRealTimers();
     }
@@ -211,16 +230,16 @@ describe('aosp-feature-export translation hook', () => {
 
   it('generic adapter writes zh sibling for eligible export writes', async () => {
     const cwd = makeProject();
-    const source = join(cwd, '.granada', 'aosp-exports', 'feature.md');
+    const source = join(cwd, '.granada', 'aosp-exports', 'system_ui.md');
     writeFileSync(source, '# English\n\nHello', 'utf8');
 
-    const { exitCode, stderr } = await runTranslationHook(cwd, makeExportInput(cwd, '.granada/aosp-exports/feature.md'), {
+    const { exitCode, stderr } = await runTranslationHook(cwd, makeExportInput(cwd, '.granada/aosp-exports/system_ui.md'), {
       env: { TRANSLATE_MD_ZH_MOCK_TEXT: '# 中文\n\n你好' },
     });
 
     expect(exitCode).toBe(0);
     expect(stderr).toBe('');
-    expect(readFileSync(join(cwd, '.granada', 'aosp-exports', 'feature_zh.md'), 'utf8')).toBe('# 中文\n\n你好');
+    expect(readFileSync(join(cwd, '.granada', 'aosp-exports', 'system_ui_zh.md'), 'utf8')).toBe('# 中文\n\n你好');
   });
 
   it('generic adapter uses packaged skill config when no SKILL.md arg is passed', async () => {
@@ -356,7 +375,7 @@ describe('aosp-feature-export translation hook', () => {
     let index = 0;
     return {
       fs: { readFileSync, writeFileSync, existsSync, copyFileSync, renameSync, unlinkSync, readdirSync, mkdirSync, statSync, lstatSync, rmSync, rmdirSync, openSync, closeSync },
-      env,
+      env: { GRANADA_TRANSLATE_LANG: 'zh', ...env },
       cwd,
       skillPathArg: 'skills/translate-md-zh/SKILL.md',
       pid: 123,
@@ -364,6 +383,24 @@ describe('aosp-feature-export translation hook', () => {
       logger: { log() {} },
     };
   }
+
+  it('Stop drain timestamps queued markdown without translation when disabled', async () => {
+    const cwd = makeProject();
+    const exportsDir = join(cwd, '.granada', 'aosp-exports');
+    writeFileSync(join(exportsDir, 'feature.md'), '# English\n\nTimestamp only', 'utf8');
+    const { enqueue, drain } = await importQueueAndDrainHooks();
+
+    enqueue.handleEnqueueArtifactHook(makeExportInput(cwd, '.granada/aosp-exports/feature.md'), drainDeps(cwd, { GRANADA_TRANSLATE_ENABLE: 'off' }));
+    const output = await drain.handleDrainArtifactsHook(baseInput('Stop', { cwd }), drainDeps(cwd, { GRANADA_TRANSLATE_ENABLE: 'off' }));
+
+    expect(output).toBeNull();
+    expect(readFileSync(join(exportsDir, '20260602-110405-feature.md'), 'utf8')).toContain('Timestamp only');
+    expect(existsSync(join(exportsDir, '20260602-110405-feature_zh.md'))).toBe(false);
+    expect(existsSync(join(exportsDir, 'feature_zh.md'))).toBe(false);
+    const queueDir = join(cwd, '.granada', '.hooks', 'artifact-queue', 'session-test-session-001');
+    const queuedRecords = existsSync(queueDir) ? readdirSync(queueDir).filter(file => file.endsWith('.json') && !file.startsWith('failed-')) : [];
+    expect(queuedRecords).toHaveLength(0);
+  });
 
   it('Stop drain translates any queued .granada markdown without legacy translate-dirs narrowing', async () => {
     const cwd = makeProject('translate-dirs: [.granada/aosp-exports]');
@@ -497,25 +534,26 @@ describe('aosp-feature-export translation hook', () => {
     expect(readFileSync(target, 'utf8')).toBe('new');
   });
 
-  it('ignores zh, timestamped zh, partial, outside, and non-md writes', async () => {
+  it('ignores translated, partial, outside, and non-md writes', async () => {
     const cwd = makeProject();
     const exportsDir = join(cwd, '.granada', 'aosp-exports');
-    for (const file of ['feature_zh.md', '20260602-110405-feature_zh.md', 'feature-partial.md', 'feature.txt']) {
+    for (const file of ['feature_zh.md', 'feature_ja.md', '20260602-110405-feature_ja.md', 'feature-partial.md', 'feature.txt']) {
       writeFileSync(join(exportsDir, file), 'source', 'utf8');
       await runTranslationHook(cwd, makeExportInput(cwd, `.granada/aosp-exports/${file}`), {
-        env: { TRANSLATE_MD_ZH_MOCK_TEXT: 'translated' },
+        env: { GRANADA_TRANSLATE_LANG: 'ja', TRANSLATE_MD_ZH_MOCK_TEXT: 'translated' },
       });
     }
     writeFileSync(join(cwd, 'README.md'), 'source', 'utf8');
     await runTranslationHook(cwd, makeExportInput(cwd, 'README.md'), {
-      env: { TRANSLATE_MD_ZH_MOCK_TEXT: 'translated' },
+      env: { GRANADA_TRANSLATE_LANG: 'ja', TRANSLATE_MD_ZH_MOCK_TEXT: 'translated' },
     });
 
-    expect(existsSync(join(exportsDir, 'feature_zh_zh.md'))).toBe(false);
-    expect(existsSync(join(exportsDir, '20260602-110405-feature_zh_zh.md'))).toBe(false);
-    expect(existsSync(join(exportsDir, 'feature-partial_zh.md'))).toBe(false);
-    expect(existsSync(join(exportsDir, 'feature_zh.txt'))).toBe(false);
-    expect(existsSync(join(cwd, 'README_zh.md'))).toBe(false);
+    expect(existsSync(join(exportsDir, 'feature_zh_ja.md'))).toBe(false);
+    expect(existsSync(join(exportsDir, 'feature_ja_ja.md'))).toBe(false);
+    expect(existsSync(join(exportsDir, '20260602-110405-feature_ja_ja.md'))).toBe(false);
+    expect(existsSync(join(exportsDir, 'feature-partial_ja.md'))).toBe(false);
+    expect(existsSync(join(exportsDir, 'feature_ja.txt'))).toBe(false);
+    expect(existsSync(join(cwd, 'README_ja.md'))).toBe(false);
   });
 
   it('rejects unsafe translate-command metacharacters', async () => {
@@ -571,7 +609,7 @@ describe('aosp-feature-export translation hook', () => {
     return {
       deps: {
         fs: { readFileSync, writeFileSync, existsSync, copyFileSync, renameSync, unlinkSync, readdirSync, mkdirSync, statSync, lstatSync, rmSync, rmdirSync, openSync, closeSync },
-        env,
+        env: { GRANADA_TRANSLATE_LANG: 'zh', ...env },
         cwd,
         skillPathArg: 'skills/translate-md-zh/SKILL.md',
         pid: 123,
@@ -605,20 +643,23 @@ describe('aosp-feature-export translation hook', () => {
     expect(readdirSync(exportsDir).some(file => /^\d{8}-\d{6}-feature\.md$/.test(file))).toBe(true);
   });
 
-  it('direct timestamp copies a source and zh sibling with one UTC+8 prefix', async () => {
+  it('direct timestamp copies a source and configured language sibling with one UTC+8 prefix', async () => {
     const cwd = makeProject();
     const exportsDir = join(cwd, '.granada', 'aosp-exports');
     writeFileSync(join(exportsDir, 'feature.md'), '# English', 'utf8');
+    writeFileSync(join(exportsDir, 'feature_ja.md'), '# 日本語', 'utf8');
     writeFileSync(join(exportsDir, 'feature_zh.md'), '# 中文', 'utf8');
     const { handleTimestampArtifactHook } = await importTimestampHook();
-    const { deps, getNowCalls } = makeTimestampDeps(cwd);
+    const { deps, getNowCalls } = makeTimestampDeps(cwd, Date.UTC(2026, 5, 2, 3, 4, 5), { GRANADA_TRANSLATE_LANG: 'ja' });
 
     const output = handleTimestampArtifactHook(makeExportInput(cwd, '.granada/aosp-exports/feature.md'), deps);
 
     expect(output).toBeNull();
     expect(readFileSync(join(exportsDir, '20260602-110405-feature.md'), 'utf8')).toBe('# English');
-    expect(readFileSync(join(exportsDir, '20260602-110405-feature_zh.md'), 'utf8')).toBe('# 中文');
+    expect(readFileSync(join(exportsDir, '20260602-110405-feature_ja.md'), 'utf8')).toBe('# 日本語');
+    expect(existsSync(join(exportsDir, '20260602-110405-feature_zh.md'))).toBe(false);
     expect(readFileSync(join(exportsDir, 'feature.md'), 'utf8')).toBe('# English');
+    expect(readFileSync(join(exportsDir, 'feature_ja.md'), 'utf8')).toBe('# 日本語');
     expect(readFileSync(join(exportsDir, 'feature_zh.md'), 'utf8')).toBe('# 中文');
     expect(getNowCalls()).toBe(1);
   });

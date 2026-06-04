@@ -1,9 +1,20 @@
 import path from 'node:path';
 const TIMESTAMP_PREFIX = /^\d{8}-\d{6}-/;
+const TRANSLATION_LANG = /^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$/;
 export function stripLeadingTimestamp(basename) {
     return basename.replace(TIMESTAMP_PREFIX, '');
 }
-export function getZhSiblingPath(sourcePath) {
+export function getTranslationLang(env = {}) {
+    const lang = String(env.GRANADA_TRANSLATE_LANG || 'zh').trim().toLowerCase();
+    if (!TRANSLATION_LANG.test(lang))
+        throw new Error('GRANADA_TRANSLATE_LANG must be a language code such as zh, en, ja, or pt-br');
+    return lang;
+}
+export function hasTranslationSuffix(basename, lang = 'zh') {
+    const sourceBase = stripLeadingTimestamp(basename);
+    return sourceBase.endsWith('_zh.md') || sourceBase.endsWith(`_${lang}.md`);
+}
+export function getTranslatedSiblingPath(sourcePath, lang = 'zh') {
     const basename = path.basename(sourcePath);
-    return path.join(path.dirname(sourcePath), `${basename.slice(0, -3)}_zh.md`);
+    return path.join(path.dirname(sourcePath), `${basename.slice(0, -3)}_${lang}.md`);
 }

@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { sanitizeLogMessage } from '../../../shared/logger.js';
 import type { HookDeps, HookInput, HookObjectOutput } from '../../../types/hook.js';
-import { getZhSiblingPath, stripLeadingTimestamp } from '../../../shared/artifact-paths.js';
+import { getTranslatedSiblingPath, getTranslationLang, stripLeadingTimestamp } from '../../../shared/artifact-paths.js';
 import { getPostToolUseCandidateReason, getToolFilePath, resolveGranadaArtifactSource } from '../../../shared/artifact-source-policy.js';
 
 type CopyPair = {
@@ -38,9 +38,9 @@ function getDestinationPath(sourcePath: string, prefix: string): string {
   return path.join(path.dirname(sourcePath), `${prefix}${stripLeadingTimestamp(path.basename(sourcePath))}`);
 }
 
-function getPlannedCopies(sourcePath: string, prefix: string, fs: HookDeps['fs']): CopyPair[] {
+function getPlannedCopies(sourcePath: string, prefix: string, lang: string, fs: HookDeps['fs']): CopyPair[] {
   const pairs: CopyPair[] = [{ source: sourcePath, destination: getDestinationPath(sourcePath, prefix) }];
-  const siblingPath = getZhSiblingPath(sourcePath);
+  const siblingPath = getTranslatedSiblingPath(sourcePath, lang);
   if (fs?.existsSync(siblingPath)) {
     pairs.push({ source: siblingPath, destination: getDestinationPath(siblingPath, prefix) });
   }
@@ -59,7 +59,8 @@ export function processTimestampArtifact(sourcePath: string, deps: HookDeps): Ti
   if (!deps.fs) throw new Error('missing fs dependency');
 
   const prefix = formatEast8Prefix(typeof deps.now === 'function' ? deps.now() : Date.now());
-  const pairs = getPlannedCopies(path.resolve(sourcePath), prefix, deps.fs);
+  const lang = getTranslationLang(deps.env);
+  const pairs = getPlannedCopies(path.resolve(sourcePath), prefix, lang, deps.fs);
   const collision = detectCollision(pairs, deps.fs);
   if (collision) {
     throw new Error(`destination already exists; source=${collision.source} destination=${collision.destination}`);
@@ -90,7 +91,10 @@ export function handleTimestampArtifactHook(input: HookInput, deps: HookDeps): H
   const filePath = getToolFilePath(input);
   if (!filePath) return null;
 
-  const resolved = resolveGranadaArtifactSource(cwd, filePath, { rejectTimestampedDerivative: false });
+  const resolved = resolveGranadaArtifactSource(cwd, filePath, {
+    rejectTimestampedDerivative: false,
+    lang: getTranslationLang(deps.env),
+  });
   if ('skipped' in resolved) {
     logger.log('D', `skip reason=${resolved.reason || 'unknown'} source=${resolved.sourcePath || filePath}`);
     return null;

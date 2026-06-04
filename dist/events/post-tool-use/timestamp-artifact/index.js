@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { sanitizeLogMessage } from '../../../shared/logger.js';
-import { getZhSiblingPath, stripLeadingTimestamp } from '../../../shared/artifact-paths.js';
+import { getTranslatedSiblingPath, getTranslationLang, stripLeadingTimestamp } from '../../../shared/artifact-paths.js';
 import { getPostToolUseCandidateReason, getToolFilePath, resolveGranadaArtifactSource } from '../../../shared/artifact-source-policy.js';
 function warningOutput(message, hookEventName = 'PostToolUse') {
     return {
@@ -23,9 +23,9 @@ function formatEast8Prefix(epochMs) {
 function getDestinationPath(sourcePath, prefix) {
     return path.join(path.dirname(sourcePath), `${prefix}${stripLeadingTimestamp(path.basename(sourcePath))}`);
 }
-function getPlannedCopies(sourcePath, prefix, fs) {
+function getPlannedCopies(sourcePath, prefix, lang, fs) {
     const pairs = [{ source: sourcePath, destination: getDestinationPath(sourcePath, prefix) }];
-    const siblingPath = getZhSiblingPath(sourcePath);
+    const siblingPath = getTranslatedSiblingPath(sourcePath, lang);
     if (fs?.existsSync(siblingPath)) {
         pairs.push({ source: siblingPath, destination: getDestinationPath(siblingPath, prefix) });
     }
@@ -43,7 +43,8 @@ export function processTimestampArtifact(sourcePath, deps) {
     if (!deps.fs)
         throw new Error('missing fs dependency');
     const prefix = formatEast8Prefix(typeof deps.now === 'function' ? deps.now() : Date.now());
-    const pairs = getPlannedCopies(path.resolve(sourcePath), prefix, deps.fs);
+    const lang = getTranslationLang(deps.env);
+    const pairs = getPlannedCopies(path.resolve(sourcePath), prefix, lang, deps.fs);
     const collision = detectCollision(pairs, deps.fs);
     if (collision) {
         throw new Error(`destination already exists; source=${collision.source} destination=${collision.destination}`);
@@ -73,7 +74,10 @@ export function handleTimestampArtifactHook(input, deps) {
     const filePath = getToolFilePath(input);
     if (!filePath)
         return null;
-    const resolved = resolveGranadaArtifactSource(cwd, filePath, { rejectTimestampedDerivative: false });
+    const resolved = resolveGranadaArtifactSource(cwd, filePath, {
+        rejectTimestampedDerivative: false,
+        lang: getTranslationLang(deps.env),
+    });
     if ('skipped' in resolved) {
         logger.log('D', `skip reason=${resolved.reason || 'unknown'} source=${resolved.sourcePath || filePath}`);
         return null;

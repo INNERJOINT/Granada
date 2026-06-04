@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { sanitizeLogMessage } from '../../../shared/logger.js';
 import type { HookDeps, HookInput, HookObjectOutput } from '../../../types/hook.js';
-import { getZhSiblingPath, stripLeadingTimestamp } from '../../../shared/artifact-paths.js';
+import { getTranslatedSiblingPath, hasTranslationSuffix, stripLeadingTimestamp } from '../../../shared/artifact-paths.js';
 import { readTranslationConfig } from './config.js';
 import { translateWithCommand } from './command.js';
 import { getCandidateReason, getWrittenFilePath, resolveArtifactPaths } from './path-policy.js';
@@ -10,7 +10,7 @@ export type TranslateArtifactResult = {
   sourcePath: string;
   targetPath: string;
   readSourcePath: string;
-};
+} | null;
 
 function warningOutput(message: unknown, hookEventName = 'PostToolUse'): HookObjectOutput {
   return {
@@ -32,24 +32,24 @@ function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function findTimestampedSourcePath(sourcePath: string, fs: HookDeps['fs']): string | null {
+function findTimestampedSourcePath(sourcePath: string, lang: string, fs: HookDeps['fs']): string | null {
   if (!fs) return null;
   const sourceDir = path.dirname(sourcePath);
   const sourceBase = stripLeadingTimestamp(path.basename(sourcePath));
-  if (sourceBase.endsWith('_zh.md')) return null;
+  if (hasTranslationSuffix(sourceBase, lang)) return null;
   const pattern = new RegExp(`^\\d{8}-\\d{6}-${escapeRegex(sourceBase)}$`);
   const candidates = fs.readdirSync(sourceDir)
-    .filter(name => pattern.test(name) && !name.endsWith('_zh.md'))
+    .filter(name => pattern.test(name) && !hasTranslationSuffix(name, lang))
     .sort()
     .reverse();
   return candidates[0] ? path.join(sourceDir, candidates[0]) : null;
 }
 
-function maybeCompensateTimestampedTarget(sourcePath: string, targetPath: string, deps: HookDeps): string {
+function maybeCompensateTimestampedTarget(sourcePath: string, targetPath: string, lang: string, deps: HookDeps): string {
   if (!deps.fs || deps.fs.existsSync(sourcePath) || !deps.fs.existsSync(targetPath)) return targetPath;
-  const timestampedSourcePath = findTimestampedSourcePath(sourcePath, deps.fs);
+  const timestampedSourcePath = findTimestampedSourcePath(sourcePath, lang, deps.fs);
   if (!timestampedSourcePath) return targetPath;
-  const timestampedTargetPath = getZhSiblingPath(timestampedSourcePath);
+  const timestampedTargetPath = getTranslatedSiblingPath(timestampedSourcePath, lang);
   if (timestampedTargetPath === targetPath) return targetPath;
   if (deps.fs.existsSync(timestampedTargetPath)) {
     throw new Error(`timestamp compensation destination already exists: ${timestampedTargetPath}`);
@@ -69,6 +69,10 @@ export async function processTranslateArtifact(sourcePath: string, deps: HookDep
 
   try {
     const config = readTranslationConfig(cwd, deps);
+    if (!config.enabled) {
+      logger.log('D', `translate skipped reason=disabled source=${sourcePath}`);
+      return null;
+    }
     const resolvedSourcePath = path.resolve(cwd, sourcePath);
     if (options.enforceTranslateDirs !== false) {
       const paths = resolveArtifactPaths(cwd, resolvedSourcePath, config);
@@ -77,15 +81,15 @@ export async function processTranslateArtifact(sourcePath: string, deps: HookDep
       }
       targetPath = paths.targetPath;
     } else {
-      targetPath = getZhSiblingPath(resolvedSourcePath);
+      targetPath = getTranslatedSiblingPath(resolvedSourcePath, config.lang);
     }
 
     let readSourcePath = resolvedSourcePath;
     let writeTargetPath = targetPath;
-    const timestampedSourcePath = findTimestampedSourcePath(resolvedSourcePath, deps.fs);
+    const timestampedSourcePath = findTimestampedSourcePath(resolvedSourcePath, config.lang, deps.fs);
     if (timestampedSourcePath) {
       readSourcePath = timestampedSourcePath;
-      writeTargetPath = getZhSiblingPath(timestampedSourcePath);
+      writeTargetPath = getTranslatedSiblingPath(timestampedSourcePath, config.lang);
     }
     const stamp = typeof deps.now === 'function' ? deps.now() : Date.now();
     tempPath = `${writeTargetPath}.${deps.pid || 'process'}.${stamp}.tmp`;
@@ -96,7 +100,7 @@ export async function processTranslateArtifact(sourcePath: string, deps: HookDep
     deps.fs.writeFileSync(tempPath, translated, 'utf8');
     deps.fs.renameSync(tempPath, writeTargetPath);
     const completedTargetPath = writeTargetPath === targetPath
-      ? maybeCompensateTimestampedTarget(resolvedSourcePath, targetPath, deps)
+      ? maybeCompensateTimestampedTarget(resolvedSourcePath, targetPath, config.lang, deps)
       : writeTargetPath;
     logger.log('I', `translate success source=${readSourcePath} target=${completedTargetPath}`);
     return { sourcePath: resolvedSourcePath, targetPath: completedTargetPath, readSourcePath };
@@ -126,6 +130,10 @@ export async function handleTranslateArtifactHook(input: HookInput, deps: HookDe
 
   try {
     const config = readTranslationConfig(cwd, deps);
+    if (!config.enabled) {
+      logger.log('D', `skip reason=disabled source=${filePath}`);
+      return null;
+    }
     const paths = resolveArtifactPaths(cwd, filePath, config);
     if (!paths || paths.skipped) {
       logger.log('D', `skip reason=${paths ? paths.reason : 'unknown'} source=${paths && paths.sourcePath ? paths.sourcePath : filePath}`);
