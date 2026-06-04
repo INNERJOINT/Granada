@@ -198,6 +198,20 @@ export function cleanupStaleJournal(cwd, deps, options = {}) {
     }
     pruneDirectoryIfEmpty(fs, root, root);
 }
+function removeSupersededSourceRecords(cwd, sessionKey, latestEntry, latestFilePath, deps) {
+    const records = getPendingSourceRecords(cwd, sessionKey, deps).get(path.resolve(latestEntry.sourcePath)) || [];
+    const latestResolvedPath = path.resolve(latestFilePath);
+    const superseded = records.filter(record => {
+        if (path.resolve(record.filePath) === latestResolvedPath)
+            return false;
+        if (record.entry.createdAt < latestEntry.createdAt)
+            return true;
+        if (record.entry.createdAt > latestEntry.createdAt)
+            return false;
+        return record.filePath < latestFilePath;
+    });
+    removeJournalRecords(cwd, superseded, deps);
+}
 export function appendJournalEntry(input, cwd, sourcePath, deps, options = {}) {
     const fs = ensureFs(deps);
     cleanupStaleJournal(cwd, deps, options);
@@ -226,6 +240,8 @@ export function appendJournalEntry(input, cwd, sourcePath, deps, options = {}) {
             finally {
                 fs.closeSync(fd);
             }
+            if (options.keepLatestSourceRecord)
+                removeSupersededSourceRecords(cwd, sessionKey, entry, filePath, deps);
             return entry;
         }
         catch (error) {

@@ -29,7 +29,7 @@ export function getToolFilePath(input: HookInput): string | null {
   return typeof inputPath === 'string' && inputPath ? inputPath : null;
 }
 
-export function getPostToolUseCandidateReason(input: HookInput, acceptedTools = new Set(['Write', 'Edit'])): string | null {
+export function getPostToolUseCandidateReason(input: HookInput, acceptedTools = new Set(['Write', 'Edit', 'Update'])): string | null {
   if (!input) return 'invalid-input';
   if (input.hook_event_name !== 'PostToolUse') return `event-${input.hook_event_name || 'unknown'}`;
   if (!acceptedTools.has(input.tool_name || '')) return `tool-${input.tool_name || 'unknown'}`;

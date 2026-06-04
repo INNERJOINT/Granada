@@ -22,8 +22,7 @@ describe('plugin PostToolUse hook manifest', () => {
     const drainHook = stopEntry.hooks[0];
 
     expect(entry.hooks).toHaveLength(1);
-    expect(entry.matcher).toBe('Write|Edit');
-    expect(entry.matcher).not.toContain('Update');
+    expect(entry.matcher).toBe('Write|Edit|Update');
     expect(enqueueHook.type).toBe('command');
     expect(enqueueHook.if).toBeUndefined();
     expect(enqueueHook.command).toBe('node');
@@ -291,7 +290,7 @@ describe('aosp-feature-export translation hook', () => {
     expect(existsSync(join(exportsDir, 'feature_zh.md'))).toBe(false);
   });
 
-  it('generic adapter queues repeated writes and drains once on Stop', async () => {
+  it('generic adapter keeps the latest source queue entry and drains once on Stop', async () => {
     const cwd = makeProject();
     const exportsDir = join(cwd, '.granada', 'aosp-exports');
     const source = join(exportsDir, 'feature.md');
@@ -301,15 +300,30 @@ describe('aosp-feature-export translation hook', () => {
       cwd,
       args: ['enqueue-artifact'],
     });
-    writeFileSync(source, '# English\n\nFinal', 'utf8');
+    writeFileSync(source, '# English\n\nMiddle', 'utf8');
     const second = await runHook('../adapters/claude-entry.cjs', {
       ...makeExportInput(cwd, '.granada/aosp-exports/feature.md'),
       tool_name: 'Edit',
-      tool_use_id: 'tu_edit_final',
+      tool_use_id: 'tu_edit_middle',
     }, {
       cwd,
       args: ['enqueue-artifact'],
     });
+    writeFileSync(source, '# English\n\nFinal', 'utf8');
+    const third = await runHook('../adapters/claude-entry.cjs', {
+      ...makeExportInput(cwd, '.granada/aosp-exports/feature.md'),
+      tool_name: 'Update',
+      tool_use_id: 'tu_update_final',
+    }, {
+      cwd,
+      args: ['enqueue-artifact'],
+    });
+
+    const queueDir = join(cwd, '.granada', '.hooks', 'artifact-queue', 'session-test-session-001');
+    const queuedRecords = readdirSync(queueDir).filter(file => file.endsWith('.json') && !file.startsWith('failed-'));
+    expect(queuedRecords).toHaveLength(1);
+    expect(JSON.parse(readFileSync(join(queueDir, queuedRecords[0]), 'utf8')).toolUseId).toBe('tu_update_final');
+
     const stop = await runHook('../adapters/claude-entry.cjs', baseInput('Stop', { cwd }), {
       cwd,
       args: ['drain-artifacts'],
@@ -318,6 +332,7 @@ describe('aosp-feature-export translation hook', () => {
 
     expect(first.exitCode).toBe(0);
     expect(second.exitCode).toBe(0);
+    expect(third.exitCode).toBe(0);
     expect(stop.exitCode).toBe(0);
     expect(stop.stdout).toBe('');
     const outputFiles = readdirSync(exportsDir);

@@ -44,6 +44,7 @@ export type ArtifactJournalOptions = {
   staleJournalTtlMs?: number;
   staleFailedEntryTtlMs?: number;
   staleDrainLockTtlMs?: number;
+  keepLatestSourceRecord?: boolean;
 };
 
 function safeSegment(value: string): string {
@@ -219,6 +220,18 @@ export function cleanupStaleJournal(cwd: string, deps: HookDeps, options: Artifa
   pruneDirectoryIfEmpty(fs, root, root);
 }
 
+function removeSupersededSourceRecords(cwd: string, sessionKey: string, latestEntry: ArtifactJournalEntry, latestFilePath: string, deps: HookDeps): void {
+  const records = getPendingSourceRecords(cwd, sessionKey, deps).get(path.resolve(latestEntry.sourcePath)) || [];
+  const latestResolvedPath = path.resolve(latestFilePath);
+  const superseded = records.filter(record => {
+    if (path.resolve(record.filePath) === latestResolvedPath) return false;
+    if (record.entry.createdAt < latestEntry.createdAt) return true;
+    if (record.entry.createdAt > latestEntry.createdAt) return false;
+    return record.filePath < latestFilePath;
+  });
+  removeJournalRecords(cwd, superseded, deps);
+}
+
 export function appendJournalEntry(input: HookInput, cwd: string, sourcePath: string, deps: HookDeps, options: ArtifactJournalOptions = {}): ArtifactJournalEntry {
   const fs = ensureFs(deps);
   cleanupStaleJournal(cwd, deps, options);
@@ -248,6 +261,7 @@ export function appendJournalEntry(input: HookInput, cwd: string, sourcePath: st
       } finally {
         fs.closeSync(fd);
       }
+      if (options.keepLatestSourceRecord) removeSupersededSourceRecords(cwd, sessionKey, entry, filePath, deps);
       return entry;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;

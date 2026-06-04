@@ -13,7 +13,7 @@ export function getToolFilePath(input) {
     const inputPath = input.tool_input?.file_path;
     return typeof inputPath === 'string' && inputPath ? inputPath : null;
 }
-export function getPostToolUseCandidateReason(input, acceptedTools = new Set(['Write', 'Edit'])) {
+export function getPostToolUseCandidateReason(input, acceptedTools = new Set(['Write', 'Edit', 'Update'])) {
     if (!input)
         return 'invalid-input';
     if (input.hook_event_name !== 'PostToolUse')

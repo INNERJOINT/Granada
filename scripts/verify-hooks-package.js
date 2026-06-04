@@ -61,8 +61,7 @@ const stopHooks = Array.isArray(stopEntry?.hooks) ? stopEntry.hooks : [];
 const enqueueHook = postHooks.find(hook => hook?.args?.[1] === 'enqueue-artifact');
 const drainHook = stopHooks.find(hook => hook?.args?.[1] === 'drain-artifacts');
 
-if (postEntry?.matcher !== 'Write|Edit') throw new Error('PostToolUse matcher is not Write|Edit');
-if (postEntry.matcher.includes('Update')) throw new Error('PostToolUse matcher should not include Update');
+if (postEntry?.matcher !== 'Write|Edit|Update') throw new Error('PostToolUse matcher is not Write|Edit|Update');
 if (postHooks.length !== 1) throw new Error(`expected exactly one PostToolUse hook, got ${postHooks.length}`);
 if (!enqueueHook) throw new Error('manifest missing enqueue-artifact hook');
 if (enqueueHook.if !== undefined) throw new Error('enqueue-artifact hook should not use manifest if filtering');
@@ -104,20 +103,26 @@ if (enqueueRun.stdout.trim()) throw new Error(`expected no stdout for successful
 if (enqueueRun.stderr.trim()) throw new Error(`expected no stderr without GRANADA_DEBUG, got ${enqueueRun.stderr}`);
 
 writeFileSync(sourcePath, '# English\n\nFinal', 'utf8');
-const editInput = {
+const updateInput = {
   ...input,
-  tool_name: 'Edit',
+  tool_name: 'Update',
   tool_input: { file_path: '.granada/aosp-exports/feature.md' },
   tool_response: { filePath: sourcePath, content: '# English\n\nFinal' },
-  tool_use_id: 'verify_edit_2',
+  tool_use_id: 'verify_update_2',
 };
-const enqueueEditRun = run('node', [adapterPath, 'enqueue-artifact'], {
+const enqueueUpdateRun = run('node', [adapterPath, 'enqueue-artifact'], {
   cwd: projectDir,
-  input: JSON.stringify(editInput),
+  input: JSON.stringify(updateInput),
   env: process.env,
 });
-if (enqueueEditRun.stdout.trim()) throw new Error(`expected no stdout for second enqueue hook output, got ${enqueueEditRun.stdout}`);
-if (enqueueEditRun.stderr.trim()) throw new Error(`expected no stderr for second enqueue, got ${enqueueEditRun.stderr}`);
+if (enqueueUpdateRun.stdout.trim()) throw new Error(`expected no stdout for second enqueue hook output, got ${enqueueUpdateRun.stdout}`);
+if (enqueueUpdateRun.stderr.trim()) throw new Error(`expected no stderr for second enqueue, got ${enqueueUpdateRun.stderr}`);
+
+const queueDir = join(projectDir, '.granada', '.hooks', 'artifact-queue', 'session-verify-hooks-package');
+const queuedRecords = readdirSync(queueDir).filter(file => file.endsWith('.json') && !file.startsWith('failed-'));
+if (queuedRecords.length !== 1) throw new Error(`expected one latest queue record, got ${queuedRecords.length}`);
+const latestRecord = JSON.parse(readFileSync(join(queueDir, queuedRecords[0]), 'utf8'));
+if (latestRecord.toolUseId !== 'verify_update_2') throw new Error(`queue did not keep latest Update record: ${latestRecord.toolUseId}`);
 
 const stopInput = {
   session_id: 'verify-hooks-package',

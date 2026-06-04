@@ -10,7 +10,7 @@ export function handleEnqueueArtifactHook(input, deps) {
         logger.log('D', `skip reason=${candidate.reason}${candidate.sourcePath ? ` source=${candidate.sourcePath}` : ''}`);
         return null;
     }
-    const entry = appendJournalEntry(input, cwd, candidate.sourcePath, deps);
+    const entry = appendJournalEntry(input, cwd, candidate.sourcePath, deps, { keepLatestSourceRecord: true });
     logger.log('I', `queued artifact source=${entry.sourcePath} session=${entry.sessionKey}`);
     return null;
 }
