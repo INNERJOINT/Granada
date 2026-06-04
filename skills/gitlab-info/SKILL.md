@@ -179,32 +179,32 @@ Extract changed files and summarize modifications between the two refs. If `from
 
 ## Output Format
 
-Answer in Chinese unless the user asks otherwise.
+Answer in English unless the user asks otherwise.
 
 ```text
-## GitLab URL 信息
+## GitLab URL Information
 - URL: <original url>
-- 类型: MR / Commit / File / Branch / Compare
-- 仓库: <project_id> (<project name if fetched>)
-- 范围: MR overall / selected commit / selected diff version / file line range / compare refs
+- Type: MR / Commit / File / Branch / Compare
+- Repository: <project_id> (<project name if fetched>)
+- Scope: MR overall / selected commit / selected diff version / file line range / compare refs
 
-## 解析结果
+## Parsed Results
 - <facts parsed from URL, including query params and fragments>
 
-## MCP 验证结果
+## MCP Verification Results
 - <facts returned by GitLab MCP>
 
-## 修改文件
+## Changed Files
 - `<path>`: <added/modified/deleted/renamed if known> — <short purpose inferred from diff>
 
-## 修改内容摘要
+## Change Summary
 - <high-signal summary of code/content changes>
 
-## 未确认 / 需要确认
+## Unconfirmed / Needs Confirmation
 - <ambiguous refs, missing permissions, skipped large diffs, or unavailable version IDs>
 ```
 
-For simple questions such as “这个链接属于哪个仓库”, answer briefly and skip unnecessary sections. For multiple URLs, repeat the URL-specific sections per URL.
+For simple questions such as “which repository does this link belong to”, answer briefly and skip unnecessary sections. For multiple URLs, repeat the URL-specific sections per URL.
 
 ## Tool Set
 

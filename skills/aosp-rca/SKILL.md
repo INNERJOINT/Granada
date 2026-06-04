@@ -68,10 +68,10 @@ Both modes save the report to `.granada/specs/`.
    - AOSP: call `mcp__plugin_zaku_sourcepilot__list_projects()` — if fails, abort with "AOSP MCP (sourcepilot) unreachable. Check SOURCEPILOT_URL and SOURCEPILOT_KEY env vars."
 
 4. **Display active AOSP project**:
-   - If `--project` override was provided: display `**AOSP Project: <name> (命令行指定)**` and use this value for all subsequent phases. Skip reading `.granada/aosp-config.json`.
+   - If `--project` override was provided: display `**AOSP Project: <name> (specified on the command line)**` and use this value for all subsequent phases. Skip reading `.granada/aosp-config.json`.
    - Otherwise, read `.granada/aosp-config.json`:
      - If configured: display `**AOSP Project: <project_name>**` prominently
-     - If not configured: display `**未配置 AOSP 项目** — 搜索将不限定项目范围。运行 /zaku:aosp-project 设置项目。`
+     - If not configured: display `**AOSP project is not configured** — Searches will not be limited to a project. Run /zaku:aosp-project to configure a project.`
 
 5. **Create temp directory**:
 ```bash
@@ -273,27 +273,27 @@ Save output to /tmp/aosp-rca-<slug>/hypotheses.md in this format:
 Agent(
   subagent_type="zaku:aosp-analyst",
   model="opus",
-  prompt="基于 AOSP 源码分析结果和问题描述，生成可能的根因假设。
+  prompt="Generate possible root-cause hypotheses based on AOSP source analysis results and the problem description.
 
-问题描述: <issue_title>
+Problem description: <issue_title>
 Read the AOSP context file: /tmp/aosp-rca-<slug>/aosp-context.md
 
-注意: 本次分析无日志输入，假设基于源码结构推断而非日志证据。所有假设的置信度上限为"中"。
+Note: This analysis has no log input; hypotheses are inferred from source structure rather than log evidence. Every hypothesis confidence is capped at medium.
 
 Generate 2-3 root-cause hypotheses. Each hypothesis must have:
 - Title (one-line description)
-- Reasoning (基于 AOSP 源码中发现的哪些代码路径/错误处理缺陷推断)
+- Reasoning (which code paths or error-handling gaps found in AOSP source support the inference)
 - Relevant AOSP source context (which AOSP code paths are involved)
 - **Covered by Phase 4 context:** list aosp-context.md sections already searched for this hypothesis
 - **New investigation targets:** code paths NOT in aosp-context.md that need further searching
-- Confidence: 低/中 (无日志模式下不允许标注"高"置信度)
+- Confidence: low/medium (no-log mode must not assign high confidence)
 
 Save output to /tmp/aosp-rca-<slug>/hypotheses.md in this format:
 
 ## Hypothesis 1: <title>
-**Reasoning:** <基于源码的推断逻辑>
-**AOSP source context:** <相关代码路径>
-**Confidence:** 中/低
+**Reasoning:** <source-based inference logic>
+**AOSP source context:** <related code paths>
+**Confidence:** medium/low
 
 ## Hypothesis 2: ...
 (repeat for each hypothesis)"
@@ -371,77 +371,77 @@ Report format:
 4. **Build the 7-section Chinese report** and save to `.granada/specs/aosp-rca-{slug}.md` after redacting common secrets from all included log excerpts and issue text (authorization headers, bearer tokens, API keys, passwords, access/refresh/id tokens, cookies, session IDs, private keys, and signed URL token/key/signature query values):
 
 ```markdown
-# 根因分析报告: {slug} — {issue_title}
+# Root Cause Analysis Report: {slug} — {issue_title}
 
-**生成时间:** {date}
-**分析模式:** {log-based: "日志驱动分析" | no-log: "无日志源码分析（基于问题描述推断）"}
-**输入目录:** {input_path or "无（无日志模式）"}
-**分析项目:** {project_name or "未限定"}
+**Generated at:** {date}
+**Analysis mode:** {log-based: "log-based analysis" | no-log: "no-log source analysis based on problem description"}
+**Input directory:** {input_path or "none (no-log mode)"}
+**Analysis project:** {project_name or "unrestricted"}
 
-## 1. 问题概述
+## 1. Problem Overview
 {issue_description_summary — derived from anomalies or --title}
 
-## 2. 事件时间线
+## 2. Event Timeline
 {log-based mode:}
-| 时间 | 来源 | 严重程度 | 事件 |
+| Time | Source | Severity | Event |
 |------|------|----------|------|
 | {timestamp} | {logcat/tombstone/ANR/kernel} | {INFO/WARN/ERROR/FATAL} | {description} |
 
 {no-log mode:}
-> 本次分析未提供日志文件，无事件时间线。以下分析基于问题描述和 AOSP 源码结构推断。
+> No log files were provided, so there is no event timeline. The following analysis is inferred from the problem description and AOSP source structure.
 
-## 3. 关键异常/错误
+## 3. Key Exceptions / Errors
 {log-based mode:}
-### 异常 1: {title}
-- **严重程度:** {FATAL/ERROR/WARN}
-- **来源:** {file}:{line}
-- **堆栈信息:**
+### Exception 1: {title}
+- **Severity:** {FATAL/ERROR/WARN}
+- **Source:** {file}:{line}
+- **Stack trace:**
   {stack_trace}
 
 {no-log mode:}
-> 本次分析未提供日志文件，无异常提取。以下根因假设基于 AOSP 源码分析推断，而非日志证据。
+> No log files were provided, so no exceptions were extracted. The following root-cause hypotheses are inferred from AOSP source analysis rather than log evidence.
 
-## 4. AOSP 源码分析
-{从 Phase 4 AOSP 源码上下文分析阶段收集的完整源码分析结果}
+## 4. AOSP Source Analysis
+{Complete source analysis collected during Phase 4 AOSP source context analysis}
 
-### 4.1 关键代码路径
-{针对每个崩溃相关的类/函数，列出 AOSP 源码路径、代码片段和功能说明}
+### 4.1 Key Code Paths
+{For each crash-related class/function, list the AOSP source path, code snippet, and functional description}
 
 #### {class_or_function_name} — {aosp_file_path}
-- **源码位置:** `{aosp/path/to/file.java}:{line_range}`
-- **代码片段:**
+- **Source location:** `{aosp/path/to/file.java}:{line_range}`
+- **Code snippet:**
   ```java
-  // 相关代码摘录（含行号）
+  // Relevant code excerpt with line numbers
   ```
-- **功能说明:** {该函数/类的作用}
-- **与崩溃的关联:** {此代码如何与日志中观察到的崩溃行为相关}
-- **错误处理分析:** {该代码对故障模式的处理方式，是否存在处理缺口}
+- **Functional description:** {what this function/class does}
+- **Relation to the crash:** {how this code relates to the crash behavior observed in logs}
+- **Error handling analysis:** {how this code handles the failure mode and whether there are handling gaps}
 
-### 4.2 已知问题与模式
-{AOSP 源码中发现的相关 TODO、FIXME、已知限制、相似崩溃模式}
+### 4.2 Known Issues and Patterns
+{Related TODOs, FIXMEs, known limitations, and similar crash patterns found in AOSP source}
 
-### 4.3 源码搜索缺口
-{搜索未返回结果的目标，可能需要进一步人工排查的部分}
+### 4.3 Source Search Gaps
+{Targets that returned no search results and may require further manual investigation}
 
-## 5. 根因假设排名
-| 排名 | 假设 | 置信度 | 关键证据 |
+## 5. Root-Cause Hypothesis Ranking
+| Rank | Hypothesis | Confidence | Key evidence |
 |------|------|--------|----------|
-| 1 | {title} | {高/中/低} | {evidence_summary} |
+| 1 | {title} | {high/medium/low} | {evidence_summary} |
 
-### 假设 1: {title} (置信度: {level})
+### Hypothesis 1: {title} (Confidence: {level})
 
-> **无日志模式约束:** 当 `analysis_mode == "no-log"` 时，所有假设的置信度上限为"中"，不允许标注"高"。报告中应注明"本分析基于源码推断，未经日志证据验证"。
+> **No-log mode constraint:** When `analysis_mode == "no-log"`, every hypothesis must have a maximum confidence of medium and must not be marked high. The report should state that the analysis is based on source inference and has not been verified by log evidence.
 
-**支持证据:**
+**Supporting evidence:**
 - {point}
-**反对证据:**
+**Contradicting evidence:**
 - {point}
-**AOSP 上下文:** {relevant_source_findings}
+**AOSP context:** {relevant_source_findings}
 
-## 6. 受影响组件图
+## 6. Affected Component Diagram
 {ASCII diagram showing affected Android subsystems and their relationships}
 
-## 7. 建议修复方案
+## 7. Recommended Fix Plan
 1. {action with specific file/component reference}
 2. {action}
 ```
@@ -504,24 +504,24 @@ Why good: All exploration delegated to subagents. Clear input (--dir). AOSP proj
 
 <Good>
 ```
-User: /aosp-rca --title "SurfaceFlinger 在旋转屏幕时崩溃"
+User: /aosp-rca --title "SurfaceFlinger crashes during screen rotation"
 
-[Phase 1] 无日志模式 (no-log). Slug: surfaceflinger-rotate-crash. MCP 健康检查通过。
+[Phase 1] No-log mode. Slug: surfaceflinger-rotate-crash. MCP health check passed.
           AOSP Project: android-14 (from .granada/aosp-config.json)
-[Phase 2] 跳过（无日志模式）
-[Phase 3] 跳过（无日志模式）
-[Phase 4] Spawned analyst → 从问题描述提取搜索目标: SurfaceFlinger, display rotation, WindowManagerService
+[Phase 2] Skipped (no-log mode)
+[Phase 3] Skipped (no-log mode)
+[Phase 4] Spawned analyst → extracted search targets from problem description: SurfaceFlinger, display rotation, WindowManagerService
           Spawned 2 aosp-investigator agents in parallel.
           Cluster 1 (SurfaceFlinger): Found SurfaceFlinger::setTransactionState rotation handling.
           Cluster 2 (WindowManager): Found DisplayRotation::rotateDisplay lock ordering.
           Saved aosp-context.md with 4 AOSP source findings.
-[Phase 5] Spawned analyst subagent → generated 2 hypotheses (置信度上限: 中):
-          H1: SurfaceFlinger rotation transaction race condition (中)
-          H2: DisplayRotation lock inversion during config change (中)
+[Phase 5] Spawned analyst subagent → generated 2 hypotheses (confidence capped at medium):
+          H1: SurfaceFlinger rotation transaction race condition (medium)
+          H2: DisplayRotation lock inversion during config change (medium)
           Spawned 2 aosp-investigator agents in parallel.
 [Phase 6] Report saved to .granada/specs/aosp-rca-surfaceflinger-rotate-crash.md (Chinese, 7 sections).
 ```
-Why good: No-log mode correctly skips Phase 2/3. Search targets extracted from --title by analyst. Confidence capped at "中". Full 7-section report generated with sections 2/3 noting absence of log evidence.
+Why good: No-log mode correctly skips Phase 2/3. Search targets extracted from --title by analyst. Confidence capped at "medium". Full 7-section report generated with sections 2/3 noting absence of log evidence.
 </Good>
 
 <Good>
@@ -555,7 +555,7 @@ Why good: Correctly aborts early when path doesn't exist.
 
 <Guardrails>
 **Must have:**
-- mcp__plugin_zaku_sourcepilot__* for AOSP source (always, not conditional) — **Phase 4 AOSP 源码分析是必选阶段**，除非十分确认问题与 AOSP 源码完全无关才可跳过
+- mcp__plugin_zaku_sourcepilot__* for AOSP source (always, not conditional) — **Phase 4 AOSP source analysis is mandatory**,skip only if absolutely certain the issue is completely unrelated to AOSP source
 - aosp-investigator subagent for both Phase 4 (AOSP context) and Phase 5 (hypothesis investigation)
 - All 7 report sections (in Chinese)
 - Report saved to `.granada/specs/aosp-rca-{slug}.md`

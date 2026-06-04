@@ -29,19 +29,19 @@ Read `.granada/aosp-config.json` via `Read` tool.
 
 - If file exists and contains a `project` value, display:
   ```
-  **当前 AOSP 项目:** <project_name>
+  **Current AOSP project:** <project_name>
   ```
 - If file does not exist or has no `project` field, display:
   ```
-  **当前未配置 AOSP 项目** — 搜索将不限定项目范围
+  **No AOSP project currently configured** — searches will not be limited to a project scope
   ```
 - If file exists and contains a `repoPath` value, display:
   ```
-  **当前 .repo 路径:** <repo_path>
+  **Current .repo path:** <repo_path>
   ```
 - If file does not exist or has no `repoPath` field, display:
   ```
-  **当前未记录 .repo 路径**
+  **No .repo path currently recorded**
   ```
 
 ### Step 2: Discover Local .repo Directory
@@ -56,11 +56,11 @@ Use `Bash` with `pwd` and a bounded parent-directory loop, or another safe local
 
 - If found, set `repoPath` to the absolute path of the `.repo` directory and display:
   ```
-  **发现 .repo 路径:** <absolute_repo_path>
+  **Discovered .repo path:** <absolute_repo_path>
   ```
 - If not found, preserve any existing `repoPath` from config and display:
   ```
-  **未发现本地 .repo 路径** — 将保留现有记录（如有）
+  **No local .repo path found** — existing record will be preserved if present
   ```
 
 If arguments are exactly `detect-repo`, skip MCP project listing and go directly to Step 6 to save the discovered `repoPath` together with the existing `project` value.
@@ -85,19 +85,19 @@ Write {"project": "<project-name>"} to .granada/aosp-config.json
 Display as a numbered list:
 
 ```
-## 可用 AOSP 项目
+## Available AOSP projects
 
 1. project-a
 2. project-b
 3. project-c
 ...
 
-当前选中: project-b (或 "未配置")
+Currently selected: project-b (or "not configured")
 ```
 
 **Validation:** If the currently configured project does not appear in the server's project list, display a warning:
 ```
-⚠ 当前配置的项目 "<project_name>" 在服务器中不存在，建议重新选择。
+⚠ The currently configured project "<project_name>" does not exist on the server; selecting again is recommended.
 ```
 
 ### Step 5: User Selection
@@ -137,12 +137,12 @@ Create the `.granada/` directory if it does not exist.
 Display the result prominently:
 
 ```
-✅ AOSP 项目已设置为: <project_name 或 未配置>
-✅ .repo 路径已记录为: <repo_path 或 未记录>
+AOSP project set to: <project_name or not configured>
+.repo path recorded as: <repo_path or not recorded>
 
-所有 AOSP 源码搜索将限定在已配置的项目范围内。
-本地 AOSP 操作可使用记录的 .repo 路径定位 checkout。
-使用 /zaku:aosp-project 可随时更改。
+All AOSP source searches will be limited to the configured project scope.
+Local AOSP operations can use the recorded .repo path to locate the checkout.
+Use /zaku:aosp-project to change it at any time.
 ```
 
 ## Tool Usage
@@ -163,4 +163,4 @@ Display the result prominently:
 
 ## Keyword Triggers
 
-- `"aosp project"`, `"aosp_project"`, `"set aosp project"`, `"选择aosp项目"`
+- `"aosp project"`, `"aosp_project"`, `"set aosp project"`, `"select AOSP project"`

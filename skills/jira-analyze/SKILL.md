@@ -41,10 +41,10 @@ Automates Android bug root-cause analysis by fetching JIRA issue details via mcp
    - AOSP: call `mcp__plugin_zaku_sourcepilot__list_projects()` — if fails, abort with "AOSP MCP (sourcepilot) unreachable. Check SOURCEPILOT_URL and SOURCEPILOT_KEY env vars."
 
 3. **Display active AOSP project**:
-   - If `--project` override was provided: display `**🔍 AOSP Project: <name> (命令行指定)**` and use this value for all subsequent phases. Skip reading `.granada/aosp-config.json`.
+   - If `--project` override was provided: display `**🔍 AOSP Project: <name> (specified on the command line)**` and use this value for all subsequent phases. Skip reading `.granada/aosp-config.json`.
    - Otherwise, read `.granada/aosp-config.json`:
      - If configured: display `**🔍 AOSP Project: <project_name>**` prominently
-     - If not configured: display `**⚠ 未配置 AOSP 项目** — 搜索将不限定项目范围。运行 /zaku:aosp-project 设置项目。`
+     - If not configured: display `**⚠ AOSP project is not configured** — Searches will not be limited to a project. Run /zaku:aosp-project to configure a project.`
    (When no `--project` override is provided, the `aosp-investigator` subagent reads this config and passes `project` to search calls automatically. When `--project` is provided, the override is passed explicitly in subagent prompts — see Phase 4 and Phase 5.)
 
 4. **Create temp directory**:
@@ -271,65 +271,65 @@ Report format:
 
 ```markdown
 <!-- Downstream dependency: jira-aftersales skill detects reports by this title format. Do not change without updating jira-aftersales. -->
-# 根因分析报告: {issue_key} — {issue_title}
+# Root Cause Analysis Report: {issue_key} — {issue_title}
 
-**生成时间:** {date}
-**问题链接:** {jira_url}
-**状态:** {status} | **经办人:** {assignee} | **优先级:** {priority}
+**Generated at:** {date}
+**Issue link:** {jira_url}
+**Status:** {status} | **Assignee:** {assignee} | **Priority:** {priority}
 
-## 1. 问题概述
+## 1. Problem Overview
 {issue_description_summary}
 
-## 2. 事件时间线
-| 时间 | 来源 | 严重程度 | 事件 |
+## 2. Event Timeline
+| Time | Source | Severity | Event |
 |------|------|----------|------|
 | {timestamp} | {logcat/tombstone/ANR/kernel} | {INFO/WARN/ERROR/FATAL} | {description} |
 
-## 3. 关键异常/错误
-### 异常 1: {title}
-- **严重程度:** {FATAL/ERROR/WARN}
-- **来源:** {file}:{line}
-- **堆栈信息:**
+## 3. Key Exceptions / Errors
+### Exception 1: {title}
+- **Severity:** {FATAL/ERROR/WARN}
+- **Source:** {file}:{line}
+- **Stack trace:**
   {stack_trace}
 
-## 4. AOSP 源码分析
-{从 Phase 4 AOSP 源码上下文分析阶段收集的完整源码分析结果}
+## 4. AOSP Source Analysis
+{Complete source analysis collected during Phase 4 AOSP source context analysis}
 
-### 4.1 关键代码路径
-{针对每个崩溃相关的类/函数，列出 AOSP 源码路径、代码片段和功能说明}
+### 4.1 Key Code Paths
+{For each crash-related class/function, list the AOSP source path, code snippet, and functional description}
 
 #### {class_or_function_name} — {aosp_file_path}
-- **源码位置:** `{aosp/path/to/file.java}:{line_range}`
-- **代码片段:**
+- **Source location:** `{aosp/path/to/file.java}:{line_range}`
+- **Code snippet:**
   ```java
-  // 相关代码摘录（含行号）
+  // Relevant code excerpt with line numbers
   ```
-- **功能说明:** {该函数/类的作用}
-- **与崩溃的关联:** {此代码如何与日志中观察到的崩溃行为相关}
-- **错误处理分析:** {该代码对故障模式的处理方式，是否存在处理缺口}
+- **Functional description:** {what this function/class does}
+- **Relation to the crash:** {how this code relates to the crash behavior observed in logs}
+- **Error handling analysis:** {how this code handles the failure mode and whether there are handling gaps}
 
-### 4.2 已知问题与模式
-{AOSP 源码中发现的相关 TODO、FIXME、已知限制、相似崩溃模式}
+### 4.2 Known Issues and Patterns
+{Related TODOs, FIXMEs, known limitations, and similar crash patterns found in AOSP source}
 
-### 4.3 源码搜索缺口
-{搜索未返回结果的目标，可能需要进一步人工排查的部分}
+### 4.3 Source Search Gaps
+{Targets that returned no search results and may require further manual investigation}
 
-## 5. 根因假设排名
-| 排名 | 假设 | 置信度 | 关键证据 |
+## 5. Root-Cause Hypothesis Ranking
+| Rank | Hypothesis | Confidence | Key evidence |
 |------|------|--------|----------|
-| 1 | {title} | {高/中/低} | {evidence_summary} |
+| 1 | {title} | {high/medium/low} | {evidence_summary} |
 
-### 假设 1: {title} (置信度: {level})
-**支持证据:**
+### Hypothesis 1: {title} (Confidence: {level})
+**Supporting evidence:**
 - {point}
-**反对证据:**
+**Contradicting evidence:**
 - {point}
-**AOSP 上下文:** {relevant_source_findings}
+**AOSP context:** {relevant_source_findings}
 
-## 6. 受影响组件图
+## 6. Affected Component Diagram
 {ASCII diagram showing affected Android subsystems and their relationships}
 
-## 7. 建议修复方案
+## 7. Recommended Fix Plan
 1. {action with specific file/component reference}
 2. {action}
 ```
@@ -418,7 +418,7 @@ Why bad: AOSP search must run for ALL hypotheses, not just the highest-ranked on
 - `aosp-log-collector` subagent for JIRA issue metadata, log collection, archive handling, extracted directory preparation, and classification manifest generation
 - `aosp-log-parser` subagent for parsing the collector-generated classification manifest, timeline merge, and anomaly merge
 - mcp-atlassian for JIRA access (not jira-cli)
-- mcp__plugin_zaku_sourcepilot__* for AOSP source (always, not conditional) — **Phase 4 AOSP 源码分析是必选阶段**，除非十分确认问题与 AOSP 源码完全无关才可跳过
+- mcp__plugin_zaku_sourcepilot__* for AOSP source (always, not conditional) — **Phase 4 AOSP source analysis is mandatory**,skip only if absolutely certain the issue is completely unrelated to AOSP source
 - aosp-investigator subagent for both Phase 4 (AOSP context) and Phase 5 (hypothesis investigation)
 - All 7 report sections (in Chinese)
 - Report posted as JIRA comment via jira_add_comment

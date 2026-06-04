@@ -43,7 +43,7 @@ This skill does NOT parse logs, generate timelines, produce RCA hypotheses, or o
 
    **Input validation and routing:**
    1. If any remaining positional argument or `--dir` value is an existing directory, abort with: `This skill produces general AOSP technical reports, not crash RCA. Redirecting: use /aosp-rca --dir <path> --title '<title or description>'`.
-   2. If the topic text contains explicit RCA/log keywords (`crash`, `ANR`, `tombstone`, `logcat`, `kernel panic`, `root cause`, `RCA`, `崩溃`, `重启`, `日志`, `根因`), abort and redirect to `aosp-rca`.
+   2. If the topic text contains explicit RCA/log keywords (`crash`, `ANR`, `tombstone`, `logcat`, `kernel panic`, `root cause`, `RCA`, `crash`, `reboot`, `logs`, `root cause`), abort and redirect to `aosp-rca`.
    3. If `--title` is absent but positional text remains: use the positional text as the title.
    4. If `--title` is absent and no positional text remains: abort with:
       ```
@@ -69,10 +69,10 @@ This skill does NOT parse logs, generate timelines, produce RCA hypotheses, or o
    - AOSP: call `mcp__plugin_zaku_sourcepilot__list_projects()` — if fails, abort with "AOSP MCP (sourcepilot) unreachable. Check SOURCEPILOT_URL and SOURCEPILOT_KEY env vars."
 
 5. **Display active AOSP project**:
-   - If `--project` override was provided: display `**AOSP Project: <name> (命令行指定)**` and use this value. Skip reading `.granada/aosp-config.json`.
+   - If `--project` override was provided: display `**AOSP Project: <name> (specified on the command line)**` and use this value. Skip reading `.granada/aosp-config.json`.
    - Otherwise, read `.granada/aosp-config.json`:
      - If configured: display `**AOSP Project: <project_name>**`
-     - If not configured: display `**未配置 AOSP 项目** — 搜索将不限定项目范围。运行 /zaku:aosp-project 设置项目。`
+     - If not configured: display `**AOSP project is not configured** — Searches will not be limited to a project. Run /zaku:aosp-project to configure a project.`
 
 6. **Create temp directory**:
 ```bash
@@ -88,21 +88,21 @@ Extract structured search targets from the title and query. Spawn an analyst sub
 Agent(
   subagent_type="zaku:aosp-analyst",
   model="opus",
-  prompt="从以下 AOSP 技术报告主题中提取结构化的源码搜索目标。
+  prompt="Extract structured source search targets from the following AOSP technical report topic.
 
-报告主题: <title>
-附加查询: <query or "无">
+Report topic: <title>
+Additional query: <query or "none">
 
-提取以下信息:
-1. 核心 AOSP 组件/服务/类名 (如 SurfaceFlinger, AudioFlinger, WindowManagerService)
-2. 相关的 native 库 (如 libsurfaceflinger.so, libaudioflinger.so)
-3. 涉及的子系统 (如 display, audio, input, power, camera)
-4. 关键函数/方法名 (如 onMessageReceived, setTransactionState)
-5. 推荐的搜索关键词 (AOSP 模块名、接口名、配置项)
+Extract the following information:
+1. Core AOSP component/service/class names (such as SurfaceFlinger, AudioFlinger, WindowManagerService)
+2. Relevant native libraries (such as libsurfaceflinger.so, libaudioflinger.so)
+3. Involved subsystems (such as display, audio, input, power, camera)
+4. Key function/method names (such as onMessageReceived, setTransactionState)
+5. Recommended search keywords (AOSP module names, interface names, and configuration items)
 
-将目标按子系统分组为 2-3 个搜索集群。
+Group targets into 2-3 search clusters by subsystem.
 
-输出 JSON 格式保存到 /tmp/aosp-analyze-<slug>/search-targets.json:
+Save JSON output to /tmp/aosp-analyze-<slug>/search-targets.json:
 {
   \"title\": \"<title>\",
   \"clusters\": [
@@ -182,66 +182,66 @@ Wait for all agents to complete. If an agent fails or times out, note the gap bu
 2. **Build the 8-section Chinese report** and save to `.granada/specs/aosp-analyze-{slug}.md` after redacting common secrets from all included title/query text, copied issue text, URLs, headers, command output, and source/investigation excerpts (authorization headers, bearer tokens, API keys, passwords, access/refresh/id tokens, cookies, session IDs, private keys, and signed URL token/key/signature query values):
 
 ```markdown
-# AOSP 技术分析报告: {slug} — {title}
+# AOSP Technical Analysis Report: {slug} — {title}
 
-**生成时间:** {date}
-**分析项目:** {project_name or "未限定"}
-**查询范围:** {query or "未指定"}
+**Generated at:** {date}
+**Analysis project:** {project_name or "unrestricted"}
+**Query scope:** {query or "unspecified"}
 
-## 1. 概述
-{简要说明分析的主题、涉及的子系统和核心组件。2-3 句话总结主要发现。}
+## 1. Overview
+{Briefly explain the analysis topic, involved subsystems, and core components. Summarize key findings in 2-3 sentences.}
 
-## 2. 受影响组件图
+## 2. Affected Component Diagram
 {ASCII box-drawing diagram showing the analyzed component, its subsystem context, related components, and their data/control relationships}
 
-## 3. 关键源码路径
-| 文件 | 路径 | 说明 |
+## 3. Key Source Paths
+| File | Path | Description |
 |------|------|------|
-| {filename} | `{aosp/repo/path/to/file}` | {简要说明} |
+| {filename} | `{aosp/repo/path/to/file}` | {brief description} |
 
-## 4. 核心类/函数
+## 4. Core Classes / Functions
 ### {class_or_function_name}
-- **源码位置:** `{path}:{line_range}`
-- **功能说明:** {what it does}
-- **关键代码:**
+- **Source location:** `{path}:{line_range}`
+- **Functional description:** {what it does}
+- **Key code:**
   ```java
-  // 核心逻辑摘录
+  // core logic excerpt
   ```
-- **关联组件:** {connected components}
+- **Related components:** {connected components}
 
 {Repeat for each core class/function}
 
-## 5. 调用/数据流
+## 5. Call / Data Flow
 {Describe the call flow and data flow between components. Use ASCII diagrams for sequence or flow.}
 
-### 调用链
+### Call Chain
 {description of the call chain}
 
-### 数据流
+### Data Flow
 {description of how data moves through the system}
 
-## 6. 接口与配置
+## 6. Interfaces and Configuration
 {List interfaces, configuration parameters, system properties, build flags, or runtime settings that affect behavior.}
 
-### 关键接口
-| 接口 | 位置 | 说明 |
+### Key Interfaces
+| Interface | Location | Description |
 |------|------|------|
 
-### 配置参数
-| 参数 | 默认值 | 说明 |
+### Configuration Parameters
+| Parameter | Default value | Description |
 |------|--------|------|
 
-## 7. 扩展点与风险
-### 扩展点
+## 7. Extension Points and Risks
+### Extension Points
 {Where and how the code can be extended, overridden, or customized}
 
-### 已知风险/限制
+### Known Risks / Limitations
 {Known limitations, TODOs, FIXMEs found in source, potential race conditions, or areas needing attention}
 
-### 源码搜索缺口
+### Source Search Gaps
 {Targets that returned no results — may require manual investigation}
 
-## 8. 后续建议
+## 8. Next Steps
 1. {actionable suggestion with specific file/component references}
 2. {actionable suggestion}
 3. {optional: areas for deeper investigation}
@@ -276,7 +276,7 @@ Wait for all agents to complete. If an agent fails or times out, note the gap bu
 User: /aosp-analyze --title "SurfaceFlinger display pipeline architecture" --project android-14
 
 [Phase 1] Title: SurfaceFlinger display pipeline architecture. Slug: surfaceflinger-display-pipeline-archit.
-          AOSP MCP health check pass. AOSP Project: android-14 (命令行指定)
+          AOSP MCP health check pass. AOSP Project: android-14 (specified on the command line)
 [Phase 2] Spawned analyst → extracted 3 clusters: SurfaceFlinger core, HWC, DispSync
           Saved search-targets.json.
 [Phase 3] Spawned 3 aosp-investigator agents in parallel.

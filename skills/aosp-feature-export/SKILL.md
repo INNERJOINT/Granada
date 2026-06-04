@@ -11,14 +11,14 @@ Documents vendor/third-party features added on top of AOSP. Takes a concrete ven
 
 **Key distinction:** The feature being documented is NOT an AOSP built-in feature. It is a vendor customization — code added or modified by the third-party vendor on top of AOSP. The AOSP search phase finds the original context that the vendor code interacts with.
 
-**Scope principle:** One export should describe one concrete vendor feature slice, such as `AIUD 在 Settings 中的定制功能`, not a broad module-level topic like `Settings 定制` or `Connectivity 定制`. If the input is too broad, first run bounded coarse exploration, save the split-candidate result to `.granada/aosp-exports/<slug>-split.md`, list concrete sub-feature candidates with evidence, stop without exporting a full report, and tell the user to run the skill again with one selected sub-feature.
+**Scope principle:** One export should describe one concrete vendor feature slice, such as `AIUD customization in Settings`, not a broad module-level topic like `Settings customization` or `Connectivity customization`. If the input is too broad, first run bounded coarse exploration, save the split-candidate result to `.granada/aosp-exports/<slug>-split.md`, list concrete sub-feature candidates with evidence, stop without exporting a full report, and tell the user to run the skill again with one selected sub-feature.
 
 ## Usage
 
 ```
-/zaku:aosp-feature-export "公共DNS"
+/zaku:aosp-feature-export "Public DNS"
 /zaku:aosp-feature-export "fingerprint unlock"
-/zaku:aosp-feature-export "AIUD 在 Settings 中的定制功能"
+/zaku:aosp-feature-export "AIUD customization in Settings"
 ```
 
 The only user input is the concrete vendor feature description. If additional vendor modification context or previous export context is needed, the skill should discover it from the conversation or ask for it during the protocol rather than exposing it as command-line flags.
@@ -32,7 +32,7 @@ Call `mcp__plugin_zaku_sourcepilot__list_projects()` to verify the MCP server is
 
 After health check passes, read `.granada/aosp-config.json` to display the active AOSP project:
 - If configured: display `**🔍 AOSP Project: <project_name>**` prominently
-- If not configured: display `**⚠ 未配置 AOSP 项目** — 搜索将不限定项目范围。运行 /zaku:aosp-project 设置项目。`
+- If not configured: display `**⚠ AOSP project is not configured** — Searches will not be limited to a project. Run /zaku:aosp-project to configure a project.`
 
 (The `aosp-investigator` subagent reads this config and passes `project` to search calls automatically — no need to inject it into spawn prompts.)
 
@@ -223,10 +223,10 @@ The orchestrator's only heavy-lifting phase — merge investigator reports into 
 5. Synthesize "Implementation method" and "implementation rationale" from concrete code paths and snippets. Do not produce a broad architecture survey unless it directly explains the vendor solution.
 6. Map cross-project dependencies only when they are required to explain the implementation path.
 6b. **Adaptive template sections:**
-   - If the feature is small, use condensed output and fold interface/path summaries into "实现路径".
-   - If no AIDL/HIDL interfaces found, omit "关键接口" and mention relevant APIs inside implementation steps.
+   - If the feature is small, use condensed output and fold interface/path summaries into "Implementation Path".
+   - If no AIDL/HIDL interfaces found, omit "Key Interfaces" and mention relevant APIs inside implementation steps.
    - If only 1 AOSP project discovered, omit a separate project summary table unless it clarifies the implementation.
-   - If no cross-project dependencies are required to explain the solution, omit "依赖关系".
+   - If no cross-project dependencies are required to explain the solution, omit "Dependencies".
    - **Always include:** Overview, Vendor Problem and Solution, Implementation Method, Key Context Code, Verification Method, Investigation Log
 7. Build the canonical output document **in English** using the template below
 
@@ -366,7 +366,7 @@ Skill is idempotent — re-running with the same inputs overwrites the output fi
 
 ## Keyword Triggers
 
-- `"aosp export"`, `"aosp feature export"`, `"功能元导出"`, `"feature export"`
+- `"aosp export"`, `"aosp feature export"`, `"feature element export"`, `"feature export"`
 
 ## Configuration
 
