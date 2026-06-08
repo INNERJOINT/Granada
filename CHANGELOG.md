@@ -1,3 +1,9 @@
+## [2.21.0](https://github.com/INNERJOINT/Granada/compare/v2.20.0...v2.21.0) (2026-06-08)
+
+### Features
+
+* **skills:** define FOSD feature import/export workflow ([9df2883](https://github.com/INNERJOINT/Granada/commit/9df28837a453ce9bc8d722e6e367d466fd9e1371))
+
 ## [2.20.0](https://github.com/INNERJOINT/Granada/compare/v2.19.0...v2.20.0) (2026-06-04)
 
 ### Features
