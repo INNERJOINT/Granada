@@ -156,7 +156,7 @@ Spawn 3 `zaku:aosp-investigator` subagents in parallel. Each investigator search
 ```
 Agent(
   subagent_type="zaku:aosp-investigator",
-  model="opus",
+  model="sonnet",
   prompt="Investigate AOSP for a VENDOR feature meta-slice.
 
 This is a third-party/vendor customization, NOT an AOSP built-in feature.

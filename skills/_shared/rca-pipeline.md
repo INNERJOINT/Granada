@@ -87,6 +87,7 @@ Group search targets into 2-3 clusters by subsystem, then spawn one aosp-investi
 ```
 Agent(
   subagent_type="zaku:aosp-investigator",
+  model="sonnet",
   prompt="[If --project override is active, prepend: **AOSP Project Override:** Use project `<name>` for ALL mcp__plugin_zaku_sourcepilot__* search calls. Do NOT read `.granada/aosp-config.json`.]
 
 Search AOSP source code for this RCA target cluster from search-targets.json:
@@ -192,6 +193,7 @@ Spawn one agent per hypothesis (max 3). Each agent receives Phase 4 context to a
 ```
 Agent(
   subagent_type="zaku:aosp-investigator",
+  model="sonnet",
   prompt="[If --project override is active, prepend: **AOSP Project Override:** Use project `<name>` for ALL mcp__plugin_zaku_sourcepilot__* search calls.]
 
 Investigate this Android crash hypothesis for <MODE_NAME> analysis <ANALYSIS_ID>:

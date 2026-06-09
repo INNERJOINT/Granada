@@ -185,7 +185,7 @@ If `--skip-source-verify` is set, skip source investigators and use the package 
 ```
 Agent(
   subagent_type="zaku:aosp-investigator",
-  model="opus",
+  model="sonnet",
   prompt="Verify source context for a vendor feature meta-slice import.
 
 AOSP Project Override: Use project '<source_project>' for ALL mcp__plugin_zaku_sourcepilot__* search calls. Do NOT read .granada/aosp-config.json.
@@ -214,7 +214,7 @@ Report source status, current signatures/context, evidence freshness, and source
 ```
 Agent(
   subagent_type="zaku:aosp-investigator",
-  model="opus",
+  model="sonnet",
   prompt="Map a vendor feature meta-slice element into the TARGET AOSP project.
 
 AOSP Project Override: Use project '<target_project>' for ALL mcp__plugin_zaku_sourcepilot__* search calls. Do NOT read .granada/aosp-config.json.
@@ -278,7 +278,7 @@ For `deep`, run up to 4 rounds and up to 8 Phase 2 agents total. Each round focu
 ```
 Agent(
   subagent_type="zaku:aosp-investigator",
-  model="opus",
+  model="sonnet",
   prompt="Deep gap investigation for a vendor feature meta-slice import.
 
 AOSP Project Override: Use project '<target_project>' for ALL mcp__plugin_zaku_sourcepilot__* search calls.
@@ -487,7 +487,7 @@ Skill is idempotent: re-running with the same inputs overwrites the output file.
 ## Tool Usage
 
 - `mcp__plugin_zaku_sourcepilot__*`: AOSP MCP health check and AOSP code search through investigators
-- `Agent(subagent_type="zaku:aosp-investigator", model="opus")`: parallel source and target investigation
+- `Agent(subagent_type="zaku:aosp-investigator", model="sonnet")`: parallel source and target investigation
 - `Read`: parse meta-slice package and `.granada/aosp-config.json`
 - `Write`: save import map
 - `Skill("zaku:aosp-plan")`: explicit planning handoff after saving the import map
