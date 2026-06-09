@@ -1,3 +1,9 @@
+## [2.21.1](https://github.com/INNERJOINT/Granada/compare/v2.21.0...v2.21.1) (2026-06-09)
+
+### Bug Fixes
+
+* **skills:** use sonnet for AOSP investigators ([40a9874](https://github.com/INNERJOINT/Granada/commit/40a9874a31ffd484926f2a7584139ea435ed2292))
+
 ## [2.21.0](https://github.com/INNERJOINT/Granada/compare/v2.20.0...v2.21.0) (2026-06-08)
 
 ### Features
