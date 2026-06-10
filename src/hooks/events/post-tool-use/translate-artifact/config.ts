@@ -102,9 +102,9 @@ export function readTranslationConfig(cwd: string, { fs, env = {}, pluginRoot, s
   }
 
   const metadata = parseFrontmatter(fs.readFileSync(skillPath, 'utf8'));
-  const dirs = parseList(metadata['translate-dirs']);
+  const dirs = parseList(metadata['artifacts-dirs']);
   if (dirs.length === 0) {
-    throw new Error(`missing translate-dirs in ${skillPath}`);
+    throw new Error(`missing artifacts-dirs in ${skillPath}`);
   }
 
   const lang = getTranslationLang(env);

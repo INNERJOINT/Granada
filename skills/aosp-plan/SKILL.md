@@ -2,7 +2,7 @@
 description: AOSP investigation-driven planning with consensus review
 argument-hint: <AOSP investigation query>
 model: opus
-translate-dirs: [.granada/plans]
+artifacts-dirs: [.granada/plans]
 ---
 
 # AOSP Plan Skill

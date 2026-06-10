@@ -2,7 +2,7 @@
 description: AOSP multi-repository execution engine that parses cross-repository change plans produced by aosp-plan and runs them in parallel
 argument-hint: <aosp-plan plan file path or query>
 model: opus
-translate-dirs: [.granada/aosp-autopilot-report]
+artifacts-dirs: [.granada/aosp-autopilot-report]
 ---
 
 # AOSP Autopilot Skill

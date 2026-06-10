@@ -10,7 +10,7 @@ export function resolveArtifactPaths(cwd, filePath, config) {
     const sourcePath = path.resolve(root, filePath);
     const allowedDirs = config.dirs.map(dir => path.resolve(root, dir));
     if (!allowedDirs.some(dir => isInside(dir, sourcePath))) {
-        return { skipped: true, reason: 'outside-translate-dirs', sourcePath };
+        return { skipped: true, reason: 'outside-artifacts-dirs', sourcePath };
     }
     const basename = path.basename(sourcePath);
     if (!basename.endsWith('.md')) {

@@ -2,7 +2,7 @@
 description: Import a six-layer AOSP vendor feature meta-slice package into another AOSP project and produce a plan-ready mapping guide
 argument-hint: '"<path-to-meta-slice-package>" [--target <project>] [--depth shallow|deep]'
 model: opus
-translate-dirs: [.granada/aosp-imports]
+artifacts-dirs: [.granada/aosp-imports]
 ---
 
 # AOSP Feature Import Skill

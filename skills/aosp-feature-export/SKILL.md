@@ -2,7 +2,7 @@
 description: Export a FOSD-style meta-slice package for vendor-modified or vendor-added AOSP features
 argument-hint: '"<vendor feature description>"'
 model: opus
-translate-dirs: [.granada/aosp-exports]
+artifacts-dirs: [.granada/aosp-exports]
 ---
 
 # AOSP Feature Export Skill

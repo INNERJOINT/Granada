@@ -70,7 +70,7 @@ describe('aosp-feature-export translation hook', () => {
     return cwd;
   }
 
-  function makeProject(frontmatter = 'translate-dirs: [.granada/aosp-exports]') {
+  function makeProject(frontmatter = 'artifacts-dirs: [.granada/aosp-exports]') {
     const cwd = makeBareProject();
     mkdirSync(join(cwd, 'skills', 'translate-md-zh'), { recursive: true });
     mkdirSync(join(cwd, 'skills', 'aosp-feature-export'), { recursive: true });
@@ -402,8 +402,8 @@ describe('aosp-feature-export translation hook', () => {
     expect(queuedRecords).toHaveLength(0);
   });
 
-  it('Stop drain translates any queued .granada markdown without legacy translate-dirs narrowing', async () => {
-    const cwd = makeProject('translate-dirs: [.granada/aosp-exports]');
+  it('Stop drain translates any queued .granada markdown without legacy artifacts-dirs narrowing', async () => {
+    const cwd = makeProject('artifacts-dirs: [.granada/aosp-exports]');
     const docsDir = join(cwd, '.granada', 'other');
     mkdirSync(docsDir, { recursive: true });
     writeFileSync(join(docsDir, 'note.md'), '# English\n\nRuntime only', 'utf8');
@@ -467,7 +467,7 @@ describe('aosp-feature-export translation hook', () => {
     expect(info.stderr).toContain('[info] translate start source=');
     expect(info.stderr).toContain('[info] translate success source=');
     expect(debug.exitCode).toBe(0);
-    expect(debug.stderr).toContain('[debug] skip reason=outside-translate-dirs');
+    expect(debug.stderr).toContain('[debug] skip reason=outside-artifacts-dirs');
     expect(error.exitCode).toBe(0);
     expect(error.stderr).toContain('[error] translate failed source=');
     expect(error.stderr).not.toContain('[info]');
@@ -490,8 +490,8 @@ describe('aosp-feature-export translation hook', () => {
     expect(existsSync(join(cwd, 'README_zh.md'))).toBe(false);
   });
 
-  it('reads translate-dirs from skill frontmatter', async () => {
-    const cwd = makeProject('translate-dirs: [docs]');
+  it('reads artifacts-dirs from skill frontmatter', async () => {
+    const cwd = makeProject('artifacts-dirs: [docs]');
     mkdirSync(join(cwd, 'docs'), { recursive: true });
     writeFileSync(join(cwd, 'docs', 'guide.md'), '# English', 'utf8');
     writeFileSync(join(cwd, '.granada', 'aosp-exports', 'feature.md'), '# English', 'utf8');
@@ -508,7 +508,7 @@ describe('aosp-feature-export translation hook', () => {
   });
 
   it('invokes translate-command without a shell', async () => {
-    const cwd = makeProject('translate-dirs: [.granada/aosp-exports]');
+    const cwd = makeProject('artifacts-dirs: [.granada/aosp-exports]');
     writeFileSync(join(cwd, '.granada', 'aosp-exports', 'feature.md'), '# English', 'utf8');
 
     const { exitCode } = await runTranslationHook(cwd, makeExportInput(cwd, '.granada/aosp-exports/feature.md'), {
@@ -557,7 +557,7 @@ describe('aosp-feature-export translation hook', () => {
   });
 
   it('rejects unsafe translate-command metacharacters', async () => {
-    const cwd = makeProject('translate-dirs: [.granada/aosp-exports]');
+    const cwd = makeProject('artifacts-dirs: [.granada/aosp-exports]');
     writeFileSync(join(cwd, '.granada', 'aosp-exports', 'feature.md'), '# English', 'utf8');
 
     const { exitCode, json } = await runTranslationHook(cwd, makeExportInput(cwd, '.granada/aosp-exports/feature.md'), {
