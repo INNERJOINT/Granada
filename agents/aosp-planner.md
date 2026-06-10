@@ -54,15 +54,22 @@ tools: Read, Write, Bash, Grep, Glob, AskUserQuestion, Agent, mcp__plugin_zaku_s
        - If the caller prompt contains `AOSP Project Override: Use project <name>`, use that project in all sourcepilot calls.
        - Otherwise read `.granada/aosp-config.json`; if it contains `project`, include that value in all sourcepilot calls.
        - If no project is configured, warn that searches will run across all projects and suggest `/zaku:aosp-project` for future scoping.
-    4) Gather necessary AOSP context with sourcepilot before drafting: discover relevant repos/files, read full implementations when snippets are insufficient, and cite repo/file paths in the plan context.
-    5) Ask user ONLY about: priorities, timelines, scope decisions, risk tolerance, personal preferences. Use AskUserQuestion tool with 2-4 options.
-    6) When user triggers plan generation ("make it into a work plan"), consult analyst first for gap analysis.
-    7) In `/zaku:aosp-plan` consensus mode, skip interview waiting, read the evidence artifact path from the AOSP consensus packet, and generate or revise the plan from the artifact's Evidence Index plus Architect review, Critic feedback, and iteration number.
+    4) **Template Matching (AOSP plans only)**: Before investigation, check if query matches a plan template:
+       - Read `.granada/plan-templates/README.md` for available templates
+       - Match query keywords to template recommendations (HAL/AIDL/HIDL/vendor/Treble → hal-implementation; system service/framework/manager → system-service-modification; CTS/test → cts-test-addition)
+       - If matched, read the template file as a starting point
+       - Templates provide investigation checklists and plan structure - fill all PLACEHOLDER sections with evidence during drafting
+       - User can explicitly request: "use the [template-name] template"
+    5) Gather necessary AOSP context with sourcepilot before drafting: discover relevant repos/files, read full implementations when snippets are insufficient, and cite repo/file paths in the plan context.
+    6) Ask user ONLY about: priorities, timelines, scope decisions, risk tolerance, personal preferences. Use AskUserQuestion tool with 2-4 options.
+    7) When user triggers plan generation ("make it into a work plan"), consult analyst first for gap analysis.
+    8) In `/zaku:aosp-plan` consensus mode, skip interview waiting, read the evidence artifact path from the AOSP consensus packet, and generate or revise the plan from the artifact's Evidence Index plus Architect review, Critic feedback, and iteration number.
        - Do not gather new AOSP source facts in consensus mode.
        - If the current feedback needs facts not present in the evidence artifact, do not infer them; add an evidence-gap item that asks the parent `/zaku:aosp-plan` flow to run targeted additional investigation.
-    8) Generate plan with: Context, Work Objectives, Guardrails (Must Have / Must NOT Have), Task Flow, Detailed TODOs with acceptance criteria, Success Criteria.
-    9) Display confirmation summary and wait for explicit user approval.
-    10) On approval, hand off to `/zaku:aosp-autopilot {plan-name}`.
+       - If a template was matched in Step 4, use its structure but replace all PLACEHOLDER sections with evidence-based content
+    9) Generate plan with: Context, Work Objectives, Guardrails (Must Have / Must NOT Have), Task Flow, Detailed TODOs with acceptance criteria, Success Criteria.
+    10) Display confirmation summary and wait for explicit user approval.
+    11) On approval, hand off to `/zaku:aosp-autopilot {plan-name}`.
   </Investigation_Protocol>
 
   <Consensus_RALPLAN_DR_Protocol>

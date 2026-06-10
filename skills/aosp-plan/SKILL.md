@@ -161,7 +161,62 @@ Rules:
 - Consensus agent prompts should pass the evidence artifact path plus a compact summary, not the full investigator output inline.
 - The final `## Sources` section must expand each cited `E#` to the full repo/path, metadata, and relevant snippet summary.
 
-### Step 4.5: Synthesis Review (--interactive only)
+### Step 4.5: Risk Scoring and Deliberate Mode Auto-Trigger
+
+After evidence artifact is saved, calculate risk score from evidence and query context:
+
+**Risk Factors Analysis** (extract from Evidence Index + query text):
+- **Code impact scope** (0-50 points):
+  - Single file modification: +10
+  - Cross-module modification: +30
+  - Cross-process boundary (Binder/AIDL/HIDL/IPC): +50
+- **Stability risks** (0-50 points, capped at 50):
+  - @SystemApi modification: +40
+  - SELinux policy change: +30
+  - Boot sequence modification: +50
+  - Binder interface: +35
+  - AIDL interface: +35
+  - HIDL interface: +35
+  - Treble boundary crossing: +40
+  - Public API modification: +45
+  - Multi-partition changes: +35
+  - Kernel/DT modification: +50
+  - Multi-user impact: +20
+  - Multi-display impact: +20
+- **Test coverage gaps** (0-30 points, capped at 30):
+  - Missing unit tests: +20
+  - Missing CTS coverage: +30
+  - Missing VTS coverage: +25
+
+**Risk Score Thresholds**:
+- Total >= 70: **Force deliberate mode** (override `--deliberate` flag)
+- Total 50-69: **Suggest deliberate mode** (log recommendation, proceed with current mode)
+- Total < 50: **Short mode** (default)
+
+**Display risk assessment**:
+```markdown
+## Risk Assessment
+**Total Score:** [X/100]
+**Recommendation:** [short / suggest-deliberate / force-deliberate]
+
+**Breakdown:**
+- Code Impact: [X/50]
+- Stability: [X/50]
+- Test Coverage: [X/30]
+
+**Triggered Factors:**
+- [Factor 1]
+- [Factor 2]
+...
+
+**Mode Decision:** [Proceeding with SHORT mode / DELIBERATE mode auto-triggered]
+```
+
+If deliberate mode is force-triggered, update the consensus packet with:
+- `Deliberate mode: auto-triggered by risk score [X/100]`
+- `Triggered factors: [list]`
+
+### Step 4.6: Synthesis Review (--interactive only)
 
 If running with `--interactive`, use `AskUserQuestion` to present synthesis results with these options:
 - **Proceed to consensus planning phase** (Recommended) — generate the structured plan through Planner -> Architect -> Critic consensus
@@ -178,11 +233,13 @@ Build a compact **AOSP consensus packet** and pass it to every consensus agent. 
 - Evidence artifact path: `.granada/plans/aosp-<slug>-evidence.md`
 - Original query and flags
 - Active AOSP project/config state
-- Deliberate-mode trigger and reason, if applicable
+- Risk score and auto-triggered deliberate mode status (if applicable)
+- Deliberate-mode trigger and reason (explicit `--deliberate` or auto-triggered)
 - Short synthesis summary, conflicts, gaps, and confidence notes
 - Evidence Index summary with stable `E#` IDs, source mappings, and `type`/`strength`/`facet` metadata
-- Step 4.5 user feedback, if any
+- Step 4.6 user feedback, if any
 - Current iteration number
+- Convergence history: array of iteration snapshots with plan hash, feedback, evidence IDs, and verdict
 - Previous plan markdown, if any
 - Previous `ARCHITECT_REVIEW`, if any
 - Previous Critic verdict and feedback, if any
@@ -326,16 +383,31 @@ VERDICT: REJECT
 
 No verdict, multiple verdicts, synonyms, conditional verdicts, or ambiguous wording MUST be treated as `VERDICT: ITERATE`. Malformed Critic output must be recorded in the Consensus Review Changelog as non-compliant/malformed.
 
-#### Step 5d: Consensus loop
+#### Step 5d: Consensus loop with convergence detection
 
-The consensus loop is capped at 5 iterations:
+The consensus loop is capped at 5 iterations with intelligent early termination:
 1. Planner creates or revises the draft plan from the consensus packet and referenced evidence artifact.
 2. Architect reviews the draft and returns `ARCHITECT_REVIEW`.
 3. Critic evaluates the draft and returns exactly one `VERDICT`.
-4. Only `VERDICT: APPROVE` exits the loop.
-5. `VERDICT: ITERATE`, `VERDICT: REJECT`, missing verdict, malformed verdict, or ambiguous verdict means Planner MUST revise the plan using Architect and Critic feedback, add a Consensus Review Changelog entry, then rerun Architect and Critic.
-6. If Architect or Critic reports evidence gaps requiring additional investigation, pause the consensus loop, return to Step 2/3 for targeted investigation, update the evidence artifact with new Evidence Index IDs, then resume consensus with the updated artifact.
-7. If 5 iterations complete without approval, save the best available version with unresolved blockers clearly listed. The saved plan remains `**Status:** pending approval`.
+4. **Convergence check** (after iteration 2+): Analyze iteration history using convergence detection logic:
+   - **Plan similarity**: Compare current plan hash to previous iteration (text similarity)
+   - **Feedback similarity**: Compare Architect + Critic feedback to previous iteration
+   - **Evidence stability**: Percentage of overlapping Evidence Index IDs between iterations
+   - **Oscillation detection**: Check if current iteration is similar to iteration N-2 but different from N-1 (stuck in loop)
+5. **Early termination conditions**:
+   - `VERDICT: APPROVE` → Exit immediately
+   - Converged (plan similarity > 95%, feedback similarity > 80%, evidence overlap > 90%) + `APPROVE` → Exit with success message
+   - Oscillating (current similar to N-2, different from N-1) after 3+ iterations → Escalate to user with "Loop is stuck, recommend human review"
+   - Converged but not approved after iteration 3+ → Log convergence in changelog, continue (quality issues remain)
+6. `VERDICT: ITERATE`, `VERDICT: REJECT`, missing verdict, malformed verdict, or ambiguous verdict means Planner MUST revise the plan using Architect and Critic feedback, add a Consensus Review Changelog entry including convergence metrics, then rerun Architect and Critic.
+7. If Architect or Critic reports evidence gaps requiring additional investigation, pause the consensus loop, return to Step 2/3 for targeted investigation, update the evidence artifact with new Evidence Index IDs, then resume consensus with the updated artifact.
+8. If 5 iterations complete without approval, save the best available version with unresolved blockers clearly listed. The saved plan remains `**Status:** pending approval`.
+
+**Convergence metrics to log in changelog each iteration**:
+- Plan change percentage vs. previous iteration
+- Feedback similarity percentage
+- Evidence Index overlap percentage
+- Oscillation warning if detected
 
 `VERDICT: REJECT` is non-terminal inside the Step 5 consensus loop. Step 7 user rejection remains terminal.
 
