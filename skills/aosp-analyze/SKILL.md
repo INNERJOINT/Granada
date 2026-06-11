@@ -1,12 +1,12 @@
 ---
-description: General AOSP source/module/function technical report — analyze a feature, module, function, or subsystem via AOSP source search and produce a structured technical report.
-argument-hint: '[--project <name>]'
+description: General AOSP source/module/function/build-artifact technical report — analyze a feature, module, function, generated file, build artifact, or subsystem via AOSP source search and produce a structured technical report.
+argument-hint: '[<analysis topic>] [--project <name>]'
 artifacts-dirs: [.granada/aosp-analyze]
 model: opus
 ---
 
 <Purpose>
-Produces a structured technical report about an AOSP module, function, feature, or subsystem. Delegates target extraction to `zaku:aosp-analyst` and source investigation to `zaku:aosp-investigator` subagents, then synthesises findings into a concise report saved to `.granada/aosp-analyze/`.
+Produces a structured technical report about an AOSP module, function, feature, generated file, build artifact, or subsystem. Delegates target extraction to `zaku:aosp-analyst` and source investigation to `zaku:aosp-investigator` subagents, then synthesises findings into a concise report saved to `.granada/aosp-analyze/`.
 
 This skill does NOT parse logs, generate timelines, or output issue-debugging sections.
 </Purpose>
@@ -15,25 +15,27 @@ This skill does NOT parse logs, generate timelines, or output issue-debugging se
 
 ## Phase 1: Initialize
 
-1. **Parse `{{ARGUMENTS}}`** only for optional project selection:
+1. **Parse `{{ARGUMENTS}}`** for an optional analysis topic and optional project selection:
 
    - `--project <value>` (pattern `--project\s+(\S+)`): Optional AOSP project override. Strip the flag from arguments.
-   - No other `{{ARGUMENTS}}` values are supported. The report topic must come from the user's natural-language request, not from command arguments.
+   - Any remaining non-empty `{{ARGUMENTS}}` text is the analysis topic. Preserve spaces and punctuation after trimming surrounding whitespace.
+   - Also inspect the user's natural-language request before the slash command. If both sources provide topic text, combine them only when they are complementary; otherwise prefer the explicit `{{ARGUMENTS}}` topic.
 
    **Input validation and routing:**
-   1. If any text remains in `{{ARGUMENTS}}` after stripping `--project`, abort with:
+   1. Reject only malformed flags (for example `--project` without a value, unknown `--flag` options, or path-like arguments that appear to be log directories/files). Abort with:
       ```
-      Unsupported arguments. aosp-analyze accepts only:
+      Unsupported arguments. aosp-analyze accepts:
+        <analysis topic>    AOSP module/function/feature/generated-file/build-artifact/partition-layout/subsystem to analyze
         --project <name>    Optional AOSP project override
 
-      Put the analysis topic in the user request, not in ARGUMENTS.
+      This skill only analyzes AOSP source and build artifacts; log files and crash dumps are outside its scope.
       ```
-   2. Resolve `title` from the user's natural-language request: the AOSP module, function, feature, subsystem, or component they want analyzed.
+   2. Resolve `title` from `{{ARGUMENTS}}` topic text first, falling back to the user's natural-language request: the AOSP module, function, feature, generated file, build artifact, partition layout, subsystem, or component they want analyzed.
    3. If no clear topic can be resolved, abort with:
       ```
-      No topic provided. Describe the AOSP module, function, feature, subsystem, or component to analyze.
-      Optional argument:
-        --project <name>    AOSP project override
+      No topic provided. Describe the AOSP module, function, feature, generated file, build artifact, partition layout, subsystem, or component to analyze.
+      Optional usage:
+        /zaku:aosp-analyze <analysis topic> [--project <name>]
       ```
 
 2. **Generate and validate a slug** from the resolved title:
@@ -75,10 +77,10 @@ Report topic: <title>
 
 Extract the following information:
 1. Core AOSP component/service/class names (such as SurfaceFlinger, AudioFlinger, WindowManagerService)
-2. Relevant native libraries (such as libsurfaceflinger.so, libaudioflinger.so)
-3. Involved subsystems (such as display, audio, input, power, camera)
+2. Relevant native libraries, generated artifacts, or build outputs (such as libsurfaceflinger.so, libaudioflinger.so, MT6768_Android_scatter.txt)
+3. Involved subsystems (such as display, audio, input, power, camera, storage, build, partition layout)
 4. Key function/method names (such as onMessageReceived, setTransactionState)
-5. Recommended search keywords (AOSP module names, interface names, and configuration items)
+5. Recommended search keywords (AOSP module names, interface names, make/Soong targets, generated file names, and configuration items)
 
 Group targets into 2-3 search clusters by subsystem.
 
@@ -234,8 +236,8 @@ Wait for all agents to complete. If an agent fails or times out, note the gap bu
 
 <Error_Handling>
 - **AOSP MCP unreachable** → abort with "AOSP MCP (sourcepilot) unreachable. Check SOURCEPILOT_URL and SOURCEPILOT_KEY env vars."
-- **Unsupported arguments** → abort with "Unsupported arguments. aosp-analyze accepts only --project <name>."
-- **No topic provided** → abort with "No topic provided. Describe the AOSP module, function, feature, subsystem, or component to analyze."
+- **Unsupported arguments** → abort with "Unsupported arguments. aosp-analyze accepts <analysis topic> and optional --project <name>. This skill only analyzes AOSP source and build artifacts; log files and crash dumps are outside its scope."
+- **No topic provided** → abort with "No topic provided. Describe the AOSP module, function, feature, generated file, build artifact, partition layout, subsystem, or component to analyze."
 - **Target extraction fails** → abort with "Target extraction failed — search-targets.json missing."
 - **AOSP search returns no results** → note "no AOSP source found" in report, do not fail
 - **Agent timeout/failure** → mark cluster as "investigation incomplete", continue with others
@@ -253,8 +255,8 @@ Wait for all agents to complete. If an agent fails or times out, note the gap bu
 <Examples>
 <Good>
 ```
-User request: Analyze the SurfaceFlinger display pipeline architecture in AOSP.
-{{ARGUMENTS}}: --project android-14
+User request: (slash command invoked directly)
+{{ARGUMENTS}}: SurfaceFlinger display pipeline architecture in AOSP --project android-14
 
 [Phase 1] Topic: SurfaceFlinger display pipeline architecture. Slug: surfaceflinger-display-pipeline-archit.
           AOSP MCP health check pass. AOSP Project: android-14 (specified on the command line)
@@ -267,7 +269,7 @@ User request: Analyze the SurfaceFlinger display pipeline architecture in AOSP.
           Saved 8 source-finding-*.md files.
 [Phase 4] Report saved to .granada/aosp-analyze/aosp-analyze-surfaceflinger-display-pipeline-archit.md (8 sections).
 ```
-Why good: The topic is in the user request, `{{ARGUMENTS}}` contains only the project override, and parallel agents are maximized. Report has all 8 sections with ASCII diagrams, call flows, and configuration tables.
+Why good: The topic is accepted from `{{ARGUMENTS}}`, `--project` is parsed as an option, and parallel agents are maximized. Report has all 8 sections with ASCII diagrams, call flows, and configuration tables.
 </Good>
 
 <Good>
@@ -288,15 +290,32 @@ User request: Analyze the Binder IPC mechanism, focusing on the driver, ServiceM
 Why good: No command arguments are needed when project config already exists. The user request carries the analysis scope.
 </Good>
 
+<Good>
+```
+User request: (slash command invoked directly)
+{{ARGUMENTS}}: 最终编译产物 MT6768_Android_scatter.txt 的来源和作用；想获取 logcat 日志应该回读 scatter 里的哪块区域
+
+[Phase 1] Topic: 最终编译产物 MT6768_Android_scatter.txt 的来源和作用；想获取 logcat 日志应该回读 scatter 里的哪块区域.
+          Slug: MT6768_Android_scatter.txt.
+          AOSP MCP health check pass.
+[Phase 2] Spawned analyst → extracted clusters: scatter generation/build, partition layout, log persistence/storage.
+[Phase 3] Spawned 3 aosp-investigator agents in parallel.
+          Cluster 1: Found scatter generation scripts/config.
+          Cluster 2: Found partition mapping and generated partition attributes.
+          Cluster 3: Found log persistence / pstore / userdata-cache related code paths if present.
+[Phase 4] Report explains both the build artifact provenance and why live logcat is normally not read from a scatter partition, with source-backed alternatives.
+```
+Why good: Generated build artifacts and partition-layout questions are valid aosp-analyze topics even when the user asks an operational follow-up. The skill should analyze source/build provenance and clarify storage/log collection concepts, not reject the topic as unsupported arguments.
+</Good>
+
 <Bad>
 ```
-User request: Analyze Binder IPC mechanism.
-{{ARGUMENTS}}: Binder IPC mechanism
+User request: 请分析这个 crash log 并找 root cause.
+{{ARGUMENTS}}: /tmp/logs --project android-14
 
-[Phase 1] Unsupported ARGUMENTS. Abort: "aosp-analyze accepts only --project <name>.
-          Put the analysis topic in the user request, not in ARGUMENTS."
+[Phase 1] Unsupported ARGUMENTS. Abort: "This skill only analyzes AOSP source and build artifacts; log files and crash dumps are outside its scope."
 ```
-Why good: Enforces that `{{ARGUMENTS}}` contains only project selection.
+Why bad for aosp-analyze: Log directories and crash/RCA requests are outside this general source/build-artifact analysis skill.
 </Bad>
 </Examples>
 
