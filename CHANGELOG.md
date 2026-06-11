@@ -1,3 +1,9 @@
+## [2.22.0](https://github.com/INNERJOINT/Granada/compare/v2.21.1...v2.22.0) (2026-06-11)
+
+### Features
+
+* **aosp-plan:** implement P0 high-priority improvements ([2a68b8f](https://github.com/INNERJOINT/Granada/commit/2a68b8fe24ac22cebe93ad349a2cec4fc37bd7c7))
+
 ## [2.21.1](https://github.com/INNERJOINT/Granada/compare/v2.21.0...v2.21.1) (2026-06-09)
 
 ### Bug Fixes
