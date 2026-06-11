@@ -1,56 +1,39 @@
 ---
-description: General AOSP source/module/function technical report — analyze a feature, module, function, or subsystem via AOSP source search and produce a structured Chinese technical report. For crash/ANR/tombstone/log-based root-cause analysis, use aosp-rca instead.
-argument-hint: '--title <description> [--query <description>] [--project <name>] [--fresh]'
+description: General AOSP source/module/function technical report — analyze a feature, module, function, or subsystem via AOSP source search and produce a structured technical report.
+argument-hint: '[--project <name>]'
+artifacts-dirs: [.granada/aosp-analyze]
 model: opus
-handoff: .granada/specs/aosp-analyze-{slug}.md
-level: 3
 ---
 
 <Purpose>
-Produces a structured Chinese technical report about an AOSP module, function, feature, or subsystem. Delegates target extraction to `zaku:aosp-analyst` and source investigation to `zaku:aosp-investigator` subagents, then synthesises findings into a concise report saved to `.granada/specs/`.
+Produces a structured technical report about an AOSP module, function, feature, or subsystem. Delegates target extraction to `zaku:aosp-analyst` and source investigation to `zaku:aosp-investigator` subagents, then synthesises findings into a concise report saved to `.granada/aosp-analyze/`.
 
-This skill does NOT parse logs, generate timelines, produce RCA hypotheses, or output root-cause analysis sections. For crash/ANR/tombstone/log-based root-cause analysis, redirect to `aosp-rca`.
+This skill does NOT parse logs, generate timelines, or output issue-debugging sections.
 </Purpose>
-
-<Use_When>
-- User wants a technical overview of an AOSP class, function, module, or subsystem
-- User says "aosp analyze", "aosp_analyze", or "aosp source analyze"
-- User asks "how does <component> work in AOSP?" or "explain the <subsystem> architecture"
-- User wants to understand call flows, data flows, interfaces, or configuration of AOSP code
-- User provides a query about AOSP internals without crash logs
-</Use_When>
-
-<Do_Not_Use_When>
-- User provides crash logs, tombstone files, ANR traces, or kernel dumps — use aosp-rca instead
-- User wants root-cause analysis or hypothesis investigation — use aosp-rca
-- User says "aosp rca", "analyze logs", "crash analyze" — these map to aosp-rca
-- User wants code modifications or an implementation plan — use aosp-plan
-- User wants to export feature documentation across projects — use aosp-feature-export
-</Do_Not_Use_When>
 
 <Steps>
 
 ## Phase 1: Initialize
 
-1. **Parse `{{ARGUMENTS}}`** to extract flags and positional text:
+1. **Parse `{{ARGUMENTS}}`** only for optional project selection:
 
-   - `--title <value>` (pattern `--title\s+(.+?)(?:\s+--|\s*$)`): Required. The report topic description. Strip the flag from arguments.
-   - `--query <value>` (pattern `--query\s+(.+?)(?:\s+--|\s*$)`): Optional. Additional search or scope refinement keywords. Strip the flag.
-   - `--project <value>` (pattern `--project\s+(\S+)`): Optional AOSP project override. Strip the flag.
-   - `--dir <path>`: Directory input is not supported here; use it only for redirecting to `aosp-rca`.
-   - `--fresh` (boolean flag): Force clean start. Strip from arguments.
-   - Any remaining positional text after flag stripping is appended to the query/title as additional context.
+   - `--project <value>` (pattern `--project\s+(\S+)`): Optional AOSP project override. Strip the flag from arguments.
+   - No other `{{ARGUMENTS}}` values are supported. The report topic must come from the user's natural-language request, not from command arguments.
 
    **Input validation and routing:**
-   1. If any remaining positional argument or `--dir` value is an existing directory, abort with: `This skill produces general AOSP technical reports, not crash RCA. Redirecting: use /aosp-rca --dir <path> --title '<title or description>'`.
-   2. If the topic text contains explicit RCA/log keywords (`crash`, `ANR`, `tombstone`, `logcat`, `kernel panic`, `root cause`, `RCA`, `crash`, `reboot`, `logs`, `root cause`), abort and redirect to `aosp-rca`.
-   3. If `--title` is absent but positional text remains: use the positional text as the title.
-   4. If `--title` is absent and no positional text remains: abort with:
+   1. If any text remains in `{{ARGUMENTS}}` after stripping `--project`, abort with:
       ```
-      No topic provided. Provide one of:
-        --title <description>    Report topic (required)
-        --query <description>    Additional search keywords (optional)
-        positional text          Additional context appended to query
+      Unsupported arguments. aosp-analyze accepts only:
+        --project <name>    Optional AOSP project override
+
+      Put the analysis topic in the user request, not in ARGUMENTS.
+      ```
+   2. Resolve `title` from the user's natural-language request: the AOSP module, function, feature, subsystem, or component they want analyzed.
+   3. If no clear topic can be resolved, abort with:
+      ```
+      No topic provided. Describe the AOSP module, function, feature, subsystem, or component to analyze.
+      Optional argument:
+        --project <name>    AOSP project override
       ```
 
 2. **Generate and validate a slug** from the resolved title:
@@ -62,27 +45,25 @@ This skill does NOT parse logs, generate timelines, produce RCA hypotheses, or o
    - Require `^[A-Za-z0-9._-]{1,40}$`.
    - Derive `target="/tmp/aosp-analyze-${slug}"` and require the resolved target to start with `/tmp/aosp-analyze-`.
 
-3. **Fresh start cleanup** (after slug and target validation):
-   - If `--fresh` flag is present: remove the validated temp directory with `rm -rf -- "$target"` before continuing.
-
-4. **MCP health check**:
+3. **MCP health check**:
    - AOSP: call `mcp__plugin_zaku_sourcepilot__list_projects()` — if fails, abort with "AOSP MCP (sourcepilot) unreachable. Check SOURCEPILOT_URL and SOURCEPILOT_KEY env vars."
 
-5. **Display active AOSP project**:
+4. **Display active AOSP project**:
    - If `--project` override was provided: display `**AOSP Project: <name> (specified on the command line)**` and use this value. Skip reading `.granada/aosp-config.json`.
    - Otherwise, read `.granada/aosp-config.json`:
      - If configured: display `**AOSP Project: <project_name>**`
      - If not configured: display `**AOSP project is not configured** — Searches will not be limited to a project. Run /zaku:aosp-project to configure a project.`
 
-6. **Create temp directory**:
+5. **Create a clean temp directory** (after slug and target validation):
 ```bash
 target="/tmp/aosp-analyze-${slug}"
+rm -rf -- "$target"
 mkdir -p -- "$target"
 ```
 
 ## Phase 2: Target Extraction
 
-Extract structured search targets from the title and query. Spawn an analyst subagent:
+Extract structured search targets from the resolved title. Spawn an analyst subagent:
 
 ```
 Agent(
@@ -91,7 +72,6 @@ Agent(
   prompt="Extract structured source search targets from the following AOSP technical report topic.
 
 Report topic: <title>
-Additional query: <query or "none">
 
 Extract the following information:
 1. Core AOSP component/service/class names (such as SurfaceFlinger, AudioFlinger, WindowManagerService)
@@ -179,14 +159,13 @@ Wait for all agents to complete. If an agent fails or times out, note the gap bu
 
 1. **Read all findings** from `/tmp/aosp-analyze-<slug>/source-finding-*.md` and `/tmp/aosp-analyze-<slug>/search-targets.json`.
 
-2. **Build the 8-section Chinese report** and save to `.granada/specs/aosp-analyze-{slug}.md` after redacting common secrets from all included title/query text, copied issue text, URLs, headers, command output, and source/investigation excerpts (authorization headers, bearer tokens, API keys, passwords, access/refresh/id tokens, cookies, session IDs, private keys, and signed URL token/key/signature query values):
+2. **Build the 8-section technical report** and save to `.granada/aosp-analyze/aosp-analyze-{slug}.md` after redacting common secrets from all included topic text, user-provided context, copied issue text, URLs, headers, command output, and source/investigation excerpts (authorization headers, bearer tokens, API keys, passwords, access/refresh/id tokens, cookies, session IDs, private keys, and signed URL token/key/signature query values):
 
 ```markdown
 # AOSP Technical Analysis Report: {slug} — {title}
 
 **Generated at:** {date}
 **Analysis project:** {project_name or "unrestricted"}
-**Query scope:** {query or "unspecified"}
 
 ## 1. Overview
 {Briefly explain the analysis topic, involved subsystems, and core components. Summarize key findings in 2-3 sentences.}
@@ -255,7 +234,8 @@ Wait for all agents to complete. If an agent fails or times out, note the gap bu
 
 <Error_Handling>
 - **AOSP MCP unreachable** → abort with "AOSP MCP (sourcepilot) unreachable. Check SOURCEPILOT_URL and SOURCEPILOT_KEY env vars."
-- **No topic provided** → abort with "No topic provided. Provide --title <description>."
+- **Unsupported arguments** → abort with "Unsupported arguments. aosp-analyze accepts only --project <name>."
+- **No topic provided** → abort with "No topic provided. Describe the AOSP module, function, feature, subsystem, or component to analyze."
 - **Target extraction fails** → abort with "Target extraction failed — search-targets.json missing."
 - **AOSP search returns no results** → note "no AOSP source found" in report, do not fail
 - **Agent timeout/failure** → mark cluster as "investigation incomplete", continue with others
@@ -265,17 +245,18 @@ Wait for all agents to complete. If an agent fails or times out, note the gap bu
 
 <Tool_Usage>
 - `mcp__plugin_zaku_sourcepilot__*` — search AOSP source for target classes, functions, and modules
-- `Agent(subagent_type="zaku:aosp-analyst", model="opus")` — target extraction from title/query (Phase 2)
+- `Agent(subagent_type="zaku:aosp-analyst", model="opus")` — target extraction from the resolved topic (Phase 2)
 - `Agent(subagent_type="zaku:aosp-investigator", model="sonnet")` — parallel source investigation (Phase 3)
-- `Write` — save final report to `.granada/specs/aosp-analyze-{slug}.md`
+- `Write` — save final report to `.granada/aosp-analyze/aosp-analyze-{slug}.md`
 </Tool_Usage>
 
 <Examples>
 <Good>
 ```
-User: /aosp-analyze --title "SurfaceFlinger display pipeline architecture" --project android-14
+User request: Analyze the SurfaceFlinger display pipeline architecture in AOSP.
+{{ARGUMENTS}}: --project android-14
 
-[Phase 1] Title: SurfaceFlinger display pipeline architecture. Slug: surfaceflinger-display-pipeline-archit.
+[Phase 1] Topic: SurfaceFlinger display pipeline architecture. Slug: surfaceflinger-display-pipeline-archit.
           AOSP MCP health check pass. AOSP Project: android-14 (specified on the command line)
 [Phase 2] Spawned analyst → extracted 3 clusters: SurfaceFlinger core, HWC, DispSync
           Saved search-targets.json.
@@ -284,47 +265,38 @@ User: /aosp-analyze --title "SurfaceFlinger display pipeline architecture" --pro
           Cluster 2 (HWC): Found HWComposer HAL interface, Composer HAL aidl.
           Cluster 3 (DispSync): Found DispSync.cpp, EventThread, VSYNC scheduling.
           Saved 8 source-finding-*.md files.
-[Phase 4] Report saved to .granada/specs/aosp-analyze-surfaceflinger-display-pipeline-archit.md (Chinese, 8 sections).
+[Phase 4] Report saved to .granada/aosp-analyze/aosp-analyze-surfaceflinger-display-pipeline-archit.md (8 sections).
 ```
-Why good: Clear title, project specified, parallel agents maximized. Report has all 8 sections with ASCII diagrams, call flows, and configuration tables.
+Why good: The topic is in the user request, `{{ARGUMENTS}}` contains only the project override, and parallel agents are maximized. Report has all 8 sections with ASCII diagrams, call flows, and configuration tables.
 </Good>
 
 <Good>
 ```
-User: /aosp-analyze --title "Binder IPC mechanism" --query "driver, ServiceManager, transaction"
+User request: Analyze the Binder IPC mechanism, focusing on the driver, ServiceManager, and transaction flow.
+{{ARGUMENTS}}: (empty)
 
-[Phase 1] Title: Binder IPC mechanism. Query: driver, ServiceManager, transaction.
-          Slug: binder-ipc-mechanism. AOSP MCP health check pass.
+[Phase 1] Topic: Binder IPC mechanism. Slug: binder-ipc-mechanism. AOSP MCP health check pass.
           AOSP Project: android-14 (from .granada/aosp-config.json)
 [Phase 2] Spawned analyst → extracted 2 clusters: Binder driver/kernel, Binder framework/java.
-          Search targets refined by query keywords.
+          Search targets refined from the request context.
 [Phase 3] Spawned 2 aosp-investigator agents in parallel.
           Cluster 1: Found binder.c, binder_internal.h, ioctl interface.
           Cluster 2: Found Binder.java, ServiceManager.java, BpBinder, BBinder.
           Saved 6 source-finding-*.md files.
-[Phase 4] Report saved to .granada/specs/aosp-analyze-binder-ipc-mechanism.md (Chinese, 8 sections).
+[Phase 4] Report saved to .granada/aosp-analyze/aosp-analyze-binder-ipc-mechanism.md (8 sections).
 ```
-Why good: --query refines search scope. Two clusters cover kernel and framework layers.
+Why good: No command arguments are needed when project config already exists. The user request carries the analysis scope.
 </Good>
 
 <Bad>
 ```
-User: /aosp-analyze /tmp/crash-logs --title "SystemUI crash"
+User request: Analyze Binder IPC mechanism.
+{{ARGUMENTS}}: Binder IPC mechanism
 
-[Phase 1] Detected directory path in arguments. This is a crash log directory.
-          Abort: "This skill produces general AOSP technical reports, not crash RCA.
-          Redirecting: use /aosp-rca --dir /tmp/crash-logs --title 'SystemUI crash'"
+[Phase 1] Unsupported ARGUMENTS. Abort: "aosp-analyze accepts only --project <name>.
+          Put the analysis topic in the user request, not in ARGUMENTS."
 ```
-Why good: Correctly detects log directory input and redirects to aosp-rca instead of trying to process logs.
-</Bad>
-
-<Bad>
-```
-User: /aosp-analyze
-
-[Phase 1] No topic provided. Abort: "No topic provided. Provide --title <description>."
-```
-Why good: Requires a topic — does not silently proceed with empty analysis.
+Why good: Enforces that `{{ARGUMENTS}}` contains only project selection.
 </Bad>
 </Examples>
 
@@ -333,15 +305,14 @@ Why good: Requires a topic — does not silently proceed with empty analysis.
 - mcp__plugin_zaku_sourcepilot__* for AOSP source search (always, not conditional)
 - aosp-investigator subagents for parallel source investigation (Phase 3)
 - analyst subagent for search target extraction (Phase 2)
-- All 8 report sections (in Chinese)
-- Report saved to `.granada/specs/aosp-analyze-{slug}.md`
-- Redirect crash/log-directory inputs to aosp-rca
+- All 8 report sections
+- Report saved to `.granada/aosp-analyze/aosp-analyze-{slug}.md`
 
 **Must NOT have:**
 - Log parsing, log collection, or timeline construction phases
-- Hypothesis generation or root-cause analysis sections
+- Issue-debugging hypothesis sections
 - JIRA MCP dependency
-- Crash signature extraction or anomaly detection
+- Failure signature extraction or anomaly detection
 - Confidence rankings or evidence evaluation
 - log-unboxer, aosp-log-collector, or aosp-log-parser dependencies
 </Guardrails>
