@@ -1,3 +1,9 @@
+## [2.22.1](https://github.com/INNERJOINT/Granada/compare/v2.22.0...v2.22.1) (2026-06-11)
+
+### Bug Fixes
+
+* **aosp-analyze:** accept inline analysis topics ([71b7e04](https://github.com/INNERJOINT/Granada/commit/71b7e0467177558448ea90eaa834927c2dddaee9))
+
 ## [2.22.0](https://github.com/INNERJOINT/Granada/compare/v2.21.1...v2.22.0) (2026-06-11)
 
 ### Features
