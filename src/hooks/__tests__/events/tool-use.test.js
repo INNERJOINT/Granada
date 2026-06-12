@@ -17,18 +17,24 @@ describe('plugin PostToolUse hook manifest', () => {
     const manifestPath = resolve(import.meta.dirname, '../../../../hooks/hooks.json');
     const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
     const entry = manifest.hooks.PostToolUse[0];
-    const enqueueHook = entry.hooks[0];
+    const [writeHook, editHook] = entry.hooks;
     const stopEntry = manifest.hooks.Stop[0];
     const drainHook = stopEntry.hooks[0];
 
-    expect(entry.hooks).toHaveLength(1);
-    expect(entry.matcher).toBe('Write|Edit|Update');
-    expect(enqueueHook.type).toBe('command');
-    expect(enqueueHook.if).toBeUndefined();
-    expect(enqueueHook.command).toBe('node');
-    expect(enqueueHook.args[0]).toBe('${CLAUDE_PLUGIN_ROOT}/scripts/hooks/adapters/claude-entry.cjs');
-    expect(enqueueHook.args[1]).toBe('enqueue-artifact');
-    expect(enqueueHook.timeout).toBe(360);
+    expect(entry.hooks).toHaveLength(2);
+    expect(entry.matcher).toBe('Write|Edit');
+    expect(writeHook.type).toBe('command');
+    expect(writeHook.if).toBe('Write(*/.granada/**)');
+    expect(writeHook.command).toBe('node');
+    expect(writeHook.args[0]).toBe('${CLAUDE_PLUGIN_ROOT}/scripts/hooks/adapters/claude-entry.cjs');
+    expect(writeHook.args[1]).toBe('enqueue-artifact');
+    expect(writeHook.timeout).toBe(360);
+    expect(editHook.type).toBe('command');
+    expect(editHook.if).toBe('Edit(*/.granada/**)');
+    expect(editHook.command).toBe('node');
+    expect(editHook.args[0]).toBe('${CLAUDE_PLUGIN_ROOT}/scripts/hooks/adapters/claude-entry.cjs');
+    expect(editHook.args[1]).toBe('enqueue-artifact');
+    expect(editHook.timeout).toBe(360);
 
     expect(stopEntry.matcher).toBeUndefined();
     expect(drainHook.type).toBe('command');
@@ -41,13 +47,13 @@ describe('plugin PostToolUse hook manifest', () => {
     expect(existsSync(resolve(import.meta.dirname, '../../../../scripts/hooks/adapters/claude-entry.cjs'))).toBe(true);
   });
 
-  it('pre-filters markdown writes under .granada while leaving loop prevention to the hook script', () => {
-    const rule = '*/.granada/*.md';
+  it('pre-filters writes under .granada while leaving loop prevention to the hook script', () => {
+    const rule = '*/.granada/**';
 
     expect(matchesClaudeWildcard(rule, '/repo/.granada/a.md')).toBe(true);
     expect(matchesClaudeWildcard(rule, '/repo/.granada/aosp-exports/feature.md')).toBe(true);
     expect(matchesClaudeWildcard(rule, '/repo/.granada/aosp-exports/nested/feature.md')).toBe(true);
-    expect(matchesClaudeWildcard(rule, '/repo/.granada/aosp-exports/feature.txt')).toBe(false);
+    expect(matchesClaudeWildcard(rule, '/repo/.granada/aosp-exports/feature.txt')).toBe(true);
     expect(matchesClaudeWildcard(rule, '/repo/granada/aosp-exports/feature.md')).toBe(false);
     expect(matchesClaudeWildcard(rule, '/repo/.granada/aosp-exports/feature_zh.md')).toBe(true);
   });
@@ -175,8 +181,7 @@ describe('aosp-feature-export translation hook', () => {
       translationDeps(cwd, { GRANADA_TRANSLATE_COMMAND: 'claude -p; echo unsafe' }),
     );
 
-    expect(output.hookSpecificOutput.hookEventName).toBe('PostToolUse');
-    expect(output.hookSpecificOutput.additionalContext).toContain('unsafe shell metacharacters');
+    expect(output.systemMessage).toContain('unsafe shell metacharacters');
     expect(existsSync(join(cwd, '.granada', 'aosp-exports', 'feature_zh.md'))).toBe(false);
   });
 
@@ -430,7 +435,7 @@ describe('aosp-feature-export translation hook', () => {
       baseInput('Stop', { cwd }),
       drainDeps(cwd, { GRANADA_TRANSLATE_COMMAND: 'claude -p; echo unsafe' }, [Date.UTC(2026, 5, 2, 3, 4, 5), Date.UTC(2026, 5, 2, 3, 4, 5)]),
     );
-    expect(failed.hookSpecificOutput.additionalContext).toContain('unsafe shell metacharacters');
+    expect(failed.systemMessage).toContain('unsafe shell metacharacters');
     expect(readFileSync(join(exportsDir, '20260602-110405-feature.md'), 'utf8')).toContain('Old');
 
     writeFileSync(source, '# English\n\nNew', 'utf8');
@@ -565,7 +570,7 @@ describe('aosp-feature-export translation hook', () => {
     });
 
     expect(exitCode).toBe(0);
-    expect(json.hookSpecificOutput.additionalContext).toContain('unsafe shell metacharacters');
+    expect(json.systemMessage).toContain('unsafe shell metacharacters');
     expect(existsSync(join(cwd, '.granada', 'aosp-exports', 'feature_zh.md'))).toBe(false);
   });
 
@@ -580,7 +585,7 @@ describe('aosp-feature-export translation hook', () => {
     });
 
     expect(exitCode).toBe(0);
-    expect(json.hookSpecificOutput.additionalContext).toContain('invalid SKILL.md path argument');
+    expect(json.systemMessage).toContain('invalid SKILL.md path argument');
     expect(existsSync(join(cwd, '.granada', 'aosp-exports', 'feature_zh.md'))).toBe(false);
   });
 
@@ -749,8 +754,8 @@ describe('aosp-feature-export translation hook', () => {
 
     const output = handleTimestampArtifactHook(makeExportInput(cwd, '.granada/aosp-exports/feature.md'), deps);
 
-    expect(output.hookSpecificOutput.additionalContext).toContain('destination already exists');
-    expect(output.hookSpecificOutput.additionalContext).toContain('feature.md');
+    expect(output.systemMessage).toContain('destination already exists');
+    expect(output.systemMessage).toContain('feature.md');
     expect(readFileSync(join(exportsDir, 'feature.md'), 'utf8')).toBe('source');
     expect(readFileSync(join(exportsDir, 'feature_zh.md'), 'utf8')).toBe('sibling');
     expect(readFileSync(join(exportsDir, '20260602-110405-feature.md'), 'utf8')).toBe('existing');
@@ -768,8 +773,8 @@ describe('aosp-feature-export translation hook', () => {
 
     const output = handleTimestampArtifactHook(makeExportInput(cwd, '.granada/aosp-exports/feature.md'), deps);
 
-    expect(output.hookSpecificOutput.additionalContext).toContain('destination already exists');
-    expect(output.hookSpecificOutput.additionalContext).toContain('feature_zh.md');
+    expect(output.systemMessage).toContain('destination already exists');
+    expect(output.systemMessage).toContain('feature_zh.md');
     expect(readFileSync(join(exportsDir, 'feature.md'), 'utf8')).toBe('source');
     expect(readFileSync(join(exportsDir, 'feature_zh.md'), 'utf8')).toBe('sibling');
     expect(existsSync(join(exportsDir, '20260602-110405-feature.md'))).toBe(false);

@@ -55,12 +55,9 @@ function sanitizeWarning(message: unknown): string {
     .slice(0, 500);
 }
 
-function warningOutput(eventName: string | undefined, message: unknown): HookObjectOutput {
+function warningOutput(message: unknown): HookObjectOutput {
   return {
-    hookSpecificOutput: {
-      hookEventName: eventName || 'Unknown',
-      additionalContext: `hook warning: ${sanitizeWarning(message)}`,
-    },
+    systemMessage: `hook warning: ${sanitizeWarning(message)}`,
   };
 }
 
@@ -106,7 +103,7 @@ async function run(runtime: HookRuntime): Promise<void> {
 
     if (output !== null && output !== undefined) writeJson(runtime, output);
   } catch (error) {
-    writeJson(runtime, warningOutput(input.hook_event_name, error instanceof Error ? error.message : String(error)));
+    writeJson(runtime, warningOutput(error instanceof Error ? error.message : String(error)));
   }
 }
 
@@ -128,6 +125,6 @@ export async function main(runtime: Partial<HookRuntime> = {}): Promise<void> {
   try {
     await run(resolvedRuntime);
   } catch (error) {
-    writeJson(resolvedRuntime, warningOutput(undefined, error instanceof Error ? error.message : String(error)));
+    writeJson(resolvedRuntime, warningOutput(error instanceof Error ? error.message : String(error)));
   }
 }

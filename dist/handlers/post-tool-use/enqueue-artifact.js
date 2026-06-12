@@ -2,7 +2,6 @@ import { composeHandlers, withResultNormalization, withWarningBoundary } from '.
 import { handleEnqueueArtifactHook } from '../../events/post-tool-use/enqueue-artifact/index.js';
 const handleEnqueueArtifactEntry = composeHandlers(handleEnqueueArtifactHook, [
     (handler) => withWarningBoundary(handler, {
-        hookEventName: 'PostToolUse',
         label: 'artifact enqueue warning',
     }),
     withResultNormalization,

@@ -4,12 +4,9 @@ import { getTranslatedSiblingPath, hasTranslationSuffix, stripLeadingTimestamp }
 import { readTranslationConfig } from './config.js';
 import { translateWithCommand } from './command.js';
 import { getCandidateReason, getWrittenFilePath, resolveArtifactPaths } from './path-policy.js';
-function warningOutput(message, hookEventName = 'PostToolUse') {
+function warningOutput(message) {
     return {
-        hookSpecificOutput: {
-            hookEventName,
-            additionalContext: `markdown translation warning: ${sanitizeLogMessage(message, 'translation failed')}`,
-        },
+        systemMessage: `markdown translation warning: ${sanitizeLogMessage(message, 'translation failed')}`,
     };
 }
 function cleanupTemp(fs, tempPath) {

@@ -4,7 +4,6 @@ import type { HookDeps, HookInput } from '../../types/hook.js';
 
 const handleTranslateArtifactEntry = composeHandlers(handleTranslateArtifactHook, [
   (handler) => withWarningBoundary(handler, {
-    hookEventName: 'PostToolUse',
     label: 'markdown translation warning',
   }),
   withResultNormalization,

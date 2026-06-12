@@ -2,12 +2,9 @@ import path from 'node:path';
 import { sanitizeLogMessage } from '../../../shared/logger.js';
 import { getTranslatedSiblingPath, getTranslationLang, stripLeadingTimestamp } from '../../../shared/artifact-paths.js';
 import { getPostToolUseCandidateReason, getToolFilePath, resolveGranadaArtifactSource } from '../../../shared/artifact-source-policy.js';
-function warningOutput(message, hookEventName = 'PostToolUse') {
+function warningOutput(message) {
     return {
-        hookSpecificOutput: {
-            hookEventName,
-            additionalContext: `markdown timestamp warning: ${sanitizeLogMessage(message, 'timestamp failed')}`,
-        },
+        systemMessage: `markdown timestamp warning: ${sanitizeLogMessage(message, 'timestamp failed')}`,
     };
 }
 function formatEast8Prefix(epochMs) {

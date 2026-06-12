@@ -14,12 +14,9 @@ export type TimestampArtifactResult = {
   copied: CopyPair[];
 };
 
-function warningOutput(message: unknown, hookEventName = 'PostToolUse'): HookObjectOutput {
+function warningOutput(message: unknown): HookObjectOutput {
   return {
-    hookSpecificOutput: {
-      hookEventName,
-      additionalContext: `markdown timestamp warning: ${sanitizeLogMessage(message, 'timestamp failed')}`,
-    },
+    systemMessage: `markdown timestamp warning: ${sanitizeLogMessage(message, 'timestamp failed')}`,
   };
 }
 

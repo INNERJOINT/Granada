@@ -6,10 +6,7 @@ import { processTranslateArtifact } from '../../post-tool-use/translate-artifact
 import { acquireDrainLock, clearFailureEntry, getPendingSourceRecords, getSessionKey, readFailureEntry, removeJournalRecords, sourceSnapshotMatches, writeFailureEntry, } from '../../../state/artifact-journal.js';
 function warningOutput(message) {
     return {
-        hookSpecificOutput: {
-            hookEventName: 'Stop',
-            additionalContext: `artifact drain warning: ${sanitizeLogMessage(message, 'artifact drain failed')}`,
-        },
+        systemMessage: `artifact drain warning: ${sanitizeLogMessage(message, 'artifact drain failed')}`,
     };
 }
 export async function handleDrainArtifactsHook(input, deps) {

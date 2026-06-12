@@ -2,7 +2,6 @@ import { composeHandlers, withResultNormalization, withWarningBoundary } from '.
 import { handleDrainArtifactsHook } from '../../events/stop/drain-artifacts/index.js';
 const handleDrainArtifactsEntry = composeHandlers(handleDrainArtifactsHook, [
     (handler) => withWarningBoundary(handler, {
-        hookEventName: 'Stop',
         label: 'artifact drain warning',
     }),
     withResultNormalization,

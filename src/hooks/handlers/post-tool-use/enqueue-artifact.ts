@@ -4,7 +4,6 @@ import type { HookDeps, HookInput } from '../../types/hook.js';
 
 const handleEnqueueArtifactEntry = composeHandlers(handleEnqueueArtifactHook, [
   (handler) => withWarningBoundary(handler, {
-    hookEventName: 'PostToolUse',
     label: 'artifact enqueue warning',
   }),
   withResultNormalization,

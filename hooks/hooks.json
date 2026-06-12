@@ -3,10 +3,18 @@
   "hooks": {
     "PostToolUse": [
       {
-        "matcher": "Write|Edit|Update",
+        "matcher": "Write|Edit",
         "hooks": [
           {
             "type": "command",
+            "if": "Write(*/.granada/**)",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/hooks/adapters/claude-entry.cjs", "enqueue-artifact"],
+            "timeout": 360
+          },
+          {
+            "type": "command",
+            "if": "Edit(*/.granada/**)",
             "command": "node",
             "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/hooks/adapters/claude-entry.cjs", "enqueue-artifact"],
             "timeout": 360

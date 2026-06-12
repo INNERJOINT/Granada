@@ -1,14 +1,10 @@
 import { sanitizeLogMessage } from '../shared/logger.js';
-function warningOutput(hookEventName, label, message) {
+function warningOutput(label, message) {
     return {
-        hookSpecificOutput: {
-            hookEventName,
-            additionalContext: `${label}: ${sanitizeLogMessage(message, 'hook failed')}`,
-        },
+        systemMessage: `${label}: ${sanitizeLogMessage(message, 'hook failed')}`,
     };
 }
 export function withWarningBoundary(handler, options = {}) {
-    const hookEventName = options.hookEventName || 'PostToolUse';
     const label = options.label || 'hook warning';
     return async (input, deps, context) => {
         try {
@@ -19,7 +15,7 @@ export function withWarningBoundary(handler, options = {}) {
             const logger = context?.logger || deps?.logger;
             if (logger && typeof logger.log === 'function')
                 logger.log('E', sanitizeLogMessage(message));
-            return warningOutput(hookEventName, label, message);
+            return warningOutput(label, message);
         }
     };
 }

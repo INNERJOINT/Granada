@@ -213,11 +213,8 @@ const warningRun = run('node', [adapterPath, 'translate-artifact'], {
   env: { ...process.env, GRANADA_TRANSLATE_LANG: 'zh', GRANADA_TRANSLATE_COMMAND: 'claude -p; echo unsafe' },
 });
 const warningOutput = JSON.parse(warningRun.stdout.trim());
-if (!warningOutput.hookSpecificOutput?.additionalContext?.includes('unsafe shell metacharacters')) {
+if (!warningOutput.systemMessage?.includes('unsafe shell metacharacters')) {
   throw new Error(`packed translate hook warning output did not mention unsafe shell metacharacters: ${warningRun.stdout}`);
-}
-if (warningOutput.hookSpecificOutput?.hookEventName !== 'PostToolUse') {
-  throw new Error('legacy translate warning should keep PostToolUse hook event name');
 }
 if (warningRun.stderr.trim()) throw new Error(`expected no stderr for warning path without GRANADA_DEBUG, got ${warningRun.stderr}`);
 if (existsSync(join(projectDir, '.granada', 'aosp-exports', 'failure_zh.md'))) {

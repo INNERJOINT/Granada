@@ -17,10 +17,7 @@ import {
 
 function warningOutput(message: unknown): HookObjectOutput {
   return {
-    hookSpecificOutput: {
-      hookEventName: 'Stop',
-      additionalContext: `artifact drain warning: ${sanitizeLogMessage(message, 'artifact drain failed')}`,
-    },
+    systemMessage: `artifact drain warning: ${sanitizeLogMessage(message, 'artifact drain failed')}`,
   };
 }
 

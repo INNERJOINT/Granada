@@ -4,7 +4,6 @@ import type { HookDeps, HookInput } from '../../types/hook.js';
 
 const handleDrainArtifactsEntry = composeHandlers(handleDrainArtifactsHook, [
   (handler) => withWarningBoundary(handler, {
-    hookEventName: 'Stop',
     label: 'artifact drain warning',
   }),
   withResultNormalization,

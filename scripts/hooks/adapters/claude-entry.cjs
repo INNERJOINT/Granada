@@ -13,10 +13,7 @@ function sanitizeWarning(message) {
 
 function writeFallbackWarning(message) {
   process.stdout.write(JSON.stringify({
-    hookSpecificOutput: {
-      hookEventName: 'PostToolUse',
-      additionalContext: `hook warning: ${sanitizeWarning(message)}`,
-    },
+    systemMessage: `hook warning: ${sanitizeWarning(message)}`,
   }));
 }
 

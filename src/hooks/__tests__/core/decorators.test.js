@@ -14,14 +14,12 @@ describe('hook decorators seam', () => {
     const handler = withWarningBoundary(() => {
       throw new Error(`boom${String.fromCharCode(0)}bad`);
     }, {
-      hookEventName: 'PostToolUse',
       label: 'markdown translation warning',
     });
 
     const output = await handler({}, { logger: { log: (level, message) => logs.push({ level, message }) } });
 
-    expect(output.hookSpecificOutput.hookEventName).toBe('PostToolUse');
-    expect(output.hookSpecificOutput.additionalContext).toBe('markdown translation warning: boombad');
+    expect(output.systemMessage).toBe('markdown translation warning: boombad');
     expect(logs).toEqual([{ level: 'E', message: 'boombad' }]);
   });
 

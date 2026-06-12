@@ -12,12 +12,9 @@ export type TranslateArtifactResult = {
   readSourcePath: string;
 } | null;
 
-function warningOutput(message: unknown, hookEventName = 'PostToolUse'): HookObjectOutput {
+function warningOutput(message: unknown): HookObjectOutput {
   return {
-    hookSpecificOutput: {
-      hookEventName,
-      additionalContext: `markdown translation warning: ${sanitizeLogMessage(message, 'translation failed')}`,
-    },
+    systemMessage: `markdown translation warning: ${sanitizeLogMessage(message, 'translation failed')}`,
   };
 }
 

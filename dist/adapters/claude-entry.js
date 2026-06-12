@@ -32,12 +32,9 @@ function sanitizeWarning(message) {
         .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
         .slice(0, 500);
 }
-function warningOutput(eventName, message) {
+function warningOutput(message) {
     return {
-        hookSpecificOutput: {
-            hookEventName: eventName || 'Unknown',
-            additionalContext: `hook warning: ${sanitizeWarning(message)}`,
-        },
+        systemMessage: `hook warning: ${sanitizeWarning(message)}`,
     };
 }
 function writeJson(runtime, value) {
@@ -81,7 +78,7 @@ async function run(runtime) {
             writeJson(runtime, output);
     }
     catch (error) {
-        writeJson(runtime, warningOutput(input.hook_event_name, error instanceof Error ? error.message : String(error)));
+        writeJson(runtime, warningOutput(error instanceof Error ? error.message : String(error)));
     }
 }
 export async function main(runtime = {}) {
@@ -102,6 +99,6 @@ export async function main(runtime = {}) {
         await run(resolvedRuntime);
     }
     catch (error) {
-        writeJson(resolvedRuntime, warningOutput(undefined, error instanceof Error ? error.message : String(error)));
+        writeJson(resolvedRuntime, warningOutput(error instanceof Error ? error.message : String(error)));
     }
 }

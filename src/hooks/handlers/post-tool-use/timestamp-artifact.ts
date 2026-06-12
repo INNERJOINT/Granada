@@ -4,7 +4,6 @@ import type { HookDeps, HookInput } from '../../types/hook.js';
 
 const handleTimestampArtifactEntry = composeHandlers(handleTimestampArtifactHook, [
   (handler) => withWarningBoundary(handler, {
-    hookEventName: 'PostToolUse',
     label: 'markdown timestamp warning',
   }),
   withResultNormalization,
