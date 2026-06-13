@@ -461,6 +461,11 @@ describe('aosp-feature-export translation hook', () => {
     const debug = await runTranslationHook(cwd, makeExportInput(cwd, 'README.md'), {
       env: { GRANADA_DEBUG: 'D', TRANSLATE_MD_ZH_MOCK_TEXT: '# 中文' },
     });
+    const verboseInput = makeExportInput(cwd, '.granada/aosp-exports/feature.md');
+    verboseInput.tool_input.content = `${'a'.repeat(600)}tail`;
+    const verbose = await runTranslationHook(cwd, verboseInput, {
+      env: { GRANADA_DEBUG: 'V', GRANADA_TRANSLATE_ENABLE: 'false' },
+    });
     const error = await runTranslationHook(cwd, makeExportInput(cwd, '.granada/aosp-exports/feature.md'), {
       env: {
         GRANADA_DEBUG: 'E',
@@ -473,6 +478,13 @@ describe('aosp-feature-export translation hook', () => {
     expect(info.stderr).toContain('[info] translate success source=');
     expect(debug.exitCode).toBe(0);
     expect(debug.stderr).toContain('[debug] skip reason=outside-artifacts-dirs');
+    expect(verbose.exitCode).toBe(0);
+    expect(verbose.stderr).toContain('[verbose] input {');
+    expect(verbose.stderr).toContain('"hook_event_name":"PostToolUse"');
+    expect(verbose.stderr).toContain('"file_path":".granada/aosp-exports/feature.md"');
+    expect(verbose.stderr).toContain('"content":"');
+    expect(verbose.stderr).toContain('… [+104 chars]');
+    expect(verbose.stderr).not.toContain('tail');
     expect(error.exitCode).toBe(0);
     expect(error.stderr).toContain('[error] translate failed source=');
     expect(error.stderr).not.toContain('[info]');

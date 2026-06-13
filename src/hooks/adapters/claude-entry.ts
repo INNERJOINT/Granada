@@ -61,6 +61,31 @@ function warningOutput(message: unknown): HookObjectOutput {
   };
 }
 
+const TOOL_INPUT_CONTENT_PREVIEW_CHARS = 500;
+
+function truncatePreview(value: string, limit = TOOL_INPUT_CONTENT_PREVIEW_CHARS): string {
+  if (value.length <= limit) return value;
+  return `${value.slice(0, limit)}… [+${value.length - limit} chars]`;
+}
+
+function inputForVerboseLog(input: HookInput): HookInput {
+  const toolInput = input.tool_input;
+  if (!toolInput || typeof toolInput !== 'object') return input;
+  const content = toolInput.content;
+  if (typeof content !== 'string' || content.length <= TOOL_INPUT_CONTENT_PREVIEW_CHARS) return input;
+  return {
+    ...input,
+    tool_input: {
+      ...toolInput,
+      content: truncatePreview(content),
+    },
+  };
+}
+
+function formatInputForVerboseLog(input: HookInput): string {
+  return JSON.stringify(inputForVerboseLog(input));
+}
+
 function writeJson(runtime: HookRuntime, value: HookObjectOutput): void {
   runtime.stdout.write(JSON.stringify(value));
 }
@@ -85,6 +110,13 @@ async function run(runtime: HookRuntime): Promise<void> {
       import(route) as Promise<HandlerModule>,
     ]);
 
+    const logger = createLogger({
+      env: runtime.env,
+      stderr: runtime.stderr,
+      prefix: `granada:${input.hook_event_name}:${handlerName || 'index'}`,
+    });
+    logger.log('V', `input ${formatInputForVerboseLog(input)}`);
+
     const output = await handlerModule.handle(input, {
       fs: runtime.fs,
       spawn: runtime.spawn,
@@ -94,11 +126,7 @@ async function run(runtime: HookRuntime): Promise<void> {
       skillPathArg: runtime.argv[3],
       pid: runtime.pid,
       now: runtime.now,
-      logger: createLogger({
-        env: runtime.env,
-        stderr: runtime.stderr,
-        prefix: `granada:${input.hook_event_name}:${handlerName || 'index'}`,
-      }),
+      logger,
     });
 
     if (output !== null && output !== undefined) writeJson(runtime, output);
