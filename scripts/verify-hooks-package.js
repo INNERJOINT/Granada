@@ -58,20 +58,22 @@ const postEntry = manifest.hooks?.PostToolUse?.[0];
 const postHooks = Array.isArray(postEntry?.hooks) ? postEntry.hooks : [];
 const stopEntry = manifest.hooks?.Stop?.[0];
 const stopHooks = Array.isArray(stopEntry?.hooks) ? stopEntry.hooks : [];
-const enqueueHook = postHooks.find(hook => hook?.args?.[1] === 'enqueue-artifact');
+const enqueueHooks = postHooks.filter(hook => hook?.args?.[1] === 'enqueue-artifact');
 const drainHook = stopHooks.find(hook => hook?.args?.[1] === 'drain-artifacts');
 
-if (postEntry?.matcher !== 'Write|Edit|Update') throw new Error('PostToolUse matcher is not Write|Edit|Update');
-if (postHooks.length !== 1) throw new Error(`expected exactly one PostToolUse hook, got ${postHooks.length}`);
-if (!enqueueHook) throw new Error('manifest missing enqueue-artifact hook');
-if (enqueueHook.if !== undefined) throw new Error('enqueue-artifact hook should not use manifest if filtering');
+if (postEntry?.matcher !== 'Write|Edit') throw new Error('PostToolUse matcher is not Write|Edit');
+if (postHooks.length !== 2) throw new Error(`expected exactly two PostToolUse hooks, got ${postHooks.length}`);
+if (enqueueHooks.length !== 2) throw new Error(`expected two enqueue-artifact hooks, got ${enqueueHooks.length}`);
+const [writeHook, editHook] = postHooks;
+if (writeHook?.if !== 'Write(*/.granada/**)') throw new Error(`Write enqueue hook if filter changed: ${writeHook?.if}`);
+if (editHook?.if !== 'Edit(*/.granada/**)') throw new Error(`Edit enqueue hook if filter changed: ${editHook?.if}`);
 if (JSON.stringify(postHooks).includes('timestamp-artifact') || JSON.stringify(postHooks).includes('translate-artifact')) {
   throw new Error('manifest PostToolUse path should not call legacy timestamp/translate routes');
 }
 if (stopEntry?.matcher !== undefined) throw new Error('Stop hook should not define a matcher');
 if (stopHooks.length !== 1) throw new Error(`expected exactly one Stop hook, got ${stopHooks.length}`);
 if (!drainHook) throw new Error('manifest missing drain-artifacts hook');
-for (const hook of [enqueueHook, drainHook]) {
+for (const hook of [...enqueueHooks, drainHook]) {
   if (hook?.command !== 'node') throw new Error('hook command is not node');
   if (hook?.args?.[0] !== '${CLAUDE_PLUGIN_ROOT}/scripts/hooks/adapters/claude-entry.cjs') {
     throw new Error('hook adapter manifest path changed');
