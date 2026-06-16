@@ -1,3 +1,14 @@
+## [2.23.0](https://github.com/INNERJOINT/Granada/compare/v2.22.1...v2.23.0) (2026-06-16)
+
+### Features
+
+* **hooks:** log hook input in verbose mode ([15881f4](https://github.com/INNERJOINT/Granada/commit/15881f4942025660a6bbdae81c51d166401e4564))
+
+### Bug Fixes
+
+* **hooks:** avoid context injection for artifact warnings ([54d61dd](https://github.com/INNERJOINT/Granada/commit/54d61dd7c0d4416e3de1c5d89656285474d3a059))
+* **hooks:** verify filtered artifact hooks ([756cc09](https://github.com/INNERJOINT/Granada/commit/756cc09b921639d41e89f9bb0c3ef0423b05c2aa))
+
 ## [2.22.1](https://github.com/INNERJOINT/Granada/compare/v2.22.0...v2.22.1) (2026-06-11)
 
 ### Bug Fixes
