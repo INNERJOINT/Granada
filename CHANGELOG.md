@@ -1,3 +1,13 @@
+## [3.0.0](https://github.com/INNERJOINT/Granada/compare/v2.23.0...v3.0.0) (2026-07-18)
+
+### ⚠ BREAKING CHANGES
+
+* **codex:** Granada now uses generated host-specific plugin surfaces. Codex installations must install zaku@zeonic-local from the repository marketplace instead of loading the repository root.
+
+### Features
+
+* **codex:** add first-class Codex plugin support ([088ff95](https://github.com/INNERJOINT/Granada/commit/088ff950eb398bb0b79a35e31b9f8f099bb154b7))
+
 ## [2.23.0](https://github.com/INNERJOINT/Granada/compare/v2.22.1...v2.23.0) (2026-06-16)
 
 ### Features
