@@ -1,16 +1,44 @@
 # Skills
 
-## `SKILL.md` YAML frontmatter
+The root `skills/` tree is Granada's canonical Claude Code workflow source. `scripts/sync-codex-plugin.mjs` converts that source into the Codex-compatible mirror under `plugins/zaku/skills/`; do not edit the generated mirror directly.
+
+## Host surfaces
+
+| Host | Skill location | Invocation |
+| --- | --- | --- |
+| Claude Code plugin | `skills/<skill-name>/SKILL.md` | `/zaku:<skill-name>` |
+| Codex plugin | `plugins/zaku/skills/<skill-name>/SKILL.md` (generated) | `$zaku:<skill-name>` |
+
+For example, invoke the planning workflow as `/zaku:aosp-plan "query"` in Claude Code and `$zaku:aosp-plan "query"` in Codex. The output style at `output-styles/diagrams-first.md` is also exported as the generated Codex skill `$zaku:diagrams-first`.
+
+The converter preserves shared Markdown content while adapting host-specific notation:
+
+- `/zaku:<name>` and Claude `Skill(...)` handoffs become `$zaku:<name>`.
+- `Agent(...)` / `Task(...)` blocks become declarative `delegate(...)` blocks interpreted through Codex collaboration tools.
+- Agent `model` / `level` hints become Codex reasoning effort, and roles that disallow `Write` or `Edit` receive a native `sandbox_mode = "read-only"` constraint.
+- `AskUserQuestion`, `ToolSearch`, `TodoWrite`, and `{{ARGUMENTS}}` are mapped to the Codex runtime contract.
+- Claude's `mcp__plugin_zaku_sourcepilot__*` namespace becomes Codex's `mcp__sourcepilot__*` namespace.
+- Every generated workflow points to `references/codex-compat.md`, which defines delegation, tool discovery, MCP naming, and workspace path behavior.
+
+Use the following commands after changing canonical skills or their shared references:
+
+```bash
+npm run sync:codex        # plugin mirror plus project .codex/agents
+npm run sync:codex-plugin # plugin mirror only
+npm run verify:codex      # read-only stale-surface check
+```
+
+## Claude Code `SKILL.md` YAML frontmatter
 
 According to the local Claude Code source, file-based skill frontmatter is primarily parsed by `parseSkillFrontmatterFields()` in `src/skills/loadSkillsDir.ts`.
 
-File-based skills must use the directory format:
+User/project file-based skills use the directory format below; a Claude Code plugin exposes the equivalent `<plugin-root>/skills/<skill-name>/SKILL.md` tree:
 
 ```text
 .claude/skills/<skill-name>/SKILL.md
 ```
 
-The `<skill-name>` directory name determines the skill invocation name; the `name` field in frontmatter is only a display name.
+The `<skill-name>` directory name determines the skill invocation name; the `name` field in frontmatter is only a display name. Granada's Claude Code plugin namespace adds the `zaku:` prefix at invocation time.
 
 ### Supported fields
 
@@ -71,6 +99,7 @@ The event keys for `hooks` come from Claude Code `HOOK_EVENTS`:
 - Frontmatter is not a strict schema: unknown fields are parsed by YAML but ignored by the file-based skill loader.
 - `aliases` only appears in programmatic bundled-skill definitions; it is not parsed as file-based `SKILL.md` frontmatter.
 - Boolean fields use `parseBooleanFrontmatter()`: only YAML `true` or string `"true"` is treated as true.
+- Codex frontmatter is generated separately and intentionally keeps only fields used by the generated runtime, including `name`, `description`, and workflow-specific `artifacts-dirs`.
 
 ### Source references
 

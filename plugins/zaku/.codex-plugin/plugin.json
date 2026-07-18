@@ -1,0 +1,42 @@
+{
+  "name": "zaku",
+  "version": "2.23.0",
+  "description": "Mass-production dev weapon — AOSP recon, JIRA elimination, Git ammo supply",
+  "author": {
+    "name": "INNERJOINT",
+    "url": "https://github.com/INNERJOINT"
+  },
+  "homepage": "https://github.com/INNERJOINT/Granada",
+  "repository": "https://github.com/INNERJOINT/Granada.git",
+  "license": "MIT",
+  "keywords": [
+    "aosp",
+    "android",
+    "jira",
+    "git",
+    "sourcepilot",
+    "codex"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Zaku for Codex",
+    "shortDescription": "AOSP analysis, Android RCA, planning, and Git workflows.",
+    "longDescription": "Granada brings its Zaku Android platform workflows to Codex with native skills, MCP servers, lifecycle hooks, and project-scoped specialist agents.",
+    "developerName": "INNERJOINT",
+    "category": "Developer Tools",
+    "capabilities": [
+      "AOSP source search",
+      "Android root-cause analysis",
+      "Multi-agent planning",
+      "Git workflows"
+    ],
+    "websiteURL": "https://github.com/INNERJOINT/Granada",
+    "defaultPrompt": [
+      "Analyze this Android issue with AOSP evidence.",
+      "Create a reviewed AOSP implementation plan.",
+      "Summarize the staged changes as a commit message."
+    ],
+    "brandColor": "#5B7F3A"
+  }
+}

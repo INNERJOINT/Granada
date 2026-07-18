@@ -16,7 +16,9 @@ function run(command, args, options = {}) {
 }
 
 function parsePackOutput(stdout) {
-  const packed = JSON.parse(stdout);
+  const jsonStart = stdout.indexOf('[');
+  if (jsonStart < 0) throw new Error(`npm pack did not return JSON:\n${stdout}`);
+  const packed = JSON.parse(stdout.slice(jsonStart));
   if (!Array.isArray(packed) || !packed[0]?.filename) {
     throw new Error('npm pack did not return a package filename');
   }
@@ -28,11 +30,21 @@ const tempRoot = mkdtempSync(join(tmpdir(), 'granada-hooks-package-'));
 const packDir = join(tempRoot, 'pack');
 const extractDir = join(tempRoot, 'extract');
 const projectDir = join(tempRoot, 'project');
+const npmCache = join(tempRoot, 'npm-cache');
 mkdirSync(packDir, { recursive: true });
 mkdirSync(extractDir, { recursive: true });
 mkdirSync(projectDir, { recursive: true });
+mkdirSync(npmCache, { recursive: true });
 
-const packResult = run('npm', ['pack', '--json', '--pack-destination', packDir], { cwd: root });
+const packResult = run('npm', ['pack', '--json', '--pack-destination', packDir], {
+  cwd: root,
+  env: {
+    ...process.env,
+    npm_config_cache: npmCache,
+    npm_config_loglevel: 'error',
+    npm_config_update_notifier: 'false',
+  },
+});
 const tarball = join(packDir, basename(parsePackOutput(packResult.stdout)));
 run('tar', ['-xzf', tarball, '-C', extractDir]);
 

@@ -1,0 +1,20 @@
+{
+  "name": "zeonic-local",
+  "interface": {
+    "displayName": "Zeonic Local"
+  },
+  "plugins": [
+    {
+      "name": "zaku",
+      "source": {
+        "source": "local",
+        "path": "./plugins/zaku"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

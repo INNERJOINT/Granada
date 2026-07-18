@@ -15,7 +15,7 @@
       "npmPublish": false
     }],
     ["@semantic-release/exec", {
-      "prepareCmd": "node scripts/sync-version.mjs ${nextRelease.version}"
+      "prepareCmd": "node scripts/sync-version.mjs ${nextRelease.version} && node scripts/sync-codex-plugin.mjs --check --plugin-only && node scripts/verify-codex-package.mjs"
     }],
     ["@semantic-release/git", {
       "assets": [
@@ -23,7 +23,9 @@
         "package-lock.json",
         "CHANGELOG.md",
         ".claude-plugin/plugin.json",
-        ".claude-plugin/marketplace.json"
+        ".claude-plugin/marketplace.json",
+        "plugins/zaku/.codex-plugin/plugin.json",
+        "plugins/zaku/package.json"
       ],
       "message": "chore(release): v${nextRelease.version}\n\n${nextRelease.notes}"
     }],

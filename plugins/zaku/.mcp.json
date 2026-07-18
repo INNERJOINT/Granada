@@ -1,0 +1,45 @@
+{
+  "mcpServers": {
+    "sourcepilot": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "./bridge/mcp-server.cjs"
+      ],
+      "cwd": ".",
+      "env_vars": [
+        "SOURCEPILOT_URL",
+        "SOURCEPILOT_KEY"
+      ],
+      "required": false,
+      "supports_parallel_tool_calls": true
+    },
+    "atlassian": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": [
+        "mcp-atlassian"
+      ],
+      "env_vars": [
+        "JIRA_URL",
+        "JIRA_PERSONAL_TOKEN",
+        "CONFLUENCE_URL",
+        "CONFLUENCE_PERSONAL_TOKEN"
+      ],
+      "required": false
+    },
+    "gitlab": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@zereight/mcp-gitlab"
+      ],
+      "env_vars": [
+        "GITLAB_PERSONAL_ACCESS_TOKEN",
+        "GITLAB_API_URL"
+      ],
+      "required": false
+    }
+  }
+}

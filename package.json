@@ -5,21 +5,47 @@
   "main": "bridge/mcp-server.cjs",
   "type": "module",
   "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/INNERJOINT/Granada.git"
   },
   "scripts": {
-    "build": "npm run build:hooks",
+    "build": "npm run build:hooks && npm run sync:codex-plugin",
     "typecheck:hooks": "tsc -p tsconfig.json --noEmit",
     "build:hooks": "tsc -p tsconfig.json",
+    "sync:codex": "node scripts/sync-codex-plugin.mjs",
+    "sync:codex-plugin": "node scripts/sync-codex-plugin.mjs --plugin-only",
+    "verify:codex": "node scripts/sync-codex-plugin.mjs --check",
+    "verify:codex-plugin": "node scripts/sync-codex-plugin.mjs --check --plugin-only",
+    "verify:codex-package": "node scripts/verify-codex-package.mjs",
     "verify:hooks-package": "node scripts/verify-hooks-package.js",
-    "test": "npm run build:hooks && vitest run",
-    "test:watch": "vitest"
+    "test": "npm run build && npm run verify:codex && vitest run",
+    "test:watch": "vitest",
+    "prepack": "npm run build && npm run verify:codex-plugin"
   },
-  "dependencies": {
-    "@modelcontextprotocol/sdk": "1.29.0"
-  },
+  "files": [
+    ".agents/plugins/marketplace.json",
+    ".claude-plugin/",
+    ".mcp.json",
+    "AGENTS.md",
+    "CHANGELOG.md",
+    "CLAUDE.md",
+    "LICENSE",
+    "README.md",
+    "agents/",
+    "assets/",
+    "bridge/",
+    "dist/",
+    "hooks/",
+    "output-styles/",
+    "plugins/zaku/",
+    "scripts/hooks/",
+    "skills/",
+    "!skills/**/.omc/**"
+  ],
   "devDependencies": {
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/exec": "^7.0.3",

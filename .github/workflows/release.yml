@@ -25,9 +25,19 @@ jobs:
       - run: npm ci
       - run: npm run typecheck:hooks
       - run: npm run build:hooks
-      - run: git diff --exit-code -- dist
+      - run: npm run sync:codex
+      - name: Verify generated Codex surfaces are committed
+        shell: bash
+        run: |
+          git diff --exit-code -- dist plugins/zaku .codex/agents
+          if [[ -n "$(git status --porcelain --untracked-files=all -- dist plugins/zaku .codex/agents)" ]]; then
+            git status --short --untracked-files=all -- dist plugins/zaku .codex/agents
+            exit 1
+          fi
+      - run: npm run verify:codex
       - run: npm test
       - run: npm run verify:hooks-package
+      - run: npm run verify:codex-package
 
       - name: Semantic Release
         env:

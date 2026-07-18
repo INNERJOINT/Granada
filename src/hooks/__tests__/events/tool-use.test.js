@@ -123,6 +123,16 @@ describe('aosp-feature-export translation hook', () => {
     expect(config.command).toBe('claude -p --model haiku --no-session-persistence');
   });
 
+  it('uses an isolated non-persistent Codex command for Codex hooks', async () => {
+    const cwd = makeProject();
+    const configUrl = pathToFileURL(resolve(import.meta.dirname, '../../../../dist/events/post-tool-use/translate-artifact/config.js')).href;
+    const { readTranslationConfig } = await import(configUrl);
+
+    const config = readTranslationConfig(cwd, translationDeps(cwd, { GRANADA_RUNTIME: 'codex' }));
+
+    expect(config.command).toBe('codex exec --ephemeral --skip-git-repo-check --ignore-user-config --sandbox read-only -c features.hooks=false -');
+  });
+
   it('loads default translation config from the plugin root', async () => {
     const cwd = makeBareProject();
     const pluginRoot = resolve(import.meta.dirname, '../../../..');
