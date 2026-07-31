@@ -1,3 +1,9 @@
+## [3.0.1](https://github.com/INNERJOINT/Granada/compare/v3.0.0...v3.0.1) (2026-07-31)
+
+### Bug Fixes
+
+* **jira:** align log collector with log-unboxer CLI ([6503e55](https://github.com/INNERJOINT/Granada/commit/6503e5544debdd790b405755f123d7e44a2dd917))
+
 ## [3.0.0](https://github.com/INNERJOINT/Granada/compare/v2.23.0...v3.0.0) (2026-07-18)
 
 ### ⚠ BREAKING CHANGES
