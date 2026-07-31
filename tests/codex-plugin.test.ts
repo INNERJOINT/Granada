@@ -19,6 +19,26 @@ function listSkillFiles(): string[] {
     .filter(path => existsSync(path));
 }
 
+function shellBlocks(markdown: string): string {
+  return [...markdown.matchAll(/```([^\r\n]*)\r?\n([\s\S]*?)```/g)]
+    .filter(match => ['', 'bash', 'sh', 'shell', 'console'].includes(match[1].trim().toLowerCase()))
+    .map(match => match[2])
+    .join('\n')
+    .replace(/\\\r?\n\s*/g, ' ');
+}
+
+function jiraToolTokens(markdown: string): string[] {
+  return [...markdown.matchAll(/\bmcp__[A-Za-z0-9_]+__jira_(?:get_issue|download_attachments)\b/g)]
+    .map(match => match[0]);
+}
+
+function nativeAgentInstructions(name: string): string {
+  const contents = readFileSync(join(root, '.codex', 'agents', `${name}.toml`), 'utf8');
+  const serialized = contents.match(/^developer_instructions = (.+)$/m)?.[1];
+  expect(serialized).toBeTruthy();
+  return JSON.parse(serialized!);
+}
+
 function exchangeWithBridge(messages: unknown[]): Promise<any[]> {
   return new Promise((resolvePromise, reject) => {
     const child = spawn(process.execPath, [join(pluginRoot, 'bridge', 'mcp-server.cjs')], {
@@ -184,6 +204,109 @@ describe('Codex plugin bundle', () => {
     }
     expect(generatedAgents).toContain('mcp__atlassian__jira_download_attachments');
     expect(generatedAgents).not.toMatch(/(?<![A-Za-z0-9_])jira_(?:get_issue|add_comment|download_attachments)\b/);
+  });
+
+  it('maps collector JIRA tools to each host namespace', () => {
+    const canonical = readFileSync(join(root, 'agents', 'aosp-log-collector.md'), 'utf8');
+    const generated = readFileSync(join(pluginRoot, 'agents', 'aosp-log-collector.md'), 'utf8');
+    const native = nativeAgentInstructions('aosp-log-collector');
+    const claudeTools = new Set([
+      'mcp__plugin_zaku_atlassian__jira_get_issue',
+      'mcp__plugin_zaku_atlassian__jira_download_attachments',
+    ]);
+    const codexTools = new Set([
+      'mcp__atlassian__jira_get_issue',
+      'mcp__atlassian__jira_download_attachments',
+    ]);
+
+    const canonicalTokens = jiraToolTokens(canonical);
+    expect(canonicalTokens.length).toBeGreaterThan(0);
+    expect(canonicalTokens.every(token => claudeTools.has(token))).toBe(true);
+    expect(canonical).toContain('Call `mcp__plugin_zaku_atlassian__jira_get_issue(issue_key=<KEY>, comment_limit=0)`');
+    expect(canonical).toContain('Call `mcp__plugin_zaku_atlassian__jira_download_attachments(issue_key=<KEY>)`');
+    expect(canonical).not.toContain('mcp__atlassian__');
+
+    for (const surface of [generated, native]) {
+      const tokens = jiraToolTokens(surface);
+      expect(tokens.length).toBeGreaterThan(0);
+      expect(tokens.every(token => codexTools.has(token))).toBe(true);
+      expect(surface).toContain('mcp__atlassian__jira_get_issue(issue_key=<KEY>, comment_limit=0)');
+      expect(surface).toContain('mcp__atlassian__jira_download_attachments(issue_key=<KEY>)');
+      expect(surface).not.toContain('mcp__plugin_zaku_atlassian__');
+    }
+
+    for (const surface of [canonical, generated, native]) {
+      expect(surface).not.toMatch(/(?<![A-Za-z0-9_])jira_(?:get_issue|download_attachments)\b/);
+    }
+  });
+
+  it('uses only documented log-unboxer commands for supported attachments', () => {
+    const surfaces = [
+      readFileSync(join(root, 'agents', 'aosp-log-collector.md'), 'utf8'),
+      readFileSync(join(pluginRoot, 'agents', 'aosp-log-collector.md'), 'utf8'),
+      nativeAgentInstructions('aosp-log-collector'),
+    ];
+    const downloadCommand = /log-unboxer download "\$serial_number"\s+--output-dir "\$extracted_dir"\s+--days 90\s+--workers 4/;
+
+    for (const surface of surfaces) {
+      const commands = shellBlocks(surface);
+      expect(commands.match(/\blog-unboxer --version\b/g) ?? []).toHaveLength(1);
+      expect(commands.match(/\blog-unboxer unpack\b/g) ?? []).toHaveLength(1);
+      expect(commands.match(/\blog-unboxer download\b/g) ?? []).toHaveLength(1);
+      expect(commands).toContain('log-unboxer unpack "$archive_path" --output-dir "$extracted_dir"');
+      expect(commands).toMatch(downloadCommand);
+      expect(commands).toContain('base64 -d < "$b64_path" > "$archive_path"');
+      expect(commands).toContain('base64 -d < "$b64_path" > "$decoded_path"');
+      expect(commands).not.toMatch(/(^|\s)--sn(?:\s|$)/);
+      expect(commands).not.toMatch(/(^|\s)--(?:url|limit)(?:\s|$)/);
+      expect(commands).not.toMatch(/\b(?:unzip|tar|7z)\b/);
+      expect(commands).not.toMatch(/log-unboxer\s+unpack\b[^;\n]*(?:zip_path|\.zip)/);
+
+      expect(surface).toContain('**Supported archive**: `.tgz` or `.tar.gz`');
+      expect(surface).toContain('**Supported direct log**: `.txt` or `.log`');
+      expect(surface).toContain('**Unsupported**: `.zip`');
+      expect(surface).toContain('validated, case-insensitive filename suffix');
+      expect(surface).toContain('Direct logs do not require `log-unboxer`');
+      expect(surface).toContain('^[A-Za-z0-9][A-Za-z0-9._-]*$');
+    }
+  });
+
+  it('preserves collector fallback, partial-output, and manifest semantics', () => {
+    const surfaces = [
+      readFileSync(join(root, 'agents', 'aosp-log-collector.md'), 'utf8'),
+      readFileSync(join(pluginRoot, 'agents', 'aosp-log-collector.md'), 'utf8'),
+      nativeAgentInstructions('aosp-log-collector'),
+    ];
+    const parser = readFileSync(join(root, 'agents', 'aosp-log-parser.md'), 'utf8');
+    const reasons = [
+      'LOG_UNBOXER_UNAVAILABLE',
+      'ATTACHMENT_METADATA_FAILED',
+      'ATTACHMENT_SIZE_UNSAFE',
+      'MCP_DOWNLOAD_FAILED',
+      'BASE64_DECODE_FAILED',
+      'ARCHIVE_UNPACK_FAILED',
+      'ARCHIVE_UNPACK_EMPTY',
+      'SN_DOWNLOAD_FAILED',
+      'SN_DOWNLOAD_EMPTY',
+    ];
+    const manifestTypes = 'logcat|tombstone|anr|kernel|other';
+
+    for (const surface of surfaces) {
+      expect(surface.indexOf('### Step J4: Evaluate Attachment Results'))
+        .toBeLessThan(surface.indexOf('### Step J5: One-Time SN Fallback Download'));
+      expect(surface).toContain('Do not run SN fallback.');
+      expect(surface).toContain('only when Steps J2-J4 yielded no parseable log files');
+      expect(surface).toContain('Run this step at most once');
+      expect(surface).toContain('Inspect `<extracted_dir>` after the command even when `download_status` is non-zero');
+      expect(surface).toContain('Parseable files plus non-zero exit');
+      expect(surface).toContain('report `PARTIAL`');
+      expect(surface).toContain('A non-zero `log-unboxer` exit does not by itself prove collection failed');
+      expect(surface).toContain('Direct `.txt` / `.log` attachments remain usable even when `log-unboxer` is unavailable');
+      for (const reason of reasons) expect(surface).toContain(reason);
+      expect(surface).toContain(`flat JSON object mapping relative filenames to \`${manifestTypes}\``);
+    }
+
+    expect(parser).toContain(`{"filename": "${manifestTypes}", ...}`);
   });
 
   it('loads the Codex hook bootstrap from an isolated plugin cache copy', () => {
