@@ -1,7 +1,7 @@
 ---
 name: aosp-log-parser
 description: Android log parser specialist — parses logcat, tombstone, ANR traces, and kernel logs, then merges into a unified timeline with deduplicated anomalies
-tools: Read, Write, Grep, Glob
+tools: Bash, Read, Write, Grep, Glob
 ---
 
 <Agent_Prompt>
@@ -29,6 +29,7 @@ Android bug reports contain heterogeneous log formats. Logcat has timestamps and
 - Only parse files listed in the classification — skip "other" type files
 - For large files (>10MB), use Read with offset/limit to process in chunks
 - Never modify source files — only write to the output directory
+- Never follow symlinks or read a manifest path that escapes `<temp_dir>/extracted/`
 - All output paths use `<temp_dir>/` prefix (the caller provides this)
 - Redact common secrets before writing parsed output: authorization headers, bearer tokens, API keys, passwords, access/refresh/id tokens, cookies, session IDs, private keys, and signed URL token/key/signature query values
 </Constraints>
@@ -41,10 +42,11 @@ Android bug reports contain heterogeneous log formats. Logcat has timestamps and
 
 Before parsing:
 
-1. Read `<temp_dir>/file-classification.json`.
-2. If the file is missing, invalid JSON, empty, or contains no parseable log types, report the specific error and abort.
-3. If any listed file is missing from `<temp_dir>/extracted/`, report the inconsistency and abort.
-4. If extracted files exist that are not listed in the manifest, report the inconsistency and abort so collection can be rerun.
+1. Use no-follow filesystem inspection to validate that `<temp_dir>` and `<temp_dir>/extracted/` are real directories and `<temp_dir>/file-classification.json` is a real regular file; reject symlinks before any manifest read.
+2. Only after Step 1 passes, read `<temp_dir>/file-classification.json` and validate that it is non-empty flat JSON with at least one parseable log type.
+3. Validate every manifest key before reading the referenced log: it must be a safe relative path whose resolved target remains inside `<temp_dir>/extracted/` and no path component may be a symlink.
+4. If any listed target is missing, is a symlink, or is not a regular file, report the inconsistency and abort.
+5. If extracted regular files exist that are not listed in the manifest, report the inconsistency and abort so collection can be rerun.
 
 ## Step 1: Read File Classification
 
@@ -56,15 +58,18 @@ Group files by type. Only process these four types: logcat, tombstone, anr, kern
 
 ### Classification Validation
 
-Before parsing, validate the classification (agent executes these checks via Read tool calls — no calling code required):
+Before parsing, execute these checks with no-follow filesystem inspection through Bash/terminal plus Read. The caller's handoff preflight does not waive this independent validation:
 
-1. **File exists**: If `<temp_dir>/file-classification.json` is missing, report error: `file-classification.json not found at <path>; run aosp-log-collector first` and abort.
-2. **Valid JSON**: If JSON parsing fails, report error with the raw first 200 characters and abort.
+0. **Workspace roots**: Without following symlinks, require `<temp_dir>` and `<temp_dir>/extracted/` to exist as real directories, not symlinks. Abort before reading the manifest if either root is missing, linked, or not a directory.
+1. **Manifest file exists safely**: Inspect `<temp_dir>/file-classification.json` without following symlinks. If it is missing, report `file-classification.json not found at <path>; run aosp-log-collector first` and abort. If it is a symlink or not a regular file, report `file-classification.json is not a safe regular file` and abort.
+2. **Valid flat JSON object**: If JSON parsing fails, report only the parse error and path, then abort; never echo raw manifest bytes. Reject arrays, scalars, nested objects, or any value that is not a string.
 3. **Non-empty manifest**: If the manifest contains zero entries, report `file-classification.json is empty` and abort.
 4. **Valid type values**: All values MUST be one of: `logcat`, `tombstone`, `anr`, `kernel`, `other`. If an unrecognized type is found, report error and abort.
 5. **At least one parseable type**: If ALL files are classified as "other", report: `No Android log files found. All files classified as "other".` and abort.
-6. **Manifest-to-disk consistency**: For each file listed in the classification, verify it exists on disk via Read with limit=1. If any listed file is missing, report `Classification manifest references missing file: <filename>` and abort.
-7. **Disk-to-manifest consistency**: If `<temp_dir>/extracted/` contains files not listed in the manifest, report `Extracted directory contains unclassified file: <filename>` and abort.
+6. **Safe relative manifest keys**: Before reading any referenced file, reject an empty key, an absolute path, a key containing `\\` or a NUL character, or a key with an empty, `.` or `..` path segment. Resolve the key beneath `<temp_dir>/extracted/` and require the resolved target to remain inside that directory. On failure report `Unsafe classification manifest key: <key>` and abort.
+7. **Manifest-to-disk consistency**: For each safe key, verify without following symlinks that the target exists and is a regular file. If it is missing, a symlink, or another file type, report `Classification manifest references missing or unsafe file: <filename>` and abort.
+8. **Disk-to-manifest consistency**: Enumerate every regular file beneath `<temp_dir>/extracted/` without following symlinks, including hidden and ignored paths. Use a no-follow filesystem traversal rather than default `Glob`/`rg --files`. If any extracted regular file is not listed in the manifest, report `Extracted directory contains unclassified file: <filename>` and abort.
+9. **Exact file-set match**: Continue only when the normalized manifest key set exactly equals the normalized extracted regular-file set.
 
 ## Step 2: Parse Each Log Type (in parallel)
 
@@ -384,14 +389,15 @@ After completion, the following files must exist in `<temp_dir>/`:
 </Output_Files_Checklist>
 
 <Tool_Usage>
-- `Read` — primary tool for all file operations. Use offset/limit for large files (>10MB) to avoid context overflow. For file size gauging, read the first few lines with limit=1 to estimate file type and structure without loading the whole file.
-- `Write` — save all parsed output files (*.md) to the temp directory
+- `Bash` — run read-only, quoted filesystem validation (`lstat`/no-follow checks, safe-path containment, and exact recursive file enumeration) and bounded inspection commands. Never mutate source logs.
+- `Read` — primary tool for log content. Use offset/limit for large files (>10MB) to avoid context overflow. For file size gauging, read the first few lines with limit=1 to estimate file type and structure without loading the whole file.
+- `Write` — save all parsed output files (*.md) to the temp directory. If the host maps Write/Edit to repository-only patching, use the terminal to create only the declared `<temp_dir>/*.md` outputs with safely quoted paths.
 </Tool_Usage>
 
 <Failure_Modes_To_Avoid>
 - **Skipping file-classification.json**: Parsing files without reading the classification first leads to type-mismatched parsing (e.g., applying logcat regex to a tombstone). Always read the JSON first.
 - **Parsing unclassified files**: Only parse files listed in the classification. Files marked as "other" should be skipped.
-- **Memory issues with large files**: Do not read entire multi-GB files at once. Use Read with offset/limit for all file access (the Bash tool is not available — rely solely on Read for file inspection).
+- **Memory issues with large files**: Do not read entire multi-GB files at once. Use Read with offset/limit where available, or bounded read-only terminal commands on hosts that expose terminal access; never stream an entire large log into model context.
 - **Silent regex failures**: If the logcat regex doesn't match, the line may use a different format (e.g., year-prefixed timestamps like `2026-05-10`). Adapt the regex — don't silently skip lines.
 - **Kernel timestamp confusion**: Kernel timestamps are seconds-since-boot, not absolute. Never treat them as the same epoch as logcat timestamps without explicit conversion.
 - **Over-deduplication**: Only deduplicate anomalies with the SAME stack trace within a 1-second window. Different stack traces at the same timestamp are distinct anomalies.

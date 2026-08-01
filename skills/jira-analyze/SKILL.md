@@ -24,10 +24,19 @@ Automates Android bug root-cause analysis for JIRA issues by fetching issue deta
    - Do **not** call sourcepilot during initialization. Sourcepilot is conditional and is checked only if Phase 5 decides source validation is needed.
    - Do **not** read `.granada/aosp-config.json`; this skill derives the AOSP project from `ro.build.display.id` in collected logs.
 
-3. **Create temp directory**:
+3. **Create a unique, fail-closed current-run workspace** only after the issue key is validated and the JIRA health check succeeds:
 ```bash
-mkdir -p /tmp/jira-analyze-<KEY>/extracted
+issue_key="<KEY>"
+temp_dir=$(mktemp -d "/tmp/jira-analyze-${issue_key}.XXXXXX") || exit 1
+[[ -n "$temp_dir" && "$temp_dir" == "/tmp/jira-analyze-${issue_key}."* ]] || exit 1
+[[ -d "$temp_dir" && ! -L "$temp_dir" ]] || exit 1
+
+extracted_dir="${temp_dir}/extracted"
+mkdir -p -- "$extracted_dir" || exit 1
+[[ -d "$extracted_dir" && ! -L "$extracted_dir" ]] || exit 1
 ```
+
+Retain the exact generated `temp_dir` value and substitute it wherever `<temp_dir>` appears in all later phases and subagent prompts. A unique directory prevents stale-artifact reuse and same-issue concurrent-run interference without deleting another run. Preserve this current-run workspace on failure for debugging.
 
 ## Phase 2: JIRA Data Collection (via aosp-log-collector Agent)
 
@@ -43,15 +52,129 @@ Agent(
 
 Mode: JIRA
 Issue key: <KEY>
-Temp directory: /tmp/jira-analyze-<KEY>/
-Extracted directory: /tmp/jira-analyze-<KEY>/extracted/
-Classification manifest: /tmp/jira-analyze-<KEY>/file-classification.json
+Temp directory: <temp_dir>/
+Extracted directory: <temp_dir>/extracted/
+Classification manifest: <temp_dir>/file-classification.json
 
-Fetch issue details with comments excluded, collect log attachments or fallback logs, populate the extracted directory, and generate the classification manifest. Report issue summary, attachment metadata, collection summary, per-type counts, and Collection status."
+Fetch issue details with comments excluded, collect log attachments or fallback logs, populate the extracted directory, and generate the classification manifest. Report issue summary, attachment metadata, per-type counts, the chronological Collection attempts ledger, the deduplicated Failure codes observed list, SN fallback outcome, and final Collection status."
 )
 ```
 
-2. **Verify collection output**: After the agent completes, check that `/tmp/jira-analyze-<KEY>/extracted/` contains files and `/tmp/jira-analyze-<KEY>/file-classification.json` exists. If the collector reports FAILED or either artifact is missing, abort with "Log collection failed — extracted logs or classification manifest missing."
+2. **Enforce the parser handoff gate** before spawning any parser:
+   - Require the collector's final status to be `SUCCESS` or `PARTIAL`. A `FAILED` result is terminal and must surface the collector's reason, Collection attempts, Failure codes observed, and retained current-run directory.
+   - Without following symlinks, require `<temp_dir>` and `<temp_dir>/extracted/` to be real directories (not symlinks), and `<temp_dir>/file-classification.json` to be a real regular file (not a symlink).
+   - Read and parse the manifest. It must be a non-empty flat JSON object whose keys and values are strings; arrays, scalars, and nested values are invalid.
+   - Require every value to be one of `logcat`, `tombstone`, `anr`, `kernel`, or `other`, with at least one `logcat|tombstone|anr|kernel` entry.
+   - Validate every key before reading it: reject empty keys, absolute paths, backslashes, NUL characters, and empty/`.`/`..` path segments. Resolve it beneath `extracted/` and require containment inside that directory.
+   - Without following symlinks, require every manifest target to be a regular file. Enumerate every extracted regular file recursively and require exact manifest-to-disk and disk-to-manifest set equality.
+   - On any failure, abort with `Log collection handoff invalid — <specific reason>`, preserve the current-run workspace, and do not spawn the parser, call Sourcepilot, generate Why seeds/RCA, or post a JIRA comment.
+
+Execute this deterministic validator with the exact current-run `temp_dir`; do not replace it with an informal visual check:
+
+```bash
+TEMP_DIR="$temp_dir" node <<'NODE'
+const fs = require('node:fs');
+const path = require('node:path');
+
+function fail(message) {
+  console.error(`Log collection handoff invalid — ${message}`);
+  process.exit(1);
+}
+
+function safeLstat(target, label) {
+  let stat;
+  try {
+    stat = fs.lstatSync(target);
+  } catch (error) {
+    fail(`${label} is missing: ${error.message}`);
+  }
+  if (stat.isSymbolicLink()) fail(`${label} must not be a symlink`);
+  return stat;
+}
+
+const tempDir = process.env.TEMP_DIR;
+if (!tempDir || !path.isAbsolute(tempDir)) fail('TEMP_DIR must be an absolute current-run path');
+const tempStat = safeLstat(tempDir, 'current-run directory');
+if (!tempStat.isDirectory()) fail('current-run path is not a directory');
+
+const extractedDir = path.join(tempDir, 'extracted');
+const extractedStat = safeLstat(extractedDir, 'extracted directory');
+if (!extractedStat.isDirectory()) fail('extracted path is not a directory');
+
+const manifestPath = path.join(tempDir, 'file-classification.json');
+const manifestStat = safeLstat(manifestPath, 'classification manifest');
+if (!manifestStat.isFile()) fail('classification manifest is not a regular file');
+
+let manifest;
+try {
+  manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+} catch (error) {
+  fail(`classification manifest is invalid JSON: ${error.message}`);
+}
+if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) {
+  fail('classification manifest must be a flat JSON object');
+}
+
+const entries = Object.entries(manifest);
+if (entries.length === 0) fail('classification manifest is empty');
+const allowed = new Set(['logcat', 'tombstone', 'anr', 'kernel', 'other']);
+const manifestKeys = [];
+let parseable = 0;
+
+for (const [key, value] of entries) {
+  if (typeof value !== 'string' || !allowed.has(value)) fail(`invalid classification type for ${key}`);
+  if (value !== 'other') parseable += 1;
+  if (!key || path.isAbsolute(key) || key.includes('\\') || key.includes(String.fromCharCode(0))) {
+    fail(`unsafe classification manifest key: ${key}`);
+  }
+
+  const segments = key.split('/');
+  if (segments.some(segment => !segment || segment === '.' || segment === '..')) {
+    fail(`unsafe classification manifest key: ${key}`);
+  }
+
+  let cursor = extractedDir;
+  for (let index = 0; index < segments.length; index += 1) {
+    cursor = path.join(cursor, segments[index]);
+    const stat = safeLstat(cursor, `manifest target ${key}`);
+    if (index < segments.length - 1 && !stat.isDirectory()) fail(`manifest parent is not a directory: ${key}`);
+    if (index === segments.length - 1 && !stat.isFile()) fail(`manifest target is not a regular file: ${key}`);
+  }
+
+  const resolved = path.resolve(extractedDir, ...segments);
+  const relative = path.relative(path.resolve(extractedDir), resolved);
+  if (!relative || relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+    fail(`unsafe classification manifest key: ${key}`);
+  }
+  manifestKeys.push(segments.join('/'));
+}
+
+if (parseable === 0) fail('classification manifest contains no parseable Android logs');
+
+const diskFiles = [];
+function walk(directory, prefix = '') {
+  for (const name of fs.readdirSync(directory).sort()) {
+    const fullPath = path.join(directory, name);
+    const relativePath = prefix ? `${prefix}/${name}` : name;
+    const stat = safeLstat(fullPath, `extracted entry ${relativePath}`);
+    if (stat.isDirectory()) walk(fullPath, relativePath);
+    else if (stat.isFile()) diskFiles.push(relativePath);
+    else fail(`unsupported extracted entry type: ${relativePath}`);
+  }
+}
+walk(extractedDir);
+
+manifestKeys.sort();
+diskFiles.sort();
+if (JSON.stringify(manifestKeys) !== JSON.stringify(diskFiles)) {
+  fail('classification manifest and extracted regular-file sets differ');
+}
+
+console.log(JSON.stringify({ status: 'VALID', files: diskFiles.length, parseable }));
+NODE
+```
+
+A `PARTIAL` collector result may continue only when this command exits zero. Artifact existence alone is never sufficient.
 
 ## Phase 3: Log Parsing and Timeline Construction (via aosp-log-parser Agent)
 
@@ -65,9 +188,9 @@ Agent(
   model="sonnet",
   prompt="Parse Android log files for JIRA issue <KEY>.
 
-Temp directory: /tmp/jira-analyze-<KEY>/
-Source files directory: /tmp/jira-analyze-<KEY>/extracted/
-Classification manifest: /tmp/jira-analyze-<KEY>/file-classification.json
+Temp directory: <temp_dir>/
+Source files directory: <temp_dir>/extracted/
+Classification manifest: <temp_dir>/file-classification.json
 
 Read the collector-generated classification manifest first, parse each listed log type using parallel tool calls where possible, then merge into unified timeline.md and anomalies.md. Abort if the manifest is missing or inconsistent with the extracted directory.
 
@@ -77,7 +200,7 @@ Report the total anomaly count at the end of your response."
 
 ### Verify Output
 
-After the agent completes, check that `/tmp/jira-analyze-<KEY>/timeline.md` and `/tmp/jira-analyze-<KEY>/anomalies.md` exist. If not, abort with "Log parsing failed — timeline or anomalies output missing."
+After the agent completes, check that `<temp_dir>/timeline.md` and `<temp_dir>/anomalies.md` exist. If not, abort with "Log parsing failed — timeline or anomalies output missing."
 
 `timeline.md` and `anomalies.md` are now the first evidence gate for the RCA. Do not perform source search before reading and evaluating these two log-derived artifacts.
 
@@ -85,13 +208,13 @@ After the agent completes, check that `/tmp/jira-analyze-<KEY>/timeline.md` and 
 
 Before Phase 4, inspect collected and parsed logs for `ro.build.display.id`:
 
-1. Search `/tmp/jira-analyze-<KEY>/extracted/`, `/tmp/jira-analyze-<KEY>/timeline.md`, and `/tmp/jira-analyze-<KEY>/anomalies.md` for lines containing `ro.build.display.id`.
+1. Search `<temp_dir>/extracted/`, `<temp_dir>/timeline.md`, and `<temp_dir>/anomalies.md` for lines containing `ro.build.display.id`.
 2. Extract the property value exactly as the **project keyword**. Examples:
    - `ro.build.display.id=...`
    - `[ro.build.display.id]: [...]`
    - `ro.build.display.id: ...`
 3. If multiple values exist, choose the most frequent value; if tied, choose the value closest to the key anomaly timestamp and note the ambiguity.
-4. Save the result to `/tmp/jira-analyze-<KEY>/project-keyword.md`:
+4. Save the result to `<temp_dir>/project-keyword.md`:
 
 ```markdown
 # Sourcepilot Project Keyword for <KEY>
@@ -106,7 +229,7 @@ If the property is absent, write `Keyword: unknown`. Do not ask the user for a p
 
 ## Phase 4: Log Evidence Deep Dive and Why Seeds
 
-Perform a log-first evidence deep dive from `/tmp/jira-analyze-<KEY>/timeline.md` and `/tmp/jira-analyze-<KEY>/anomalies.md`. At this point the skill must stay within parsed log evidence; sourcepilot is considered later only if Phase 5 identifies a concrete evidence gap or source-only mechanism question.
+Perform a log-first evidence deep dive from `<temp_dir>/timeline.md` and `<temp_dir>/anomalies.md`. At this point the skill must stay within parsed log evidence; sourcepilot is considered later only if Phase 5 identifies a concrete evidence gap or source-only mechanism question.
 
 ### Evidence Threshold
 
@@ -121,7 +244,7 @@ If any field is missing or contradictory, record it as an evidence gap. Evidence
 
 ### Generate why-seeds.md
 
-Create `/tmp/jira-analyze-<KEY>/why-seeds.md` containing **1-3 Why seeds**. Each seed must be grounded in the parsed logs and include:
+Create `<temp_dir>/why-seeds.md` containing **1-3 Why seeds**. Each seed must be grounded in the parsed logs and include:
 
 ```markdown
 # Why Seeds for <KEY>
@@ -150,7 +273,7 @@ Mark exactly one seed as **Strongest seed / selected main chain**. Later phases 
 
 ### Compatibility Artifacts
 
-Initialize `/tmp/jira-analyze-<KEY>/aosp-context.md` with a status section such as:
+Initialize `<temp_dir>/aosp-context.md` with a status section such as:
 
 ```markdown
 # Conditional Sourcepilot Context for <KEY>
@@ -162,11 +285,11 @@ This preserves the existing artifact contract without forcing sourcepilot to run
 
 ## Phase 5: Main 5 Whys Chain and Conditional Sourcepilot Validation
 
-Read `/tmp/jira-analyze-<KEY>/why-seeds.md`, choose the strongest seed, and expand only that seed into a single evidence-closed 5 Whys chain.
+Read `<temp_dir>/why-seeds.md`, choose the strongest seed, and expand only that seed into a single evidence-closed 5 Whys chain.
 
 ### Main 5 Whys Chain
 
-Save the chain to `/tmp/jira-analyze-<KEY>/hypotheses.md` using this structure:
+Save the chain to `<temp_dir>/hypotheses.md` using this structure:
 
 ```markdown
 # Main 5 Whys Chain for <KEY>
@@ -222,8 +345,8 @@ Do **not** trigger sourcepilot when the log evidence threshold is satisfied and 
 
 If triggered:
 
-1. Read `/tmp/jira-analyze-<KEY>/project-keyword.md` and extract the `Keyword` value derived from `ro.build.display.id`.
-   - If the keyword is `unknown`, record "mechanism validation unresolved — ro.build.display.id not found in logs" in `/tmp/jira-analyze-<KEY>/aosp-context.md` and continue to the report; do not ask the user for a project name.
+1. Read `<temp_dir>/project-keyword.md` and extract the `Keyword` value derived from `ro.build.display.id`.
+   - If the keyword is `unknown`, record "mechanism validation unresolved — ro.build.display.id not found in logs" in `<temp_dir>/aosp-context.md` and continue to the report; do not ask the user for a project name.
 2. Resolve the sourcepilot project by calling `mcp__plugin_zaku_sourcepilot__resolve_project_by_keyword({ keyword: "<ro.build.display.id value>" })`.
    - If it returns `project`, use that exact project for all sourcepilot calls and record `matched_keyword` in `aosp-context.md`.
    - If it returns `project: null`, record "mechanism validation unresolved — no sourcepilot project matched ro.build.display.id" and continue to the report; do not fall back to `.granada/aosp-config.json` or a user-provided project.
@@ -259,23 +382,23 @@ Report:
 )
 ```
 
-5. Save the result to `/tmp/jira-analyze-<KEY>/aosp-context.md` and `/tmp/jira-analyze-<KEY>/investigation-1.md`.
+5. Save the result to `<temp_dir>/aosp-context.md` and `<temp_dir>/investigation-1.md`.
 
 If not triggered:
 
-- Write `/tmp/jira-analyze-<KEY>/aosp-context.md` with `Status: sourcepilot not triggered — log evidence threshold satisfied and no source-only mechanism validation required.`
-- Write `/tmp/jira-analyze-<KEY>/investigation-1.md` with `Status: no source investigation performed; RCA is based on log evidence and the 5 Whys chain.`
+- Write `<temp_dir>/aosp-context.md` with `Status: sourcepilot not triggered — log evidence threshold satisfied and no source-only mechanism validation required.`
+- Write `<temp_dir>/investigation-1.md` with `Status: no source investigation performed; RCA is based on log evidence and the 5 Whys chain.`
 
 ## Phase 6: Synthesis and Report
 
 1. **Read all synthesis inputs**:
-   - `/tmp/jira-analyze-<KEY>/timeline.md`
-   - `/tmp/jira-analyze-<KEY>/anomalies.md`
-   - `/tmp/jira-analyze-<KEY>/project-keyword.md`
-   - `/tmp/jira-analyze-<KEY>/why-seeds.md`
-   - `/tmp/jira-analyze-<KEY>/hypotheses.md`
-   - `/tmp/jira-analyze-<KEY>/aosp-context.md`
-   - `/tmp/jira-analyze-<KEY>/investigation-*.md`
+   - `<temp_dir>/timeline.md`
+   - `<temp_dir>/anomalies.md`
+   - `<temp_dir>/project-keyword.md`
+   - `<temp_dir>/why-seeds.md`
+   - `<temp_dir>/hypotheses.md`
+   - `<temp_dir>/aosp-context.md`
+   - `<temp_dir>/investigation-*.md`
 
 2. **Redact secrets** from all included log excerpts, issue text, source snippets, and generated explanations: authorization headers, bearer tokens, API keys, passwords, access/refresh/id tokens, cookies, session IDs, private keys, and signed URL token/key/signature query values.
 
@@ -371,12 +494,14 @@ Embed these handlers throughout all phases:
 - **`ro.build.display.id` missing when source validation is triggered** → record "mechanism validation unresolved — ro.build.display.id not found in logs" in `aosp-context.md` and the final report; do not ask the user for a project name
 - **Sourcepilot project resolver returns no match** → record "mechanism validation unresolved — no sourcepilot project matched ro.build.display.id" in `aosp-context.md` and the final report; do not fall back to `.granada/aosp-config.json`
 - **Sourcepilot unreachable when source validation is triggered** → record "mechanism validation unresolved — sourcepilot unreachable" in `aosp-context.md` and the final report; do not abort the entire RCA
-- **Collector reports FAILED** → abort with the collector's failure reason
-- **Collector reports PARTIAL** → continue only if `extracted/` and `file-classification.json` exist and include parseable logs
+- **Collector reports FAILED** → hard-stop Phase 2 with the collector's failure reason, attempt ledger, failure codes, and retained current-run workspace
+- **Collector reports PARTIAL** → continue only after the complete parser handoff gate passes; artifact existence alone is insufficient
+- **Invalid, empty, all-`other`, unsafe, or inconsistent classification manifest** → abort in Phase 2 with `Log collection handoff invalid — <specific reason>`
 - **No parseable logs found** → abort with "No Android log files found in collected artifacts"
-- **Log evidence threshold incomplete** → continue into 5 Whys, mark gaps in `why-seeds.md`, and consider conditional sourcepilot validation if the gap is mechanism-related
+- **Collector or parser agent timeout/failure** → hard-stop before the next phase; never reuse existing artifacts from an earlier run
+- **Log evidence threshold incomplete after successful parsing** → continue into 5 Whys, mark gaps in `why-seeds.md`, and consider conditional sourcepilot validation if the gap is mechanism-related
 - **Sourcepilot returns no results** → record "mechanism validation unresolved" as a gap; do not fail
-- **Agent timeout/failure** → mark the affected artifact as incomplete and continue if enough log evidence remains for a cautious RCA
+- **Later analysis agent timeout/failure** → mark the affected artifact as incomplete and continue only if current-run parsed log evidence remains sufficient for a cautious RCA
 - **5 Whys chain cannot close** → report with "insufficient evidence" conclusion and name the missing evidence
 - **JIRA comment post fails** → warn user, do not abort (local report file is still available)
 </Error_Handling>
@@ -385,7 +510,7 @@ Embed these handlers throughout all phases:
 - `jira_get_issue` — Phase 1 JIRA health check and issue metadata collection (mcp-atlassian)
 - `Agent(subagent_type="zaku:aosp-log-collector", model="sonnet")` — JIRA issue metadata, log attachment collection, archive handling, extracted directory preparation, and classification manifest generation (Phase 2)
 - `Agent(subagent_type="zaku:aosp-log-parser", model="sonnet")` — log parsing and timeline construction from the collector-generated classification manifest (Phase 3)
-- Main skill orchestration — Phase 4 log evidence threshold evaluation, `why-seeds.md` generation, Phase 5 main 5 Whys chain, and Phase 6 report synthesis
+- Main skill orchestration — validated workspace reset, Phase 2 manifest handoff verification, Phase 4 log evidence threshold evaluation, `why-seeds.md` generation, Phase 5 main 5 Whys chain, and Phase 6 report synthesis
 - `mcp__plugin_zaku_sourcepilot__resolve_project_by_keyword` — conditional Phase 5 project resolver. Input is the `ro.build.display.id` value extracted from logs; output `project` is used for sourcepilot searches when present.
 - `Agent(subagent_type="zaku:aosp-investigator", model="sonnet")` — conditional Phase 5 lightweight sourcepilot validation only after `ro.build.display.id` resolves to a sourcepilot project and evidence gaps or one mechanism hypothesis require validation
 - `mcp__plugin_zaku_sourcepilot__*` — used only by `aosp-investigator` during conditional lightweight source validation with the resolver-returned project; search budget is one mechanism hypothesis and 1-2 precise queries, not broad audit
@@ -460,7 +585,9 @@ Why bad: `jira-aftersales` detects reports by the exact `# Root Cause Analysis R
 <Guardrails>
 **Must have:**
 - Exactly one JIRA URL as input; reject direct issue keys, flags, paths, and extra arguments
-- `ro.build.display.id` extraction from collected logs into `/tmp/jira-analyze-<KEY>/project-keyword.md`
+- Unique current-run workspace creation only after the JIRA key and health check are validated
+- A complete current-run classification manifest handoff gate before parser delegation
+- `ro.build.display.id` extraction from collected logs into `<temp_dir>/project-keyword.md`
 - `mcp__plugin_zaku_sourcepilot__resolve_project_by_keyword` for turning the extracted build display ID into the sourcepilot project when source validation is triggered
 - `aosp-log-collector` subagent for JIRA issue metadata, log collection, archive handling, extracted directory preparation, and classification manifest generation
 - `aosp-log-parser` subagent for parsing the collector-generated classification manifest, timeline merge, and anomaly merge
@@ -475,12 +602,13 @@ Why bad: `jira-aftersales` detects reports by the exact `# Root Cause Analysis R
 - Lead only orchestrates: MCP calls, subagent spawning, artifact verification, and report assembly
 
 **Must NOT have:**
-- Changes outside `skills/jira-analyze/SKILL.md` for this refactor
-- Changes to `skills/aosp-rca/SKILL.md`, `skills/_shared/rca-pipeline.md`, or any `agents/` file
+- Deletion or reuse of any pre-existing JIRA analysis workspace; use only the exact unique `temp_dir` returned by `mktemp` for this run
+- Reuse of stale extracted logs, manifests, timelines, anomalies, or reports from an earlier run
+- Parser, Sourcepilot, 5 Whys, RCA, or JIRA comment execution before the Phase 2 handoff gate passes
 - Interactive/conversational mode (produces static report)
 - iOS or non-Android log parsing
 - Binary attachment processing (images, videos)
-- Inline download, decompression, base64, or cleanup command details in this skill; those belong in `aosp-log-collector`
+- Inline download, decompression, base64, or attachment-intermediate cleanup details in this skill; those belong in `aosp-log-collector`. Fresh current-run workspace lifecycle remains lead-owned.
 - Direct issue-key input, flags, paths, or any extra arguments
 - Reading `.granada/aosp-config.json` or asking the user for an AOSP project in this skill
 - Falling back to an unverified project when `resolve_project_by_keyword` returns `project: null`

@@ -107,6 +107,17 @@ MCP tool namespaces differ by host:
 
 The optional Atlassian and GitLab stdio servers also require `uvx` and `npx`, respectively, on `PATH`.
 
+### log-unboxer
+
+JIRA serial-number fallback and `.tgz` / `.tar.gz` attachment processing require working `log-unboxer` and `bwrap` executables on `PATH`. `bwrap` (Bubblewrap) provides the fail-closed Linux sandbox around untrusted downloaded bundles. Install `log-unboxer` from the upstream GitLab repository with pipx, then verify the entry point before running `jira-analyze`:
+
+```bash
+pipx install "git+ssh://git@gitlab.gz.cvte.cn/XBS_OS_SOFTWARE/tools/log_unboxer.git"
+log-unboxer --version
+```
+
+The collector uses extraction-filter checks as defense in depth, then confines every archive/SN operation with Bubblewrap and merges only validated regular files from a private stage. `bwrap` is required for these operations on Linux; when unavailable, the collector fails closed while direct `.txt` / `.log` collection remains usable. Python 3.12.13+ is recommended. The collector deliberately does not install, upgrade, or repair external dependencies. If an old editable pipx installation points to a deleted source checkout, replace it from the upstream URL rather than using `pipx reinstall`, which reuses the original install source and options.
+
 The fallback SourcePilot surface includes `list_projects`, `list_repos`, `search_code`, `search_symbol`, `search_file`, `search_regex`, `get_file_content`, and `resolve_project_by_keyword` under the host-specific namespace above.
 
 ## Hooks

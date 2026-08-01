@@ -128,9 +128,15 @@ function assertRequiredPackFiles(files) {
     'plugins/zaku/bridge/mcp-server.cjs',
     'plugins/zaku/dist/adapters/codex-entry.js',
     'plugins/zaku/scripts/hooks/adapters/codex-entry.cjs',
+    'agents/aosp-log-collector.md',
+    'agents/aosp-log-parser.md',
+    'skills/jira-analyze/SKILL.md',
     'plugins/zaku/references/codex-compat.md',
     'plugins/zaku/agents/aosp-investigator.md',
+    'plugins/zaku/agents/aosp-log-collector.md',
+    'plugins/zaku/agents/aosp-log-parser.md',
     'plugins/zaku/skills/aosp-analyze/SKILL.md',
+    'plugins/zaku/skills/jira-analyze/SKILL.md',
   ];
   const missing = required.filter(path => !paths.has(path));
   if (missing.length > 0) fail(`npm package is missing required files:\n${missing.map(path => `- ${path}`).join('\n')}`);
