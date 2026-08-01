@@ -1,3 +1,19 @@
+## [4.0.0](https://github.com/INNERJOINT/Granada/compare/v3.0.1...v4.0.0) (2026-08-01)
+
+### ⚠ BREAKING CHANGES
+
+* **codex:** Codex marketplace installation, generated plugin bundles, project agents, hooks, and compatibility tooling are no longer shipped.
+
+Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
+
+### Bug Fixes
+
+* **jira:** sandbox log collection and validate parser handoff ([e3c5053](https://github.com/INNERJOINT/Granada/commit/e3c5053ea0d3a7286dbaca7af4318b9894d3d0dd))
+
+### Code Refactoring
+
+* **codex:** remove Codex plugin support ([9b0d498](https://github.com/INNERJOINT/Granada/commit/9b0d498bdf6ca38cfb8acdcb37c32bf0dd7abc12))
+
 ## [3.0.1](https://github.com/INNERJOINT/Granada/compare/v3.0.0...v3.0.1) (2026-07-31)
 
 ### Bug Fixes
