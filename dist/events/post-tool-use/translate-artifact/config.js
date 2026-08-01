@@ -73,10 +73,7 @@ function getTargetLanguage(lang) {
     };
     return names[lang] || lang;
 }
-function getDefaultTranslationCommand(env) {
-    if (env.GRANADA_RUNTIME === 'codex') {
-        return 'codex exec --ephemeral --skip-git-repo-check --ignore-user-config --sandbox read-only -c features.hooks=false -';
-    }
+function getDefaultTranslationCommand() {
     return 'claude -p --model haiku --no-session-persistence';
 }
 export function readTranslationConfig(cwd, { fs, env = {}, pluginRoot, skillPathArg }) {
@@ -96,7 +93,7 @@ export function readTranslationConfig(cwd, { fs, env = {}, pluginRoot, skillPath
     const lang = getTranslationLang(env);
     return {
         dirs,
-        command: env.GRANADA_TRANSLATE_COMMAND || getDefaultTranslationCommand(env),
+        command: env.GRANADA_TRANSLATE_COMMAND || getDefaultTranslationCommand(),
         timeoutMs: Number.parseInt(metadata['translate-timeout-ms'] || env.TRANSLATE_MD_ZH_TIMEOUT_MS || '300000', 10),
         lang,
         targetLanguage: getTargetLanguage(lang),

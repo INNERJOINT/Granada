@@ -13,21 +13,15 @@
     "url": "git+https://github.com/INNERJOINT/Granada.git"
   },
   "scripts": {
-    "build": "npm run build:hooks && npm run sync:codex-plugin",
+    "build": "npm run build:hooks",
     "typecheck:hooks": "tsc -p tsconfig.json --noEmit",
     "build:hooks": "tsc -p tsconfig.json",
-    "sync:codex": "node scripts/sync-codex-plugin.mjs",
-    "sync:codex-plugin": "node scripts/sync-codex-plugin.mjs --plugin-only",
-    "verify:codex": "node scripts/sync-codex-plugin.mjs --check",
-    "verify:codex-plugin": "node scripts/sync-codex-plugin.mjs --check --plugin-only",
-    "verify:codex-package": "node scripts/verify-codex-package.mjs",
     "verify:hooks-package": "node scripts/verify-hooks-package.js",
-    "test": "npm run build && npm run verify:codex && vitest run",
+    "test": "npm run build && vitest run",
     "test:watch": "vitest",
-    "prepack": "npm run build && npm run verify:codex-plugin"
+    "prepack": "npm run build"
   },
   "files": [
-    ".agents/plugins/marketplace.json",
     ".claude-plugin/",
     ".mcp.json",
     "AGENTS.md",
@@ -41,7 +35,6 @@
     "dist/",
     "hooks/",
     "output-styles/",
-    "plugins/zaku/",
     "scripts/hooks/",
     "skills/",
     "!skills/**/.omc/**"

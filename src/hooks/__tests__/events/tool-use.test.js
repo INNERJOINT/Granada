@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
-import { closeSync, copyFileSync, lstatSync, mkdtempSync, mkdirSync, openSync, readdirSync, readFileSync, writeFileSync, existsSync, renameSync, rmSync, rmdirSync, statSync, unlinkSync } from 'node:fs';
+import { closeSync, copyFileSync, lstatSync, mkdtempSync, mkdirSync, openSync, readdirSync, readFileSync, writeFileSync, existsSync, renameSync, rmSync, rmdirSync, statSync, unlinkSync, utimesSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { PassThrough } from 'node:stream';
@@ -121,16 +121,6 @@ describe('aosp-feature-export translation hook', () => {
     const config = readTranslationConfig(cwd, translationDeps(cwd));
 
     expect(config.command).toBe('claude -p --model haiku --no-session-persistence');
-  });
-
-  it('uses an isolated non-persistent Codex command for Codex hooks', async () => {
-    const cwd = makeProject();
-    const configUrl = pathToFileURL(resolve(import.meta.dirname, '../../../../dist/events/post-tool-use/translate-artifact/config.js')).href;
-    const { readTranslationConfig } = await import(configUrl);
-
-    const config = readTranslationConfig(cwd, translationDeps(cwd, { GRANADA_RUNTIME: 'codex' }));
-
-    expect(config.command).toBe('codex exec --ephemeral --skip-git-repo-check --ignore-user-config --sandbox read-only -c features.hooks=false -');
   });
 
   it('loads default translation config from the plugin root', async () => {
@@ -437,7 +427,9 @@ describe('aosp-feature-export translation hook', () => {
     const cwd = makeProject();
     const exportsDir = join(cwd, '.granada', 'aosp-exports');
     const source = join(exportsDir, 'feature.md');
+    const fixedMtime = new Date('2026-06-02T03:00:00.000Z');
     writeFileSync(source, '# English\n\nOld', 'utf8');
+    utimesSync(source, fixedMtime, fixedMtime);
     const { enqueue, drain } = await importQueueAndDrainHooks();
 
     enqueue.handleEnqueueArtifactHook(makeExportInput(cwd, '.granada/aosp-exports/feature.md'), drainDeps(cwd));
@@ -449,6 +441,7 @@ describe('aosp-feature-export translation hook', () => {
     expect(readFileSync(join(exportsDir, '20260602-110405-feature.md'), 'utf8')).toContain('Old');
 
     writeFileSync(source, '# English\n\nNew', 'utf8');
+    utimesSync(source, fixedMtime, fixedMtime);
     enqueue.handleEnqueueArtifactHook({ ...makeExportInput(cwd, '.granada/aosp-exports/feature.md'), tool_name: 'Edit', tool_use_id: 'tu_after_failure' }, drainDeps(cwd));
     const succeeded = await drain.handleDrainArtifactsHook(
       baseInput('Stop', { cwd }),

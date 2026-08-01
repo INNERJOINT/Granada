@@ -769,7 +769,7 @@ On failure, write the classification manifest whenever files exist (even if ever
 </Failure_Modes_To_Avoid>
 
 <Final_Checklist>
-- [ ] JIRA tools use the host-specific plugin namespace
+- [ ] JIRA tools use the Claude Code plugin namespace (`mcp__plugin_zaku_atlassian__*`)
 - [ ] Attachment metadata inspected before the all-attachments download call
 - [ ] Only `.tgz` / `.tar.gz` passed to `log-unboxer unpack`; direct `.txt` / `.log` decoded without it
 - [ ] `log-unboxer` version plus baseline-runtime/installed-filter/archive-canary capability and `bwrap` sandbox probed at most once before first use; no installation or alternative decompressor attempted

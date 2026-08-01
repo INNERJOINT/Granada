@@ -2,8 +2,8 @@
 /**
  * Standalone SourcePilot MCP proxy for the Zaku plugin.
  *
- * This file intentionally uses only Node.js built-ins so the generated Codex
- * plugin remains self-contained after Codex copies it into the plugin cache.
+ * This file intentionally uses only Node.js built-ins so the npm package
+ * remains self-contained when loaded from an isolated package cache.
  */
 'use strict';
 

@@ -13,7 +13,6 @@ export type Spawn = typeof nodeSpawn;
 
 export interface HookInput {
   session_id?: string;
-  turn_id?: string;
   transcript_path?: string;
   cwd?: string;
   hook_event_name?: string;

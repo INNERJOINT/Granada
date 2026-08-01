@@ -72,6 +72,5 @@ Subagent `tools:` frontmatter should grant access via the wildcard `mcp__plugin_
 
 ## Dependencies
 
-- Node.js 20+ (for MCP server)
-- `@modelcontextprotocol/sdk` (MCP server runtime)
+- Node.js 20+ (for the self-contained MCP bridge and lifecycle hooks)
 - Network access to AOSP MCP server (for sourcepilot tool)

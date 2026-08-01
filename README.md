@@ -19,21 +19,21 @@
 
 ---
 
-Mass-production dev weapon for Claude Code and OpenAI Codex — AOSP recon, JIRA elimination, Git ammo supply.
+Mass-production dev weapon for Claude Code — AOSP recon, JIRA elimination, Git ammo supply.
 
-Granada is Zeonic's orbital fortress—where Zaku mobile suits are mass-produced before they sortie into combat. This project ships the same Android platform workflows to Claude Code and Codex: AOSP source search, JIRA-driven root-cause analysis, and Git workflow automation.
+Granada is Zeonic's orbital fortress—where Zaku mobile suits are mass-produced before they sortie into combat. This project ships Android platform workflows to Claude Code: AOSP source search, JIRA-driven root-cause analysis, and Git workflow automation.
 
 ## Installation
 
 Node.js 20 or newer is required for the bundled MCP bridge and lifecycle hooks.
 
-### Claude Code
+Install the published skill workflows:
 
 ```bash
 npx skills add @zeonic/zaku
 ```
 
-This installs the published skill workflows. For the complete local plugin surface, including agents, hooks, and MCP servers, clone the repository and install it as a Claude Code plugin:
+For the complete plugin surface, including agents, hooks, and MCP servers, clone the repository and install it as a Claude Code plugin:
 
 ```bash
 git clone https://github.com/INNERJOINT/Granada.git
@@ -42,36 +42,13 @@ cd Granada && claude plugin install .
 
 Claude Code discovers the repository's canonical `skills/`, `agents/`, `hooks/hooks.json`, and `.mcp.json` surfaces directly.
 
-### Codex
-
-Install Granada as a repository marketplace, then install the lightweight Zaku plugin from that marketplace:
-
-```bash
-git clone https://github.com/INNERJOINT/Granada.git
-cd Granada
-codex plugin marketplace add "$PWD"
-codex plugin add zaku@zeonic-local
-```
-
-Confirm that Codex sees the plugin and its optional MCP servers:
-
-```bash
-codex plugin list --json
-codex mcp list
-```
-
-Start a new Codex thread after installing or updating the plugin so its generated skills, hooks, and MCP configuration are rediscovered. The marketplace intentionally points at `plugins/zaku` instead of the repository root, keeping local Git state, dependencies, and host-specific configuration out of the Codex plugin cache.
-
 ## Invocation
 
-The workflow name is shared across hosts; only the invocation prefix changes:
+Invoke workflows with the `zaku:` plugin namespace:
 
-| Host | Example |
-| --- | --- |
-| Claude Code | `/zaku:aosp-plan "trace the Android boot flow"` |
-| Codex | `$zaku:aosp-plan "trace the Android boot flow"` |
-
-Generated Codex workflows translate Claude-specific delegation and tool notation to Codex-native skills, collaboration tools, and MCP names. Codex keeps `zaku:` as the plugin skill namespace, but uses `$` instead of Claude's `/` prefix.
+```text
+/zaku:aosp-plan "trace the Android boot flow"
+```
 
 ## Features
 
@@ -91,19 +68,17 @@ Generated Codex workflows translate Claude-specific delegation and tool notation
 
 ## Tools
 
-### sourcepilot (MCP)
+### SourcePilot (MCP)
 
-Proxies requests to a remote AOSP MCP server for code search across multiple Android projects. Set `SOURCEPILOT_URL` and, when required, `SOURCEPILOT_KEY` in the environment that starts the host.
+Claude Code connects to a remote AOSP MCP server over HTTP through `.mcp.json`. Set `SOURCEPILOT_URL` and, when required, `SOURCEPILOT_KEY` in the environment that starts Claude Code.
 
-The Codex bundle uses a dependency-free stdio proxy. It mirrors the remote SourcePilot tool definitions dynamically; if the server is not configured or discovery fails, it still exposes a stable fallback schema and returns a clear configuration or connection error when a tool is called.
+For package contexts that need a self-contained launcher, `bridge/mcp-server.cjs` forwards MCP requests to the same HTTP endpoint using only Node.js built-ins. It discovers the remote tool schema when available and exposes a stable fallback schema when the server is not configured or discovery fails.
 
-MCP tool namespaces differ by host:
-
-| Server | Claude Code | Codex | Environment |
-| --- | --- | --- | --- |
-| SourcePilot | `mcp__plugin_zaku_sourcepilot__*` | `mcp__sourcepilot__*` | `SOURCEPILOT_URL`, `SOURCEPILOT_KEY` |
-| Atlassian | `mcp__plugin_zaku_atlassian__*` | `mcp__atlassian__*` | `JIRA_URL`, `JIRA_PERSONAL_TOKEN`, `CONFLUENCE_URL`, `CONFLUENCE_PERSONAL_TOKEN` |
-| GitLab | `mcp__plugin_zaku_gitlab__*` | `mcp__gitlab__*` | `GITLAB_PERSONAL_ACCESS_TOKEN`, `GITLAB_API_URL` |
+| Server | Claude Code namespace | Environment |
+| --- | --- | --- |
+| SourcePilot | `mcp__plugin_zaku_sourcepilot__*` | `SOURCEPILOT_URL`, `SOURCEPILOT_KEY` |
+| Atlassian | `mcp__plugin_zaku_atlassian__*` | `JIRA_URL`, `JIRA_PERSONAL_TOKEN`, `CONFLUENCE_URL`, `CONFLUENCE_PERSONAL_TOKEN` |
+| GitLab | `mcp__plugin_zaku_gitlab__*` | `GITLAB_PERSONAL_ACCESS_TOKEN`, `GITLAB_API_URL` |
 
 The optional Atlassian and GitLab stdio servers also require `uvx` and `npx`, respectively, on `PATH`.
 
@@ -118,13 +93,11 @@ log-unboxer --version
 
 The collector uses extraction-filter checks as defense in depth, then confines every archive/SN operation with Bubblewrap and merges only validated regular files from a private stage. `bwrap` is required for these operations on Linux; when unavailable, the collector fails closed while direct `.txt` / `.log` collection remains usable. Python 3.12.13+ is recommended. The collector deliberately does not install, upgrade, or repair external dependencies. If an old editable pipx installation points to a deleted source checkout, replace it from the upstream URL rather than using `pipx reinstall`, which reuses the original install source and options.
 
-The fallback SourcePilot surface includes `list_projects`, `list_repos`, `search_code`, `search_symbol`, `search_file`, `search_regex`, `get_file_content`, and `resolve_project_by_keyword` under the host-specific namespace above.
+The fallback SourcePilot surface includes `list_projects`, `list_repos`, `search_code`, `search_symbol`, `search_file`, `search_regex`, `get_file_content`, and `resolve_project_by_keyword` under the Claude Code namespace above.
 
 ## Hooks
 
-Both hosts defer processing of Markdown artifacts under `.granada/**`: edit events enqueue the latest source path, and the session `Stop` hook timestamps and optionally translates the final content once. Claude Code uses `scripts/hooks/adapters/claude-entry.cjs`; Codex auto-discovers the generated `plugins/zaku/hooks/hooks.json` and uses `scripts/hooks/adapters/codex-entry.cjs`.
-
-The Codex adapter expands a multi-file `apply_patch` into one queue candidate per added, updated, or moved file; deleted files are ignored. Codex translation runs in an ephemeral read-only child session with hooks disabled to prevent recursion. See [scripts/hooks/README.md](scripts/hooks/README.md) for runtime and environment details.
+Claude Code defers processing of Markdown artifacts under `.granada/**`: `PostToolUse` enqueues the latest eligible source path, and the session `Stop` hook timestamps and optionally translates the final content once. See [scripts/hooks/README.md](scripts/hooks/README.md) for runtime, queue, and environment details.
 
 ## Agents
 
@@ -139,23 +112,7 @@ The Codex adapter expands a multi-file `apply_patch` into one queue candidate pe
 | `aosp-log-parser` | Android log parser (logcat, tombstone, ANR, kernel) |
 | `executor` | Approved multi-repository implementation executor |
 
-Claude Code discovers the canonical Markdown agents under `agents/`. For Codex development in this repository, `npm run sync:codex` generates project-scoped native roles under `.codex/agents/*.toml`. Codex plugins cannot declare custom agents in the current manifest format, so installed workflows carry the generated Markdown role prompts and use generic `spawn_agent` delegation when a matching native role is unavailable.
-
-## Codex compatibility development
-
-Treat the root `skills/`, `agents/`, hooks, bridge, references, and assets as the source of truth. `plugins/zaku/**` and Granada-owned `.codex/agents/*.toml` files are generated; do not edit them by hand.
-
-```bash
-npm run build:hooks          # compile the shared hook runtime
-npm run sync:codex           # regenerate plugins/zaku and .codex/agents
-npm run sync:codex-plugin    # regenerate only plugins/zaku
-npm run verify:codex         # fail when generated Codex surfaces are stale
-npm run verify:codex-package # verify the packed Codex bundle in isolation
-npm run verify:hooks-package # verify the packed hook runtime
-npm test
-```
-
-The detailed skill conversion contract lives in [references/codex-compat.md](references/codex-compat.md).
+Claude Code discovers the canonical Markdown agents under `agents/`.
 
 ## License
 

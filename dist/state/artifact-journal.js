@@ -138,7 +138,8 @@ export function getSourceSnapshot(sourcePath, deps) {
     const fs = ensureFs(deps);
     try {
         const stat = fs.statSync(sourcePath);
-        return { mtimeMs: stat.mtimeMs, size: stat.size };
+        const contentSha256 = crypto.createHash('sha256').update(fs.readFileSync(sourcePath)).digest('hex');
+        return { mtimeMs: stat.mtimeMs, size: stat.size, contentSha256 };
     }
     catch {
         return null;
@@ -148,7 +149,11 @@ export function sourceSnapshotMatches(sourcePath, snapshot, deps) {
     if (!snapshot)
         return false;
     const current = getSourceSnapshot(sourcePath, deps);
-    return !!current && current.mtimeMs === snapshot.mtimeMs && current.size === snapshot.size;
+    if (!current)
+        return false;
+    if (typeof snapshot.contentSha256 === 'string')
+        return current.contentSha256 === snapshot.contentSha256;
+    return current.mtimeMs === snapshot.mtimeMs && current.size === snapshot.size;
 }
 export function cleanupStaleJournal(cwd, deps, options = {}) {
     const fs = ensureFs(deps);

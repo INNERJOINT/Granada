@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { basename, join, resolve } from 'node:path';
+import { basename, join, relative, resolve } from 'node:path';
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
@@ -19,13 +19,45 @@ function parsePackOutput(stdout) {
   const jsonStart = stdout.indexOf('[');
   if (jsonStart < 0) throw new Error(`npm pack did not return JSON:\n${stdout}`);
   const packed = JSON.parse(stdout.slice(jsonStart));
-  if (!Array.isArray(packed) || !packed[0]?.filename) {
-    throw new Error('npm pack did not return a package filename');
+  if (!Array.isArray(packed) || !packed[0]?.filename || !Array.isArray(packed[0]?.files)) {
+    throw new Error('npm pack did not return a package filename and file list');
   }
-  return packed[0].filename;
+  return packed[0];
+}
+
+function listPlainFiles(rootPath, basePath, { skipOmc = false } = {}) {
+  const files = [];
+  function walk(current) {
+    for (const name of readdirSync(current).sort()) {
+      if (skipOmc && name === '.omc') continue;
+      const filePath = join(current, name);
+      const stat = lstatSync(filePath);
+      if (stat.isSymbolicLink()) throw new Error(`package surface must not contain symlinks: ${filePath}`);
+      if (stat.isDirectory()) walk(filePath);
+      else if (stat.isFile()) files.push(relative(basePath, filePath).replaceAll('\\', '/'));
+    }
+  }
+  walk(rootPath);
+  return files;
+}
+
+function assertSafePackageFiles(files) {
+  const forbiddenSegments = new Set(['.git', '.granada', '.omc', '.claude', '.firecrawl', '.codex', '.agents', 'node_modules']);
+  const unsafe = [];
+  for (const file of files) {
+    const normalized = file.replaceAll('\\', '/').replace(/^\.\//, '');
+    const segments = normalized.split('/');
+    const forbiddenSegment = segments.find(segment => forbiddenSegments.has(segment));
+    if (forbiddenSegment) unsafe.push(`${normalized}: contains ${forbiddenSegment}`);
+    else if (segments.some(segment => segment === '.env' || segment.startsWith('.env.'))) unsafe.push(`${normalized}: contains an environment file`);
+    else if (normalized === 'plugins/zaku' || normalized.startsWith('plugins/zaku/')) unsafe.push(`${normalized}: contains the removed generated plugin`);
+    else if (/codex|openai/i.test(normalized)) unsafe.push(`${normalized}: contains a removed host-specific path`);
+  }
+  if (unsafe.length > 0) throw new Error(`npm package contains unsafe files:\n${unsafe.map(entry => `- ${entry}`).join('\n')}`);
 }
 
 const root = resolve(import.meta.dirname, '..');
+const packageLock = JSON.parse(readFileSync(join(root, 'package-lock.json'), 'utf8'));
 const tempRoot = mkdtempSync(join(tmpdir(), 'granada-hooks-package-'));
 const packDir = join(tempRoot, 'pack');
 const extractDir = join(tempRoot, 'extract');
@@ -45,16 +77,112 @@ const packResult = run('npm', ['pack', '--json', '--pack-destination', packDir],
     npm_config_update_notifier: 'false',
   },
 });
-const tarball = join(packDir, basename(parsePackOutput(packResult.stdout)));
+const packed = parsePackOutput(packResult.stdout);
+const packedFiles = packed.files.map(file => file.path.replaceAll('\\', '/'));
+const canonicalRoots = ['.claude-plugin', 'agents', 'assets', 'bridge', 'dist', 'hooks', 'output-styles', 'scripts/hooks', 'skills'];
+const requiredPackedFiles = [
+  'package.json',
+  'README.md',
+  'AGENTS.md',
+  'CLAUDE.md',
+  'CHANGELOG.md',
+  'LICENSE',
+  '.mcp.json',
+  ...canonicalRoots.flatMap(path => listPlainFiles(join(root, path), root, { skipOmc: true })),
+];
+const packedFileSet = new Set(packedFiles);
+const missingPackedFiles = requiredPackedFiles.filter(path => !packedFileSet.has(path));
+if (missingPackedFiles.length > 0) {
+  throw new Error(`npm package is missing required files:\n${missingPackedFiles.map(path => `- ${path}`).join('\n')}`);
+}
+assertSafePackageFiles(packedFiles);
+
+const tarball = join(packDir, basename(packed.filename));
 run('tar', ['-xzf', tarball, '-C', extractDir]);
 
 const packageRoot = join(extractDir, 'package');
+const extractedFiles = listPlainFiles(packageRoot, packageRoot).sort();
+const reportedFiles = [...packedFiles].sort();
+if (JSON.stringify(extractedFiles) !== JSON.stringify(reportedFiles)) {
+  throw new Error('extracted package file set does not match npm pack output');
+}
+assertSafePackageFiles(extractedFiles);
+const packageJsonPath = join(packageRoot, 'package.json');
+const pluginManifestPath = join(packageRoot, '.claude-plugin', 'plugin.json');
+const marketplacePath = join(packageRoot, '.claude-plugin', 'marketplace.json');
+const mcpConfigPath = join(packageRoot, '.mcp.json');
 const manifestPath = join(packageRoot, 'hooks', 'hooks.json');
 const adapterPath = join(packageRoot, 'scripts', 'hooks', 'adapters', 'claude-entry.cjs');
 const distEntryPath = join(packageRoot, 'dist', 'adapters', 'claude-entry.js');
+const bridgePath = join(packageRoot, 'bridge', 'mcp-server.cjs');
 
-for (const requiredPath of [manifestPath, adapterPath, distEntryPath]) {
+for (const requiredPath of [
+  packageJsonPath,
+  pluginManifestPath,
+  marketplacePath,
+  mcpConfigPath,
+  manifestPath,
+  adapterPath,
+  distEntryPath,
+  bridgePath,
+]) {
   if (!existsSync(requiredPath)) throw new Error(`packed artifact missing ${requiredPath}`);
+}
+
+const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8'));
+const pluginManifest = JSON.parse(readFileSync(pluginManifestPath, 'utf8'));
+const marketplace = JSON.parse(readFileSync(marketplacePath, 'utf8'));
+const marketplacePlugin = marketplace.plugins?.find(plugin => plugin.name === 'zaku');
+const versions = [
+  ['package-lock.json', packageLock.version],
+  ['package-lock.json root package', packageLock.packages?.['']?.version],
+  ['.claude-plugin/plugin.json', pluginManifest.version],
+  ['.claude-plugin/marketplace.json', marketplace.version],
+  ['.claude-plugin/marketplace.json zaku plugin', marketplacePlugin?.version],
+];
+for (const [label, version] of versions) {
+  if (version !== packageJson.version) {
+    throw new Error(`${label} version ${version} does not match package version ${packageJson.version}`);
+  }
+}
+if (pluginManifest.mcpServers !== './.mcp.json') {
+  throw new Error(`Claude plugin MCP manifest path changed: ${pluginManifest.mcpServers}`);
+}
+if (packageJson.main !== 'bridge/mcp-server.cjs') {
+  throw new Error(`packed package main changed: ${packageJson.main}`);
+}
+
+const bridgeSource = readFileSync(bridgePath, 'utf8');
+if (bridgeSource.includes('@modelcontextprotocol/sdk')) {
+  throw new Error('packed bridge must remain self-contained without @modelcontextprotocol/sdk');
+}
+const bridgeInput = [
+  JSON.stringify({
+    jsonrpc: '2.0',
+    id: 1,
+    method: 'initialize',
+    params: { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'verify', version: '1' } },
+  }),
+  JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} }),
+  '',
+].join('\n');
+const bridgeRun = run(process.execPath, [bridgePath], {
+  cwd: packageRoot,
+  input: bridgeInput,
+  env: { ...process.env, SOURCEPILOT_URL: '', SOURCEPILOT_KEY: '' },
+});
+const bridgeResponses = bridgeRun.stdout
+  .split(/\r?\n/)
+  .filter(Boolean)
+  .map(line => JSON.parse(line));
+const initialized = bridgeResponses.find(response => response.id === 1);
+const listed = bridgeResponses.find(response => response.id === 2);
+if (initialized?.result?.serverInfo?.name !== 'zaku-sourcepilot') {
+  throw new Error(`packed bridge initialization failed: ${bridgeRun.stdout}`);
+}
+const toolNames = listed?.result?.tools?.map(tool => tool.name) || [];
+for (const requiredTool of ['list_projects', 'search_code', 'get_file_content']) {
+  if (!toolNames.includes(requiredTool)) throw new Error(`packed bridge missing fallback tool: ${requiredTool}`);
 }
 
 const adapterSource = readFileSync(adapterPath, 'utf8');
@@ -235,4 +363,4 @@ if (existsSync(join(projectDir, '.granada', 'aosp-exports', 'failure_zh.md'))) {
   throw new Error('packed translate hook wrote zh sibling after unsafe command rejection');
 }
 
-console.log(`verified packed hook runtime: ${tarball}`);
+console.log(`verified packed hook runtime and bridge: ${tarball}`);

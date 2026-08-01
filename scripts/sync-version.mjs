@@ -18,8 +18,6 @@ const targets = [
   { path: '.claude-plugin/plugin.json', jsonpath: ['version'] },
   { path: '.claude-plugin/marketplace.json', jsonpath: ['version'] },
   { path: '.claude-plugin/marketplace.json', jsonpath: ['plugins', 0, 'version'] },
-  { path: 'plugins/zaku/.codex-plugin/plugin.json', jsonpath: ['version'] },
-  { path: 'plugins/zaku/package.json', jsonpath: ['version'] },
 ];
 
 for (const { path, jsonpath } of targets) {
@@ -36,10 +34,3 @@ for (const { path, jsonpath } of targets) {
   writeFileSync(absolutePath, JSON.stringify(content, null, 2) + '\n');
   console.log(`Updated ${path} → ${version}`);
 }
-
-const marketplace = JSON.parse(readFileSync(join(root, '.agents/plugins/marketplace.json'), 'utf8'));
-const zaku = marketplace.plugins?.find(plugin => plugin.name === 'zaku');
-if (zaku?.source?.source !== 'local' || zaku?.source?.path !== './plugins/zaku') {
-  throw new Error('Codex marketplace does not point zaku at ./plugins/zaku');
-}
-console.log('Validated .agents/plugins/marketplace.json → ./plugins/zaku');

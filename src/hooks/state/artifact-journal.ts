@@ -28,6 +28,7 @@ export type ArtifactJournalRecord = {
 export type SourceSnapshot = {
   mtimeMs: number;
   size: number;
+  contentSha256?: string;
 };
 
 export type ArtifactFailureEntry = {
@@ -174,7 +175,8 @@ export function getSourceSnapshot(sourcePath: string, deps: HookDeps): SourceSna
   const fs = ensureFs(deps);
   try {
     const stat = fs.statSync(sourcePath);
-    return { mtimeMs: stat.mtimeMs, size: stat.size };
+    const contentSha256 = crypto.createHash('sha256').update(fs.readFileSync(sourcePath)).digest('hex');
+    return { mtimeMs: stat.mtimeMs, size: stat.size, contentSha256 };
   } catch {
     return null;
   }
@@ -183,7 +185,9 @@ export function getSourceSnapshot(sourcePath: string, deps: HookDeps): SourceSna
 export function sourceSnapshotMatches(sourcePath: string, snapshot: SourceSnapshot | undefined, deps: HookDeps): boolean {
   if (!snapshot) return false;
   const current = getSourceSnapshot(sourcePath, deps);
-  return !!current && current.mtimeMs === snapshot.mtimeMs && current.size === snapshot.size;
+  if (!current) return false;
+  if (typeof snapshot.contentSha256 === 'string') return current.contentSha256 === snapshot.contentSha256;
+  return current.mtimeMs === snapshot.mtimeMs && current.size === snapshot.size;
 }
 
 export function cleanupStaleJournal(cwd: string, deps: HookDeps, options: ArtifactJournalOptions = {}): void {
